@@ -16623,11 +16623,11 @@ ObjectsManager_Init:
 		move.l	a0,a1
 		adda.w	(a0,d0.w),a0
 		; Initialize each object load address with the first object in the layout
-		move.l	a0,($FFFFF770).w
-		move.l	a0,($FFFFF774).w
-		move.l	a0,($FFFFF778).w
-		move.l	a0,($FFFFF77C).w
-		lea	($FFFFFC00).w,a2
+		move.l	a0,(Obj_load_addr_right).w
+		move.l	a0,(Obj_load_addr_left).w
+		move.l	a0,(Obj_load_addr_right_P2).w
+		move.l	a0,(Obj_load_addr_left_P2).w
+		lea	(Object_Respawn_Table).w,a2
 		move.w	#$0101,(a2)+	; the first two bytes are not used as respawn values
 		; Instead, they are used to keep track of the current respawn indexes
 
