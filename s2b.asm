@@ -55,7 +55,7 @@ SonicDriverVer = 2
 ; start of ROM
 
 StartOfRom:
-Vectors:	dc.l    System_Stack, EntryPoint, BusError, AddressError  
+Vectors:	dc.l    System_Stack, EntryPoint, BusError, AddressError
 		dc.l    IllegalInstr, ZeroDivide, ChkInstr, TrapvInstr
 		dc.l    PrivilegeViol, Trace, Line1010Emu, Line1111Emu
 		dc.l    ErrorExcept, ErrorExcept, ErrorExcept, ErrorExcept
@@ -199,7 +199,7 @@ ChecksumLoop:
 		nop
 		nop
 		lea	(CrossResetRAM).w,a6
-		moveq	#0,d7 
+		moveq	#0,d7
 		move.w	#bytesToLcnt(CrossResetRAM_End-CrossResetRAM),d6
 ; loc_34E:
 GameClrStack:
@@ -210,12 +210,12 @@ GameClrStack:
 		move.b	d0,(Graphics_Flags).w
 		move.l	#'init',(Checksum_fourcc).w
 ; loc_36A:
-GameInit:              
-		lea	(RAM_Start&$FFFFFF).l,a6 
-		moveq	#0,d7 
+GameInit:
+		lea	(RAM_Start&$FFFFFF).l,a6
+		moveq	#0,d7
 		move.w	#bytesToLcnt(CrossResetRAM-RAM_Start),d6
-; loc_376: 
-GameClrRAM:		
+; loc_376:
+GameClrRAM:
 		move.l	d7,(a6)+
 		dbf	d6,GameClrRAM
 
@@ -224,7 +224,7 @@ GameClrRAM:
 		bsr.w	JoypadInit
 		; Strangely, this loads the title screen, and not the Sega screen,
 		; and the August 21st prototype suggests this was NOT done by the pirates...
-		move.b	#4,(Game_Mode).w
+;		move.b	#4,(Game_Mode).w
 ; loc_38E:
 MainGameLoop:
 		move.b	(Game_Mode).w,d0
@@ -253,73 +253,91 @@ Checksum_Red:
 Checksum_Loop:
 		bra.s	Checksum_Loop
 ; ===========================================================================
-BusError: ; loc_3CE:
-		move.b  #$02, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMsg_TwoAddresses   ; loc_432
-AddressError: ; loc_3D6:		
-		move.b  #$04, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMsg_TwoAddresses   ; loc_432
-IllegalInstr: ; loc_3DE:		
-		move.b  #$06, (Object_Respawn_Table+$44).w
-		addq.l  #$02, $0002(A7)
-		bra.s   ErrorMessage            ; loc_45A
-ZeroDivide: ; loc_3EA:		
-		move.b  #$08, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMessage            ; loc_45A
-ChkInstr: ; loc_3F2:		
-		move.b  #$0A, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMessage            ; loc_45A
-TrapvInstr: ; loc_3FA:		
-		move.b  #$0C, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMessage            ; loc_45A             
-PrivilegeViol: ; loc_402:
-		move.b  #$0E, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMessage            ; loc_45A  
-Trace: ; loc_40A:
-		move.b  #$10, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMessage            ; loc_45A 
-Line1010Emu: ; loc_412:
-		move.b  #$12, (Object_Respawn_Table+$44).w
-		addq.l  #$02, $0002(A7)
-		bra.s   ErrorMessage            ; loc_45A
-Line1111Emu: ; loc_41E:
-		move.b  #$14, (Object_Respawn_Table+$44).w
-		addq.l  #$02, $0002(A7)
-		bra.s   ErrorMessage            ; loc_45A 
-ErrorExcept: ; loc_42A:
-		move.b  #$00, (Object_Respawn_Table+$44).w
-		bra.s   ErrorMessage            ; loc_45A 
-ErrorMsg_TwoAddresses: ; loc_432: 
-		move    #$2700, SR
-		addq.w  #$02, A7
-		move.l  (A7)+, (Object_Respawn_Table+$40).w
-		addq.w  #$02, A7
-		movem.l D0-A7, (Object_Respawn_Table).w
-		bsr.w     ShowErrorMsg            ; loc_480
-		move.l  $0002(A7), D0
-		bsr.w     ShowErrAddress          ; loc_5B2
-		move.l  (Object_Respawn_Table+$40).w, D0
-		bsr.w     ShowErrAddress          ; loc_5B2
-		bra.s   ErrorMsg_Wait           ; loc_470		  
-ErrorMessage: ; loc_45A:
-		move    #$2700, SR
-		movem.l D0-A7, (Object_Respawn_Table).w
-		bsr.w     ShowErrorMsg            ; loc_480
-		move.l  $0002(A7), D0
-		bsr.w     ShowErrAddress          ; loc_5B2
-ErrorMsg_Wait: ; loc_470:
-		bsr.w     Error_WaitForC          ; loc_5D8 
-		movem.l (Object_Respawn_Table).w, D0-A7  
-		move    #$2300, SR
-		rte
+
+BusError:
+		move.b	#2,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMsg_TwoAddresses
+
+AddressError:
+		move.b	#4,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMsg_TwoAddresses
+
+IllegalInstr:
+		move.b	#6,(Object_Respawn_Table+$44).w
+		addq.l	#2,2(sp)
+		bra.s	ErrorMessage
+
+ZeroDivide:
+		move.b	#8,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMessage
+
+ChkInstr:
+		move.b	#$A,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMessage
+
+TrapvInstr:
+		move.b	#$C,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMessage
+
+PrivilegeViol:
+		move.b	#$E,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMessage
+
+Trace:
+		move.b	#$10,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMessage
+
+Line1010Emu:
+		move.b	#$12,(Object_Respawn_Table+$44).w
+		addq.l	#2,2(sp)
+		bra.s	ErrorMessage
+
+Line1111Emu:
+		move.b	#$14,(Object_Respawn_Table+$44).w
+		addq.l	#2,2(sp)
+		bra.s	ErrorMessage
+
+ErrorExcept:
+		move.b	#0,(Object_Respawn_Table+$44).w
+		bra.s	ErrorMessage
 ; ===========================================================================
-; loc_480:
+
+ErrorMsg_TwoAddresses:
+		move	#$2700,sr
+		addq.w	#2,sp
+		move.l	(sp)+,(Object_Respawn_Table+$40).w
+		addq.w	#2,sp
+		movem.l	d0-a7,(Object_Respawn_Table).w
+		bsr.w	ShowErrorMsg
+		move.l	2(sp),d0
+		bsr.w	ShowErrAddress
+		move.l	(Object_Respawn_Table+$40).w,d0
+		bsr.w	ShowErrAddress
+		bra.s	ErrorMsg_Wait
+; ===========================================================================
+
+ErrorMessage:
+		move	#$2700,sr
+		movem.l	d0-a7,(Object_Respawn_Table).w
+		bsr.w	ShowErrorMsg
+		move.l	2(sp),d0
+		bsr.w	ShowErrAddress
+
+ErrorMsg_Wait:
+		bsr.w	Error_WaitForC
+		movem.l	(Object_Respawn_Table).w,d0-a7
+		move	#$2300,sr
+		rte
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
 ShowErrorMsg:
 		lea	(VDP_data_port).l,a6
 		move.l	#$78000003,(VDP_control_port).l
 		lea	(Art_Text).l,a0
 		move.w	#$27F,d1
-; loc_49A;
+
 Error_LoadGfx:
 		move.w	(a0)+,(a6)
 		dbf	d1,Error_LoadGfx
@@ -344,7 +362,7 @@ ErrorTextTbl:	dc.w ErrTxt_Except-ErrorTextTbl
 		dc.w ErrTxt_BusError-ErrorTextTbl
 		dc.w ErrTxt_AddressError-ErrorTextTbl
 		dc.w ErrTxt_IllegalInstr-ErrorTextTbl
-		dc.w ErrTxt_ZeroDivide-ErrorTextTbl 
+		dc.w ErrTxt_ZeroDivide-ErrorTextTbl
 		dc.w ErrTxt_ChkInstr-ErrorTextTbl
 		dc.w ErrTxt_TrapvInstr-ErrorTextTbl
 		dc.w ErrTxt_PrivilegeViol-ErrorTextTbl
@@ -363,30 +381,49 @@ ErrTxt_Trace:		dc.b "TRACE              "
 ErrTxt_Line1010Emu:	dc.b "LINE 1010 EMULATOR "
 ErrTxt_Line1111Emu:	dc.b "LINE 1111 EMULATOR "
 		even
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
 
-ShowErrAddress: ; loc_5B2:
-		move.w  #$07CA, (A6)
-		moveq   #$07, D2 
-ShowErrAddress_DigitLoop: ; loc_5B8:		
-		rol.l   #$04, D0
-		bsr.s   ShowErrDigit            ; loc_5C2
-		dbf    D2, ShowErrAddress_DigitLoop ; loc_5B8
+
+ShowErrAddress:
+		move.w	#$7CA,(a6)
+		moveq	#7,d2
+
+ShowErrAddress_DigitLoop:
+		rol.l	#4,d0
+		bsr.s	ShowErrDigit
+		dbf	d2,ShowErrAddress_DigitLoop
 		rts
-ShowErrDigit: ; loc_5C2:   
-		move.w  D0, D1
-		andi.w  #$000F, D1
-		cmpi.w  #$000A, D1
-		bcs.s   ShowErrDigit_NoOverflow ; loc_5D0
-		addq.w  #$07, D1
-ShowErrDigit_NoOverflow: ; loc_5D0:		
-		addi.w  #$07C0, D1 
-		move.w  D1, (A6)
+; End of function ShowErrAddress
+
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+ShowErrDigit:
+		move.w	d0,d1
+		andi.w	#$F,d1
+		cmpi.w	#$A,d1
+		bcs.s	ShowErrDigit_NoOverflow
+		addq.w	#7,d1
+
+ShowErrDigit_NoOverflow:
+		addi.w	#$7C0,d1
+		move.w	d1,(a6)
 		rts
-Error_WaitForC: ; loc_5D8:
-		bsr.w     ReadJoypads             ; loc_132C
-		cmpi.b  #$20, (Ctrl_1_Press).w
-		bne.w     Error_WaitForC          ; loc_5D8
-		rts 
+; End of function ShowErrDigit
+
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+Error_WaitForC:
+		bsr.w	ReadJoypads
+		cmpi.b	#$20,(Ctrl_1_Press).w
+		bne.w	Error_WaitForC
+		rts
+; End of function Error_WaitForC
+
+; ===========================================================================
 Art_Text:	BINCLUDE	"data\sprites\art_menu.dat"
 		even
 ; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -408,7 +445,7 @@ loc_B14:
 		beq.s	loc_B42
 		move.w	#$700,d0
 
-loc_B3E: 
+loc_B3E:
 		dbf	d0,loc_B3E
 
 loc_B42:
@@ -33638,7 +33675,7 @@ loc_1C862:
 		move.w  $000C(A0), D3
 		bset    #$07, $0022(A0)
 		bra.s   loc_1C884
-loc_1C87E:		
+loc_1C87E:
 		bsr.w     J_SingleObjLoad2_07  ; loc_1CBB8
 		bne.s   loc_1C8DE
 loc_1C884:
@@ -34213,7 +34250,7 @@ loc_1D12E:
 loc_1D142:
 		move.w  $0034(A0), D0
 		bra.w     loc_1D202
-loc_1D14A:		  
+loc_1D14A:
 		dc.w    loc_1D14E-loc_1D14A
 		dc.w    loc_1D19E-loc_1D14A
 loc_1D14E:
@@ -34263,7 +34300,7 @@ loc_1D1BC:
 		dc.l    $F0076040, $6020FFD0, $F00F6048, $6024FFE0
 		dc.l    $F00F6048, $60240000, $F00F6048, $60240020		
 ;=============================================================================== 
-; Object 0x76 - Dust Hill - Platform with spikes on sides 
+; Object 0x76 - Dust Hill - Platform with spikes on sides
 ; [ End ]		         
 ;===============================================================================		   
 		nop		             ; Filler
@@ -34838,7 +34875,7 @@ loc_1D8EC:
 		move.b  #$0F, $003F(A1)
 loc_1D8FE:
 		move.w  #$00CC, D0
-		jmp     (PlaySound).l             ; loc_14C6    
+		jmp     (PlaySound).l             ; loc_14C6
 loc_1D908:
 		dc.w    loc_1D910-loc_1D908
 		dc.w    loc_1D913-loc_1D908
@@ -34888,7 +34925,7 @@ loc_1D97C:
 ;=============================================================================== 
 ; Object 0x4D - Hidden Palace - Rhinobot 
 ; [ Begin ]		         
-;===============================================================================		      
+;===============================================================================
 Obj_0x4D_Rhinobot: ; loc_1D984:
 		moveq   #$00, D0
 		move.b  $0024(A0), D0
@@ -35238,7 +35275,7 @@ J_SpeedToPos_0B: ; loc_1DEA4:
 ;=============================================================================== 
 ; Object 0x4F - Hidden Palace - Dinobot 
 ; [ Begin ]		         
-;===============================================================================		 
+;===============================================================================
 Obj_0x4F_Dinobot: ; loc_1DEAC:               
 		moveq   #$00, D0
 		move.b  $0024(A0), D0
@@ -35288,7 +35325,7 @@ loc_1DF46:
 		bclr    #$07, $02(A2, D0)
 loc_1DF58:
 		bra.w     J_DeleteObject_22       ; loc_1DFF6
-loc_1DF5C:               
+loc_1DF5C:
 		ori.b   #$28, D4
 		subq.w  #$01, $0030(A0)
 		bpl.s   loc_1DF82
@@ -35338,7 +35375,7 @@ J_DeleteObject_22: ; loc_1DFF6:
 J_AnimateSprite_07: ; loc_1DFFC:
 		jmp     AnimateSprite           ; loc_D412
 J_ObjectFall_02: ; loc_1E002:
-		jmp     ObjectFall              ; loc_D24E  
+		jmp     ObjectFall              ; loc_D24E
 J_SpeedToPos_0C: ; loc_1E008:
 		jmp     SpeedToPos              ; loc_D27A  
 		dc.w    $0000		   ; Filler 
@@ -36838,7 +36875,7 @@ JmpTo17_SpeedToPos:
 		jmp	(SpeedToPos).l
 ;=============================================================================== 
 ; Object 0x54 - Green Hill - Motobug
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================  
 Obj_0x54_Motobug: ; loc_1F6E8:		 
 		moveq   #$00, D0
@@ -37213,7 +37250,7 @@ loc_1FBF0:
 ;=============================================================================== 
 ; Object 0x58 - 
 ; [ Begin ]		         
-;===============================================================================  
+;===============================================================================
 Obj_0x58: ; loc_1FC0A:
 		moveq   #$00, D0
 		move.b  $0024(A0), D0
@@ -37913,7 +37950,7 @@ loc_206AE:
 loc_206B2:
 		dc.b    $0F, $00, $FF
 loc_206B5:
-		dc.b    $07, $01, $02, $FF, $00 
+		dc.b    $07, $01, $02, $FF, $00
 Ghz_Boss_Mappings:		 
 loc_206BA:
 		dc.w    loc_206C0-loc_206BA
@@ -38363,7 +38400,7 @@ loc_21312:
 		move.w  #$03E8, D0
 		move.w  #$000A, $003E(A1)
 loc_2132C:
-		bsr.w     AddPoints               ; loc_22FD0		
+		bsr.w     AddPoints               ; loc_22FD0
 		_move.b  #$27, 0(A1)
 		move.b  #$00, $0024(A1)
 		tst.w   $0012(A0)
@@ -38788,7 +38825,7 @@ loc_218A2:
 		dbf    D7, loc_21894
 		rts 
 ;===============================================================================		
-S1SS_AniIndex: ; loc_218AA: 
+S1SS_AniIndex: ; loc_218AA:
 		dc.l    loc_218C2
 		dc.l    loc_218F2
 		dc.l    loc_21928
@@ -39013,7 +39050,7 @@ loc_21AF2:
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
 		dc.w    $2142  
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w    $2142  
+		dc.w    $2142
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
 		dc.w    $2142  
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
@@ -39138,7 +39175,7 @@ loc_21AF2:
 		dc.w    $25F0
 		dc.l    SS_Red_White_Ball_Mappings ; loc_21CDA 
 		dc.w    $45F0     
-SS_Reverse_Goal_Mappings: ; loc_21CC6:   
+SS_Reverse_Goal_Mappings: ; loc_21CC6:
 		dc.w    loc_21CCC-SS_Reverse_Goal_Mappings
 		dc.w    loc_21CD2-SS_Reverse_Goal_Mappings
 		dc.w    loc_21CD8-SS_Reverse_Goal_Mappings
@@ -39363,7 +39400,7 @@ loc_21EE2:
 ;=============================================================================== 
 ; Sub Routine SonicInSS_MoveRight
 ; [ Begin ]		         
-;===============================================================================		 
+;===============================================================================
 SonicInSS_MoveRight: ; loc_21EE8:
 		bclr    #$00, $0022(A0)
 		move.w  $0014(A0), D0
@@ -39388,7 +39425,7 @@ loc_21F14:
 ; [ End ]		         
 ;===============================================================================
 		 
-;=============================================================================== 
+;===============================================================================
 ; Sub Routine SonicInSS_Jump
 ; [ Begin ]		         
 ;===============================================================================		 
@@ -39438,7 +39475,7 @@ SonicInSS_Null: ; loc_21F5A:
 loc_21F74:
 		rts
 		
-;=============================================================================== 
+;===============================================================================
 ; Sub Routine S1SS_FixCamera
 ; [ Begin ]		         
 ;===============================================================================  
@@ -39858,12 +39895,12 @@ loc_223E0:
 ; Object 0x10
 ; [ Begin ]		         
 ;===============================================================================				 
-Obj_0x10: 
+Obj_0x10:
 loc_223E2:
 		rts   
 ;=============================================================================== 
 ; Object 0x10
-; [ End ]		         
+; [ End ]
 ;===============================================================================		 
 J_Adjust2PArtPointer_26: ; loc_223E4:				
 		jmp     Adjust2PArtPointer     ; (loc_DC30)
@@ -40038,7 +40075,7 @@ loc_22614:
 		bra.w     loc_22634		            
 Dynamic_Normal: ; loc_22630:
 		lea     (Anim_Counters).w, A3
-loc_22634:		
+loc_22634:
 		move.w  (A2)+, D6
 loc_22636:
 		subq.b  #$01, (A3)
@@ -40088,7 +40125,7 @@ loc_22698: ; Green Hill Dynamic Reload Sprites
 		dc.w    $72C0		   ; VRam
 		dc.w    $0802		   ; Frames/Tiles
 		dc.w    $027F, $000B, $020B, $000B, $0205, $0005, $0205, $0005 ; Frame Load/Frame Time
-		dc.l    ($07<<$18)|ArtUnc_Flowers3 ; loc_28100  
+		dc.l    ($07<<$18)|ArtUnc_Flowers3 ; loc_28100
 		dc.w    $7300		   ; VRam
 		dc.w    $0202		   ; Frames/Tiles
 		dc.w    $0002		   ; Frame Load/Frame Time
@@ -41382,7 +41419,7 @@ Debug_HTz: ; loc_23FAE:  ; Hill Top
 		dc.l    ($41<<$18)|Spring_Mappings             ; loc_EF70
 		dc.b    $90, $03, $04, $70		  
 		dc.l    ($41<<$18)|Spring_Mappings             ; loc_EF70
-		dc.b    $A0, $06, $04, $5C		     
+		dc.b    $A0, $06, $04, $5C
 		dc.l    ($41<<$18)|Spring_Mappings             ; loc_EF70
 		dc.b    $30, $07, $04, $3C		    
 		dc.l    ($41<<$18)|Spring_Mappings             ; loc_EF70
@@ -41745,7 +41782,7 @@ PlrList_Std2:	plrlistheader
 PlrList_Std2_End:
 
 loc_244AE:   
-Standard_Sprites_3:           
+Standard_Sprites_3:
 		dc.w    (((loc_244C2-loc_244AE-$02)/$06)-$01)
 		dc.l    Explosion               ; loc_7F012
 		dc.w    $B400  
@@ -41778,7 +41815,7 @@ loc_244CA:
 		dc.l    ArtNem_HrzntlSprng       ; loc_78774
 		dc.w    $8E00
 Green_Hill_Sprites_2:		  
-loc_244FC: 
+loc_244FC:
 		dc.w    (((loc_24510-loc_244FC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
 		dc.l    ArtNem_Buzzer       ; loc_7A4BC
 		dc.w    $7CC0 
@@ -41844,7 +41881,7 @@ Metropolis_Sprites_2:
 		dc.w    $A7E0  
 		dc.l    ArtNem_MtzCog            ; loc_752A0
 		dc.w    $ABE0       
-Hill_Top_Sprites_1:   
+Hill_Top_Sprites_1:
 loc_245A2:
 		dc.w    (((loc_245E0-loc_245A2-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
 		dc.l    ArtNem_GHZ    ; loc_81C00
@@ -41910,7 +41947,7 @@ loc_2463A: ; Not all sprites are loaded in to VRam
 		dc.l    ArtNem_Batbot              ; loc_7A6A2
 		dc.w    $6A00  
 		dc.l    Hpz_Rhinobot            ; loc_7AD18 ; Left Over
-		dc.w    $7880 
+		dc.w    $7880
 		dc.l    ArtNem_Redz             ; loc_7B114 
 		dc.w    $A000 
 		dc.l    Hpz_Piranha             ; loc_7B4EA ; Left Over
@@ -41976,7 +42013,7 @@ loc_246E2:
 		dc.l    ArtNem_Spikes		  ; loc_7914E
 		dc.w    $8680
 		dc.l    Dhz_Bridge              ; loc_77614
-		dc.w    $8780  
+		dc.w    $8780
 		dc.l    Diagonal_Spring_1       ; loc_798F4
 		dc.w    $8800  
 		dc.l    ArtNem_VrtclSprng         ; loc_78658
@@ -42009,7 +42046,7 @@ loc_24730:
 		dc.l    Cpz_Metal_Structure     ; loc_77A1C  
 		dc.w    $6E60
 		dc.l    Cpz_Automatic_Door      ; loc_77C66
-		dc.w    $7280 
+		dc.w    $7280
 		dc.l    Cpz_Speed_Booster       ; loc_77942
 		dc.w    $7380
 		dc.l    Cpz_Elevator            ; loc_77684
@@ -42075,7 +42112,7 @@ loc_247DC:
 		dc.w    (((loc_247E4-loc_247DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto		  
 		dc.l    ArtNem_Signpost               ; loc_7931E 
 		dc.w    $8680
-loc_247E4: ; Not all sprites are loaded in to VRam		   
+loc_247E4: ; Not all sprites are loaded in to VRam
 		dc.l    Hidden_Points           ; loc_7FB5C
 		dc.w    $96C0
 		dc.l    Big_Ring_Flash          ; loc_7F9E8
@@ -42108,7 +42145,7 @@ loc_24804: ; Not all sprites are loaded in to VRam
 		dc.w    $8B80   
 		dc.l    ArtNem_HrzntlSprng       ; loc_78774
 		dc.w    $8E00  
-loc_24838:		
+loc_24838:
 		dc.w    (((loc_24840-loc_24838-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto 
 		dc.l    Title_Cards             ; loc_7EA04    
 		dc.w    $B000   
@@ -42174,7 +42211,7 @@ loc_248C2:
 		dc.w    $8B80 
 		dc.l    ArtNem_HrzntlSprng       ; loc_78774
 		dc.w    $8E00 
-Chemical_Plant_Sprites_Previous_Build_1:		  
+Chemical_Plant_Sprites_Previous_Build_1:
 loc_248DC:		 
 		dc.w    (((loc_2491A-loc_248DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
 		dc.l    ArtNem_CPZ-$07E2 ; loc_B1D24
@@ -42207,7 +42244,7 @@ loc_2491A:
 		dc.l    (Diagonal_Spring_1-$0188) ; loc_7976C 
 		dc.w    $8800  
 		dc.l    ArtNem_VrtclSprng         ; loc_78658
-		dc.w    $8B80   
+		dc.w    $8B80
 		dc.l    ArtNem_HrzntlSprng       ; loc_78774
 		dc.w    $8E00   
 Neo_Green_Hill_Sprites_Previous_Build_1:		    
@@ -43406,7 +43443,7 @@ Cnz_1_Foreground:  ; loc_3C4B0:
 Cnz_2_Foreground:  ; loc_3CCB2:          
 		BINCLUDE  "data\cnz\foreact2.dat"
 Cnz_1_Background:  ; loc_3D4B4:
-		BINCLUDE  "data\cnz\backact1.dat" 
+		BINCLUDE  "data\cnz\backact1.dat"
 Cnz_2_Background:  ; loc_3DCB6: 
 		dc.b    $03, $01 ; x / y
 		dc.b    $8B, $8C, $8D, $8E, $8F, $90, $91, $92
@@ -43434,21 +43471,19 @@ Null_Layout_6:     ; loc_40CFC:
 ;=============================================================================== 
 ; Level Object Layout
 ; [ End ]
-;===============================================================================		    
-loc_40D00: ; Big Ring - Left Over from Sonic 1		
+;===============================================================================
+loc_40D00: ; Big Ring - Left Over from Sonic 1
 		BINCLUDE  "data\sprites\bigring.dat"
-loc_41940: ; Neo Green Hill Foreground Act 2 overwrite by Big Ring- Left Over from previous build ???		 
-		BINCLUDE  "data\nghz\fgunused.dat"  
-loc_41B72: ; Neo Green Hill Background Act 1 - Left Over from previous build ???		 
-		BINCLUDE  "data\nghz\backact1.dat"				
-loc_42374: ; Neo Green Hill Background Act 2 - Left Over from previous build ???		 
-		BINCLUDE  "data\nghz\bgunused.dat"  
-loc_42B76: ; Filler for Null Level Layout - Left Over from previous build ???				
-		dc.b    $00, $00, $00, $00				    
-loc_42B7A: ; Another Big Ring - Left Over from Sonic 1  
-		BINCLUDE  "data\sprites\bigring.dat"       
+loc_41940: ; Neo Green Hill Foreground Act 2 overwrite by Big Ring- Left Over from previous build ???
+		BINCLUDE  "data\nghz\fgunused.dat"
+loc_41B72: ; Neo Green Hill Background Act 1 - Left Over from previous build ???
+		BINCLUDE  "data\nghz\backact1.dat"
+loc_42374: ; Neo Green Hill Background Act 2 - Left Over from previous build ???
+		BINCLUDE  "data\nghz\bgunused.dat"
+	org $437BA
+
 Unknow_Pallete_0x0437BA: ; loc_437BA:
-		dc.w    $0000, $0262, $02A4, $04E8, $0000, $0EEE		
+		dc.w    $0000, $0262, $02A4, $04E8, $0000, $0EEE
 Unknow_Data_0x0437C6: ; loc_437C6:
 		dc.b    $20, $00, $00, $2D, $01, $20, $02, $02, $02, $12, $03, $02, $C6, $20, $02, $03
 		dc.b    $0B, $72, $20, $02, $06, $AD, $62, $02, $FF, $DC, $61, $02, $02, $01, $66, $02
@@ -44198,7 +44233,7 @@ CNz_1_Rings_Layout:   ; loc_4896C:
 CNz_2_Rings_Layout:   ; loc_4896E:		
 		dc.w    $FFFF		
 CPz_1_Rings_Layout:   ; loc_48970:               
-		BINCLUDE  "data\cpz\rng_act1.dat"				               
+		BINCLUDE  "data\cpz\rng_act1.dat"
 CPz_2_Rings_Layout:   ; loc_48A3E:		
 		BINCLUDE  "data\cpz\rng_act2.dat"             
 GCz_1_Rings_Layout:   ; loc_48B94:		
@@ -44886,8 +44921,7 @@ Unknow_Data_0x048DB4: ; loc_48DB4:
 		dc.b    $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01
 		dc.b    $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $0B, $08
 		dc.b    $09, $0A, $84, $E9, $00, $0D, $00, $00
-Rock_Splashing: ; loc_4B76C: 
-		BINCLUDE  "data\sprites\rockspsh.dat"				
+	org $4BAAC
 Unknow_Palett_0x04BAAC: ; loc_4BAAC:
 		dc.w    $0000, $0A20, $0666, $0888, $0CAA, $0ECC, $0246, $0008
 		dc.w    $000E, $046A, $068C, $08CE, $0E22, $0E62, $0000, $0EEE
@@ -45621,9 +45655,7 @@ Unknow_Data_0x04BC4C: ; loc_4BC4C:
 		dc.b    $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
 		dc.b    $02, $01, $03, $02, $01, $03, $1E, $1D, $1A, $1E, $01, $06, $07, $01, $06, $07
 		dc.b    $01, $06, $07, $01, $06, $07, $01, $06, $07, $01, $06, $07, $01, $06, $07, $01
-		dc.b    $06, $07, $01, $06, $07, $14, $15, $13, $14, $85, $9E, $00, $00, $10, $CB, $BB		
-Fire_In_Bowl: ; loc_4E86C:
-		BINCLUDE  "data\sprites\firebowl.dat"  
+		dc.b    $06, $07, $01, $06, $07, $14, $15, $13, $14, $85, $9E, $00, $00, $10, $CB, $BB
 Filler_1: ; loc_4EC6C: ; Filler
 		org $4EE00
 Unknow_Data_0x04EE00: ; loc_4EE00:
@@ -45844,11 +45876,11 @@ Unknow_Data_0x04EE00: ; loc_4EE00:
 		dc.b    $10, $10, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00
 		dc.b    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08
 		dc.b    $08, $08, $08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00
-		dc.b    $00, $00, $00, $00, $00, $00, $00, $00		
+		dc.b    $00, $00, $00, $00, $00, $00, $00, $00
 
 ; For whatever reason (presumably due to decompiler weirdness), the rest of the data above is missing,
 ; so this has been placed so all other data lines up with the original ROM
-		align $50000
+	org $50000
 ;---------------------------------------------------------------------------------------
 ; Uncompressed art
 ; Patterns for Sonic  ; ArtUnc_50000:
@@ -45861,7 +45893,7 @@ ArtUnc_Sonic:	BINCLUDE	"art/uncompressed/Sonic's art.bin"
 ;--------------------------------------------------------------------------------------
 MapUnc_Sonic:	BINCLUDE	"mappings/sprite/Sonic.bin"
 Tails_Sprites: ; loc_6254C:
-		BINCLUDE  "data\sprites\tails.dat"              
+		BINCLUDE  "data\sprites\tails.dat"
 ;--------------------------------------------------------------------------------------
 ; Sprite Dynamic Pattern Reloading
 ; Sonic DPLCs   		; MapRUnc_6DA4C: Sonic_Dyn_Script:
@@ -46953,7 +46985,7 @@ loc_70954:
 loc_7095A:
 		dc.w    $0002
 		dc.w    $759C, $35A4
-SegaLogo: ; loc_70960:		
+SegaLogo: ; loc_70960:
 		BINCLUDE  "data\sprites\sega.nem"
 SegaLogo_Mappings: ; loc_70DD0:
 		BINCLUDE  "data\all\sega.eni"
@@ -47118,7 +47150,7 @@ Dhz_Collapsing_Platform: ; loc_772C8:
 Dhz_Vines: ; loc_77472:   
 		BINCLUDE  "data\dhz\vines.nem" 
 Dhz_Vines_1: ; loc_7756A:   
-		BINCLUDE  "data\dhz\vines_1.nem"  
+		BINCLUDE  "data\dhz\vines_1.nem"
 Dhz_Bridge: ; loc_77614:   
 		BINCLUDE  "data\dhz\bridge.nem" 
 Cpz_Elevator: ; loc_77684:      
@@ -47415,7 +47447,7 @@ BM16_CPZ: ; loc_B0F26:
 ArtNem_CPZ: ; loc_B2506: 
 		BINCLUDE  "data\cpz\cpz_8.nem"
 Cpz_Init_Sprites_Dyn_Reload: ; loc_B602E:  
-		BINCLUDE  "data\cpz\init_spr.nem" 
+		BINCLUDE  "data\cpz\init_spr.nem"
 BM128_CPZ: ; loc_B6058:		 
 		BINCLUDE  "data\cpz\cpz_128.kos"		
 		dc.w    $0000, $0000, $0000 ; Filler  
@@ -47437,37 +47469,26 @@ ArtNem_CPZ_Previous_Builder: ; loc_CAA1C:
 		BINCLUDE  "data\sprites\cpz_8.nem"  
 Cpz_Building: ; loc_CDFC6: ;  Left over						        
 		BINCLUDE  "data\sprites\building.nem"   
-BM128_CPZ_Previous_Builder:  ; loc_CE03A:				              
-		BINCLUDE  "data\all\cpz_128.dat"		  
-BM16_NGHZ_Previous_Builder: ; loc_D603A:				            
-		BINCLUDE  "data\all\nghz_16.dat"		              
-ArtNem_NGHZ_Previous_Builder: ; loc_D793A:				            
-		BINCLUDE  "data\nghz\nghz_8.nem"				             
+BM128_CPZ_Previous_Builder:  ; loc_CE03A:
+		BINCLUDE  "data\all\cpz_128.dat"
+BM16_NGHZ_Previous_Builder: ; loc_D603A:
+		BINCLUDE  "data\all\nghz_16.dat"
+ArtNem_NGHZ_Previous_Builder: ; loc_D793A:
+		BINCLUDE  "data\nghz\nghz_8.nem"
 Nghz_Init_Sprites_Dyn_Reload_2: ; loc_DCEEA: ; Waterfalls  ; Left over
-		BINCLUDE  "data\nghz\init_spr.nem"		  
-BM128_NGHZ_Previous_Builder: ; loc_DD04A:				   
+		BINCLUDE  "data\nghz\init_spr.nem"
+BM128_NGHZ_Previous_Builder: ; loc_DD04A:
 		BINCLUDE  "data\all\nghz_128.dat"
-Neo_Green_Hill_8x8_Incomplete_Tiles_Previous_Builder: ; loc_E504A:				   
-		BINCLUDE  "data\sprites\nghz_8.nem"				
+Neo_Green_Hill_8x8_Incomplete_Tiles_Previous_Builder: ; loc_E504A:
+		BINCLUDE  "data\sprites\nghz_8.nem"
 Nghz_Init_Sprites_Dyn_Reload_3: ; loc_E57E6: ; Waterfalls  ; Left over
 		BINCLUDE  "data\nghz\init_spr.nem"
-
-; ===========================================================================
-; Uncompiled Neo Green Hill Zone chunk data; it can be opened in any
-; text editor, but the Japanese at the top won't display correctly
-; loc_E5946: Uncompiled_ASM:
-		BINCLUDE	"Data/all/Uncompiled chunk data for NGHZ.bin"
-
-; ===========================================================================
-; Unused duplicate Sega sound
-Snd_SegaDup:	BINCLUDE	"data\all\sega.snd"
-
+	org $EC000
 ; ===========================================================================
 ; Moving the music and sound effects would cause them to break due to using
 ; hardcoded pointers; I have already have converted the music to ASM, but
 ; the sound effects are still data
 ;
-; $E8000 => Duplicate Sega PCM (same as used version)
 ; $ED000 => DAC samples
 ; $F0000 => Music $98 to $9F
 ; $F1E8C => Sega PCM
@@ -47605,7 +47626,7 @@ SaxDec_IsDictionaryReference:
 ; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
 
 
-SaxDec_GetByte:		
+SaxDec_GetByte:
 		move.b	(a6)+,d0
 		subq.w	#1,d7	; decrement the remaining number of bytes
 		bne.s	+
@@ -47858,7 +47879,7 @@ Sfx_A6: ; loc_FF174:
 		dc.b    $8A, $F1, $01, $01, $80, $05, $7E, $F1, $F2, $00, $EF, $00, $F0, $01, $01, $10
 		dc.b    $FF, $CF, $05, $D7, $25, $F2, $3B, $3C, $30, $39, $31, $DF, $1F, $1F, $DF, $04
 		dc.b    $04, $05, $01, $04, $04, $04, $02, $FF, $1F, $0F, $AF, $29, $0F, $20, $80
-Sfx_A7: ; loc_FF1A3:    
+Sfx_A7: ; loc_FF1A3:
 		dc.b    $B9, $F1, $01, $01, $80, $04, $AD, $F1, $00, $06, $EF, $00, $8F, $07, $80, $02
 		dc.b    $8F, $06, $80, $10, $ED, $F2, $FA, $21, $10, $30, $32, $1F, $1F, $1F, $1F, $05
 		dc.b    $09, $18, $02, $06, $06, $0F, $02, $1F, $4F, $2F, $2F, $0F, $0E, $0E, $80
