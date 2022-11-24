@@ -10277,11 +10277,11 @@ Dhz_Swing_Platforms_Mappings_2: ; loc_8B7A:
 Dhz_Swing_Platforms_Map_04: ; loc_8B80:
 		dc.w    $0002
 		dc.l    $F80D6058, $602CFFE0, $F80D6858, $682C0000
+		even
 ;===============================================================================
 ; Object 0x15 - Swing Platforms - Dust Hill / Oil Ocean
 ; [ End ]
 ;===============================================================================
-		nop
 
 ; NOTE:
 ; It seems like the compiler the developers used (which evidently was for a Macintosh-like environment) automatically generated these "Jump To"s blocks
@@ -14431,8 +14431,8 @@ Obj3B_Main:
 ; Unused sprite mappings
 ; ---------------------------------------------------------------------------
 Obj3B_MapUnc_CD66:	BINCLUDE	"mappings/sprite/obj3B.bin"
+		even
 ; ===========================================================================
-		align 4
 
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
@@ -25568,7 +25568,7 @@ Obj0C_Main:
 loc_14A8E:
 		addq.b	#1,$3D(a0)
 		move.b	d1,d0
-		bsr.w	JmpTo_CalcSine
+		jsr	(CalcSine).l
 		addi.w	#8,d0
 		asr.w	#6,d0
 		subi.w	#$10,d0
@@ -25588,7 +25588,7 @@ loc_14ABC:
 
 
 loc_14AC0:
-		bsr.w	JmpTo_CalcSine
+		jsr	(CalcSine).l
 		addi.w	#8,d1
 		asr.w	#4,d1
 		add.w	$3A(a0),d1
@@ -25606,15 +25606,7 @@ loc_14AD2:
 ; Unused sprite mappings
 ; ---------------------------------------------------------------------------
 Obj0C_MapUnc_14AE6:	BINCLUDE	"mappings/sprite/obj0C.bin"
-
-; ===========================================================================
-		nop
-; loc_14AF4:
-JmpTo_CalcSine:
-		jmp	(CalcSine).l
-
-		align 4
-
+		even
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Object 12 - Emerald from Hidden Palace Zone
@@ -39129,15 +39121,14 @@ loc_21D32:
 		dc.b    $F8, $05, $00, $08, $F8        ; Sonic 1 Mappings Format
 loc_21D38:
 		dc.b    $01
-		dc.b    $F8, $05, $00, $0C, $F8        ; Sonic 1 Mappings Format						       
+		dc.b    $F8, $05, $00, $0C, $F8        ; Sonic 1 Mappings Format
+		even
 ;===============================================================================
 ; Special Stage - Sub-routine
-; [ End ]              
-;===============================================================================  
-		nop		             ; Filler		        
+; [ End ]
 ;=============================================================================== 
 ; Object 0x09 - Sonic In Special Stage
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================		 
 Obj_0x09_Sonic_In_Special_Stage: ; loc_21D40:
 		tst.w   (Debug_placement_mode).w
@@ -47366,9 +47357,8 @@ Nghz_Init_Sprites_Dyn_Reload: ; loc_BF408:  Waterfalls
 		BINCLUDE  "data\nghz\init_spr.nem"  
 BM128_NGHZ: ; loc_BF568:		  
 		BINCLUDE  "data\nghz\nghz_128.kos"		 
-loc_C2138: ; Leftover end of compressed Nghz 128x128 mappings...
-		dc.w    $C00B, $F8C4, $C00B, $5200, $F8C0, $F80E, $00F0, $0000  
-Unknow_Uncompressed_12x128_Map: ; loc_C2148:				            
+
+Unknow_Uncompressed_12x128_Map: ; loc_C2148:
 		BINCLUDE  "data\all\unk_128.dat" 
 BM16_CPZ_Previous_Builder: ; loc_C943C:				            
 		BINCLUDE  "data\all\cpz_16.dat"		 
