@@ -1,13 +1,13 @@
 @ECHO OFF
 
-REM // make sure we can write to the file s2built.bin
-REM // also make a backup to s2built.prev.bin
-IF NOT EXIST s2built.bin goto LABLNOCOPY
-IF EXIST s2built.prev.bin del s2built.prev.bin
-IF EXIST s2built.prev.bin goto LABLNOCOPY
-move /Y s2built.bin s2built.prev.bin > NUL
-IF EXIST s2built.bin goto LABLERROR3
-REM IF EXIST s2built.prev.bin copy /Y s2built.prev.bin s2built.bin
+REM // make sure we can write to the file s2SWbuilt.bin
+REM // also make a backup to s2SWbuilt.prev.bin
+IF NOT EXIST s2SWbuilt.bin goto LABLNOCOPY
+IF EXIST s2SWbuilt.prev.bin del s2SWbuilt.prev.bin
+IF EXIST s2SWbuilt.prev.bin goto LABLNOCOPY
+move /Y s2SWbuilt.bin s2SWbuilt.prev.bin > NUL
+IF EXIST s2SWbuilt.bin goto LABLERROR3
+REM IF EXIST s2SWbuilt.prev.bin copy /Y s2SWbuilt.prev.bin s2SWbuilt.bin
 :LABLNOCOPY
 
 REM // delete some intermediate assembler output just in case
@@ -55,17 +55,17 @@ REM // if there were errors, there won't be any s2b.p output
 IF NOT EXIST s2b.p goto LABLERROR5
 
 REM // combine the assembler output into a rom
-"win32/s2p2bin" %s2p2bin_args% s2b.p s2built.bin s2b.h
+"win32/s2p2bin" %s2p2bin_args% s2b.p s2SWbuilt.bin s2b.h
 
 REM // fix the rom header (checksum)
-IF EXIST s2built.bin "win32/fixheader" s2built.bin
+IF EXIST s2SWbuilt.bin "win32/fixheader" s2SWbuilt.bin
 
 REM // if there were errors/warnings, a log file is produced
 IF EXIST s2.log goto LABLERROR4
 
 
 REM // done -- pause if we seem to have failed, then exit
-IF EXIST s2built.bin exit /b
+IF EXIST s2SWbuilt.bin exit /b
 
 pause
 
@@ -87,7 +87,7 @@ pause
 exit /b
 
 :LABLERROR3
-echo Failed to build because write access to s2built.bin was denied.
+echo Failed to build because write access to s2SWbuilt.bin was denied.
 pause
 
 exit /b
