@@ -523,7 +523,7 @@ ShowErrDigit_NoOverflow:
 
 Error_WaitForC:
 		bsr.w	ReadJoypads
-		cmpi.b	#$20,(Ctrl_1_Press).w
+		cmpi.b	#$20,(Ctrl_1_Held).w
 		bne.w	Error_WaitForC
 		rts
 ; End of function Error_WaitForC
@@ -671,7 +671,7 @@ Vint_PCM:
 		beq.w	return_D28
 		subq.w	#1,(Demo_Time_left).w
 
-return_D28:  
+return_D28:
 		rts
 ; ===========================================================================
 ; loc_D2A: VintSub4:
@@ -687,8 +687,7 @@ return_D3E:
 ; ===========================================================================
 ; loc_D40: VintSub6:
 Vint_Unused6:
-		bsr.w	Do_ControllerPal
-		rts
+		bra.w	Do_ControllerPal
 ; ===========================================================================
 ; loc_D46: VintSub10:
 Vint_Pause:
@@ -1385,7 +1384,7 @@ loc_166E:
 		move.w  D1, D0
 		andi.w  #$000F, D1
 		andi.w  #$00F0, D0
-loc_167C:		  
+loc_167C:
 		lsr.w   #$04, D0
 loc_167E:		 
 		lsl.l   #$04, D4
@@ -1546,7 +1545,7 @@ LoadPLC2:
 		move.w	(a1,d0.w),d0 
 		lea	(a1,d0.w),a1
 		bsr.s	ClearPLC
-		lea	(Plc_Buffer).w,a2 
+		lea	(Plc_Buffer).w,a2
 		move.w	(a1)+,d0
 		bmi.s	loc_1794	; if it's negative, skip the next loop
 
@@ -1751,7 +1750,7 @@ loc_1914:
 		lsr.w   #$04, D1
 		add.w   D1, D1
 		jmp     loc_1970(PC, D1)
-loc_1924:		 
+loc_1924:
 		move.w  A2, (A1)+
 		addq.w  #$01, A2
 		dbf    D2, loc_1924
@@ -1833,7 +1832,7 @@ loc_19B8:
 		btst    D6, D5
 		beq.s   loc_19C6
 		addi.w  #$2000, D3
-loc_19C6:  
+loc_19C6:
 		add.b   D1, D1
 		bcc.s   loc_19D4
 		subq.w  #$01, D6
@@ -1874,7 +1873,7 @@ loc_1A12:
 		beq.s   loc_1A24
 		lsr.w   D7, D1
 		move.w  A5, D0
-		add.w   D0, D0 
+		add.w   D0, D0
 		and.w   loc_1A28-$02(PC, D0), D1
 		add.w   D3, D1
 		move.w  A5, D0
@@ -2161,7 +2160,7 @@ loc_1BF2:
 loc_1BF4:
 		move.b  (A6)+, (A2)+ 
 loc_1BF6:
-		move.b  (A6)+, (A2)+ 
+		move.b  (A6)+, (A2)+
 		move.b  (A6)+, (A2)+
 		move.b  (A6)+, (A2)+
 		cmp.w   A2, D7
@@ -2243,7 +2242,7 @@ loc_1C88:
 		move.w  #$FFFF, D0
 		moveq   #$07, D2
 		rts
-loc_1C90:  
+loc_1C90:
 		move.w  #$0001, D0
 		moveq   #$03, D2
 		rts
@@ -2325,7 +2324,7 @@ loc_1D1E:
 		add.b   D1, D1 
 		bcs.s   loc_1D9A
 		move.l  A2, A6
-		add.b   D1, D1 
+		add.b   D1, D1
 		bcs.s   loc_1D3E
 		move.b  (A1)+, D5 
 		suba.l  D5, A6
@@ -2366,7 +2365,7 @@ loc_1D6A:
 		move.b  (A6)+, (A2)+
 loc_1D6C: 
 		move.b  (A6)+, (A2)+
-loc_1D6E: 
+loc_1D6E:
 		move.b  (A6)+, (A2)+
 		move.b  (A6)+, (A2)+
 		move.b  (A6)+, (A2)+
@@ -2571,7 +2570,7 @@ loc_1EDC:
 loc_1EE2: 
 		move.b  (A6)+, (A2)+ 
 loc_1EE4: 
-		move.b  (A6)+, (A2)+ 
+		move.b  (A6)+, (A2)+
 loc_1EE6: 
 		move.b  (A6)+, (A2)+ 
 		move.b  (A6)+, (A2)+ 
@@ -2653,7 +2652,7 @@ loc_1FA4:
 		move.l  $00(A0, D0), (A1)+
 		move.l  $04(A0, D0), (A1)
 loc_1FB0:		
-		rts  
+		rts
 PalCycle_Mz: ; loc_1FB2: ; $04/$05 - Metropolis Rotating Palette routine
 		subq.w  #$01, (PalCycle_Timer).w    
 		bpl.s   loc_1FE2
@@ -3555,7 +3554,7 @@ loc_34EC:
 		bpl.w     loc_34F8
 		neg.w   D0
 		addi.w  #$0100, D0
-loc_34F8:   
+loc_34F8:
 		movem.l (A7)+, D3-D4
 		rts              
 loc_34FE:  
@@ -3906,7 +3905,7 @@ LevelSelect_PressStart:
 		; The original value was seemingly a hackish way to make the
 		; Special Stages inaccessable, remove the '+1' from here and
 		; from LevelSelect_Order to "access" the remnants
-		cmpi.w	#$7FFF+1,d0
+		cmpi.w	#$7FFF,d0
 		bne.s	LevelSelect_StartZone
 
 ; LevelSelect_SpecialStage:
@@ -3934,7 +3933,7 @@ LevelSelect_Order:
 		dc.w	$E00, $E01		; GCZ
 		dc.w	$F00, $F01		; NGHZ
 		dc.w	$1000, $1001		; DEZ
-		dc.w	$7FFF+1			; SS
+		dc.w	$7FFF			; SS
 		dc.w	0			; Sound Test
 ; ===========================================================================
 ; loc_3B0A: Level_Select_Level:
@@ -5398,19 +5397,20 @@ loc_5260:
 		moveq   #$14, D0
 		bsr.w     RunPLC_ROM              ; loc_18A8
 
-		clearRAM Primary_Collision,Primary_Collision+$2000	; this should be Object_RAM; leftover from Sonic 1
+;		clearRAM Primary_Collision,Primary_Collision+$2000	; this should be Object_RAM; leftover from Sonic 1
+		clearRAM Object_RAM,Object_RAM_End
 		clearRAM Misc_Variables,Misc_Variables_End
 		clearRAM Oscillating_Data,Oscillating_Numbers_End
 		clearRAM Decomp_Buffer,Decomp_Buffer_End
 
 		clr.b   (Water_fullscreen_flag).w
 		clr.w   (Level_Inactive_flag).w
-		moveq	#S1PalID_SpecStg,d0		; loads the wrong palette; should be PalID_SpecStg
+		moveq	#PalID_SpecStg,d0
 		bsr.w     PalLoad1		; loc_28E2
 		jsr     (S1_Special_Stage_Load) ; loc_21A36
 		move.l  #$00000000, (Camera_X_pos).w
 		move.l  #$00000000, (Camera_Y_pos).w
-		move.b  #$09, ($FFFFB000).w
+		move.b  #$09, (Object_RAM).w
 		bsr.w     S1_Pal_Cycle_Special_Stage ; loc_5584
 		clr.w   (SpecialStage_angle).w
 		move.w  #$0040, (SpecialStage_speed).w
@@ -5491,7 +5491,7 @@ loc_53F8:
 		bsr.w     NemDec              ; loc_15FC
 		jsr     (Head_Up_Display_Base)  ; loc_23184
 		move    #$2300, SR
-		moveq	#S1PalID_SpecStg,d0	; same wrong palette
+		moveq	#PalID_SpecStg,d0	; same wrong palette
 		bsr.w     PalLoad2		; loc_28FE
 		moveq   #PLCID_Std1, D0
 		bsr.w     LoadPLC2		; loc_176E
@@ -5775,11 +5775,11 @@ loc_58E5:
 loc_58ED:
 		dc.b    $08, $02, $04, $FF, $02, $03, $08, $FF, $04, $02, $02, $03, $08, $FD, $04, $02
 		dc.b    $02, $03, $02, $FF, $00
+		even
 ;===============================================================================
 ; Special Stage
 ; [ End ]
 ;===============================================================================
-		nop		             ; Filler
 ; ---------------------------------------------------------------------------
 ; Subroutine to load level boundaries and start locations
 ; ---------------------------------------------------------------------------
@@ -13781,7 +13781,8 @@ loc_C030:
 ;=============================================================================== 
 ; Object 0x?? - Special Stage Results Screen
 ; [ Begin ]
-;=============================================================================== 
+;===============================================================================
+Obj_0x7E_SS_Results:
 Special_Stage_Results: ; loc_C068:
 		moveq   #$00, D0
 		move.b  $0024(A0), D0
@@ -13916,6 +13917,7 @@ loc_C1E6:
 ; Object 0x?? - Emeralds From Special Stage Results Screen
 ; [ Begin ]
 ;===============================================================================    
+Obj_0x7F_SS_Emeralds:
 Emeralds: ; loc_C20E:
 		moveq   #$00, D0
 		move.b  $0024(A0), D0
@@ -14789,9 +14791,9 @@ Obj_Index:
 		dc.l    Obj_0x7A_Platform_Horizontal      ; loc_1D594
 		dc.l    Obj_0x7B_Spring_Tubes             ; loc_1D74C
 		dc.l    Obj_Null		          ; loc_D24A ; Object $7C
-		dc.l    Obj_0x7D_Hidden_Bonus             ; loc_13DFC 
-		dc.l    Obj_Null		          ; loc_D24A ; Object $7E
-		dc.l    Obj_Null		          ; loc_D24A ; Object $7F
+		dc.l    Obj_0x7D_Hidden_Bonus             ; loc_13DFC
+		dc.l    Obj_0x7E_SS_Results	          ; loc_D24A ; Object $7E
+		dc.l    Obj_0x7F_SS_Emeralds	          ; loc_D24A ; Object $7F
 		dc.l    Obj_Null		          ; loc_D24A ; Object $80
 		dc.l    Obj_Null		          ; loc_D24A ; Object $81
 		dc.l    Obj_Null		          ; loc_D24A ; Object $82
@@ -24693,13 +24695,13 @@ loc_13EEA:
 		dc.l    $F40E000C, $0006FFF0
 loc_13EF4:
 		dc.w    $0001
-		dc.l    $F40E0018, $000CFFF0   
-;=============================================================================== 
+		dc.l    $F40E0018, $000CFFF0
+		even
+;===============================================================================
 ; Object 0x7D - Hidden Bonus at end of levels - Sonic 1 Leftover
 ; [ End ]
-;===============================================================================      
-		nop		             ; Filler  
-;=============================================================================== 
+;===============================================================================
+;===============================================================================
 ; Object ??? - Unknow Object 0x013F00
 ; [ Begin ]
 ;===============================================================================		  
@@ -24797,11 +24799,11 @@ loc_14036:
 loc_14048:
 		dc.w    $0002
 		dc.l    $F007000E, $0007FFF0, $F007080E, $08070000				  
-;=============================================================================== 
+		even
+;===============================================================================
 ; Object ??? - Unknow Object 0x013F00
 ; [ Begin ]
-;===============================================================================          
-		nop		             ; Filler
+;===============================================================================
 ;=============================================================================== 
 ; Object ??? - Unknow Object 0x01405C
 ; [ Begin ]
@@ -39118,7 +39120,7 @@ loc_21CD2:
 		dc.b    $F4, $0A, $00, $09, $F4        ; Sonic 1 Mappings Format
 loc_21CD8:
 		dc.b    $00
-		dc.b    $00		     ; Filler     
+		even  
 SS_Red_White_Ball_Mappings: ; loc_21CDA:
 		dc.w    loc_21CE2-SS_Red_White_Ball_Mappings
 		dc.w    loc_21CE8-SS_Red_White_Ball_Mappings
@@ -39205,7 +39207,6 @@ loc_21D64:
 		move.b  #$07, $0017(A0)
 		move.l  #MapUnc_Sonic, $0004(A0) ; loc_614C0
 		move.w  #$0780, $0002(A0)
-		bsr.w     J_Adjust2PArtPointer_26 ; loc_223E4
 		move.b  #$04, $0001(A0)
 		move.b  #$00, $0018(A0)
 		move.b  #$02, $001C(A0)
@@ -39833,9 +39834,6 @@ loc_223E2:
 ; Object 0x10
 ; [ End ]
 ;===============================================================================		 
-J_Adjust2PArtPointer_26: ; loc_223E4:				
-		jmp     Adjust2PArtPointer     ; (loc_DC30)
-		dc.w    $0000		   ; Filler
 
 		
 Dynamic_Art_Cues: ; loc_223EC: ; Dynamic reload sprites routine
@@ -43250,7 +43248,8 @@ Neo_Green_Hill_Colision_1: ; loc_316EA:
 		BINCLUDE  "data\nghz\nghzcol1.dat"
 Neo_Green_Hill_Colision_2: ; loc_319EA:		
 		BINCLUDE  "data\nghz\nghzcol2.dat"																				              
-;=============================================================================== 
+		even
+;===============================================================================
 ; 16x16 Colision Index
 ; [ End ]
 ;===============================================================================		  
@@ -43259,18 +43258,24 @@ Neo_Green_Hill_Colision_2: ; loc_319EA:
 ; [ Begin ]
 ;===============================================================================        
 Special_Stage_1: ; loc_31CEA:
-		BINCLUDE  ".\data\ss\stage_1.eni"  
+		BINCLUDE  ".\data\ss\stage_1.eni"
+		even
 Special_Stage_2: ; loc_31F64:
-		BINCLUDE  ".\data\ss\stage_2.eni"  
-Special_Stage_3: ; loc_32376:        
-		BINCLUDE  ".\data\ss\stage_3.eni"  
+		BINCLUDE  ".\data\ss\stage_2.eni"
+		even
+Special_Stage_3: ; loc_32376:
+		BINCLUDE  ".\data\ss\stage_3.eni"
+		even
 Special_Stage_4: ; loc_326D2:
-		BINCLUDE  ".\data\ss\stage_4.eni"  
+		BINCLUDE  ".\data\ss\stage_4.eni"
+		even
 Special_Stage_5: ; loc_32BAC:
-		BINCLUDE  ".\data\ss\stage_5.eni"  
+		BINCLUDE  ".\data\ss\stage_5.eni"
+		even
 Special_Stage_6: ; loc_3305C:
-		BINCLUDE  ".\data\ss\stage_6.eni"						               
-;=============================================================================== 
+		BINCLUDE  ".\data\ss\stage_6.eni"
+		even
+;===============================================================================
 ; Special Stage Layout
 ; [ End ]
 ;===============================================================================  
