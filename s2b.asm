@@ -41782,11 +41782,11 @@ PLCptr_Std2:	offsetTableEntry.w PlrList_Std2
 		offsetTableEntry.w PlrList_Results
 		offsetTableEntry.w PlrList_Results
 		offsetTableEntry.w PlrList_EOL
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
+		offsetTableEntry.w PlrList_EHZB
+		offsetTableEntry.w PlrList_EHZB
+		offsetTableEntry.w PlrList_EHZB
+		offsetTableEntry.w PlrList_EHZB
+		offsetTableEntry.w PlrList_EHZB
 
 ; macro for a pattern load request list header
 ; must be on the same line as a label that has a corresponding _End label later
@@ -42099,82 +42099,24 @@ PlrList_EOL_End:
 		; Not all sprites are loaded in to VRam
 		plreq $04B6, Hidden_Points
 		plreq $0462, Big_Ring_Flash
-Green_Hill_Boss:
-loc_247F0:
-		dc.w    (((loc_24804-loc_247F0-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    Robotnik_Ship           ; loc_7CC9E
-		dc.w    $8C00
-		dc.l    Ghz_Boss_Car            ; loc_7E124
-		dc.w    $9800
-		dc.l    Ghz_Boss_Blades         ; loc_7E910
-		dc.w    $A800
-loc_24804: ; Not all sprites are loaded in to VRam
-		dc.l    Robotnik_Ship           ; loc_7CC9E
-		dc.w    $8000
-		dc.l    Cpz_Boss		; loc_7D3DA   
-		dc.w    $8C00
-		dc.l    Ship_Boost              ; loc_7DFC0 
-		dc.w    $9A00 
-		dc.l    Boss_Smoke              ; loc_7E03E 
-		dc.w    $9B00 
-		dc.l    Ghz_Boss_Car            ; loc_7E124
-		dc.w    $9D00
-		dc.l    Ghz_Boss_Blades         ; loc_7E910
-		dc.w    $AD00		 
-		dc.w    (Diagonal_Spring_1&$FFFF) ; loc_798F4 ; Left over from previous build
-		dc.w    $8800		   
-		dc.l    ArtNem_VrtclSprng         ; loc_78658
-		dc.w    $8B80   
-		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w    $8E00  
-loc_24838:
-		dc.w    (((loc_24840-loc_24838-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto 
-		dc.l    Title_Cards             ; loc_7EA04    
-		dc.w    $B000   
-loc_24840:  
-		dc.w    (((loc_24848-loc_24840-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_Signpost               ; loc_7931E 
-		dc.w    $8680
-loc_24848:     
-		dc.l    Hidden_Points           ; loc_7FB5C
-		dc.w    $96C0
-		dc.l    Big_Ring_Flash          ; loc_7F9E8
-		dc.w    $8C40
-loc_24854:		   
-		dc.w    (((loc_24868-loc_24854-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    Robotnik_Ship           ; loc_7CC9E 
-		dc.w    $8C00
-		dc.l    Ghz_Boss_Car            ; loc_7E124
-		dc.w    $9800
-		dc.l    Ghz_Boss_Blades         ; loc_7E910
-		dc.w    $A800 
-loc_24868:		  
-		dc.l    Robotnik_Ship           ; loc_7CC9E 
-		dc.w    $8000
-		dc.l    Cpz_Boss		; loc_7D3DA   
-		dc.w    $8C00
-		dc.l    Ship_Boost              ; loc_7DFC0 
-		dc.w    $9A00 
-		dc.l    Boss_Smoke              ; loc_7E03E 
-		dc.w    $9B00 
-		dc.l    Ghz_Boss_Car            ; loc_7E124
-		dc.w    $9D00
-		dc.l    Ghz_Boss_Blades         ; loc_7E910
-		dc.w    $AD00
-		dc.w    (Boss_Smoke&$FFFF)      ; loc_7E03E ; Left over from previous build
-		dc.w    $9B00 
-		dc.l    Ghz_Boss_Car            ; loc_7E124
-		dc.w    $9D00
-		dc.l    Ghz_Boss_Blades         ; loc_7E910
-		dc.w    $AD00
-		dc.l    Dhz_Bridge              ; loc_77614
-		dc.w    $8780
-		dc.l    (Diagonal_Spring_1-$0188) ; loc_7976C ; Left over from previous build
-		dc.w    $8800  
-		dc.l    ArtNem_VrtclSprng         ; loc_78658
-		dc.w    $8B80 
-		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w    $8E00 
+
+;---------------------------------------------------------------------------------------
+; Pattern load queue
+; Emerald Hill Boss primary
+;---------------------------------------------------------------------------------------
+PlrList_EHZB:	plrlistheader
+;		plreq $0460, Robotnik_Ship
+;		plreq $04C0, Ghz_Boss_Car
+;		plreq $0540, Ghz_Boss_Blades
+;PlrList_EHZB_End:
+		; Not all sprites are loaded in to VRam
+		plreq $0400, Robotnik_Ship
+		plreq $0460, Cpz_Boss
+		plreq $04D0, Ship_Boost
+		plreq $04D8, Boss_Smoke
+		plreq $04E8, Ghz_Boss_Car
+		plreq $0568, Ghz_Boss_Blades
+PlrList_EHZB_End:
 ;---------------------------------------------------------------------------------------
 ; Uncompressed art
 ; Animated flowers in GHZ and HTZ ; ArtUnc_28000: ArtUnc_28080: ArtUnc_21800: ArtUnc_28180:
@@ -42208,9 +42150,9 @@ ArtUnc_Lava:	BINCLUDE	"art/uncompressed/Lava.bin"
 ArtUnc_MTZAnimBack:	BINCLUDE	"art/uncompressed/Animated section of MTZ background.bin"
 
 Mz_Drills:               ; loc_2A86A:
-		BINCLUDE  "data\mz\drills.dat"				               
+		BINCLUDE  "data\mz\drills.dat"
 HPz_Dyn_Background: ; Unused - Left over from previous build
-		BINCLUDE  "data\hpz\backgnd.dat" 
+		BINCLUDE  "data\hpz\backgnd.dat"
 ;---------------------------------------------------------------------------------------
 ; Uncompressed art
 ; Pulsing orb in HPZ				; ArtUnc_2B46A: HPz_Orbs:
@@ -42231,68 +42173,68 @@ ArtUnc_Oil1:	BINCLUDE	"art/uncompressed/Oil - 1.bin"
 ArtUnc_Oil2:	BINCLUDE	"art/uncompressed/Oil - 2.bin"
 
 CPz_Dyn_Background:      ; loc_2CCEA:
-		BINCLUDE  "data\cpz\backgnd.dat"  
+		BINCLUDE  "data\cpz\backgnd.dat"
 NGHz_Water_Falls_1:      ; loc_2CEEA:
-		BINCLUDE  "data\nghz\water_f1.dat"		
+		BINCLUDE  "data\nghz\water_f1.dat"
 NGHz_Water_Falls_2:      ; loc_2CFEA:
-		BINCLUDE  "data\nghz\water_f2.dat"		 
+		BINCLUDE  "data\nghz\water_f2.dat"
 NGHz_Water_Falls_3:      ; loc_2D0EA:
-		BINCLUDE  "data\nghz\water_f3.dat" 
-;=============================================================================== 
+		BINCLUDE  "data\nghz\water_f3.dat"
+;===============================================================================
 ; Colision Array
 ; [ Begin ]
-;===============================================================================		 
-AngleMap: ; loc_2D1EA:  
+;===============================================================================
+AngleMap: ; loc_2D1EA:
 		BINCLUDE	"level/collision/Curve and resistance mappings.bin"
-Colision_Array_1: ; loc_2D2EA: 
+Colision_Array_1: ; loc_2D2EA:
 		BINCLUDE	"level/collision/Collision array 1.bin"
-Colision_Array_2: ; loc_2E2EA: 
+Colision_Array_2: ; loc_2E2EA:
 		BINCLUDE	"level/collision/Collision array 2.bin"
-;=============================================================================== 
+;===============================================================================
 ; Colision Array
 ; [ End ]
 ;===============================================================================
-;=============================================================================== 
+;===============================================================================
 ; 16x16 Colision Index
 ; [ Begin ]
-;===============================================================================				          
-Green_Hill_Colision_1:     ; loc_2F2EA:		
+;===============================================================================
+Green_Hill_Colision_1:     ; loc_2F2EA:
 		BINCLUDE	"level/collision/GHZ primary 16x16 collision index.bin"
-Green_Hill_Colision_2:     ; loc_2F5EA:		
+Green_Hill_Colision_2:     ; loc_2F5EA:
 		BINCLUDE	"level/collision/GHZ secondary 16x16 collision index.bin"
 Wood_Colision:             ; loc_2F8EA:
 		BINCLUDE	"level/collision/WZ 16x16 collision index.bin"
 Metropolis_Colision:       ; loc_2FBEA:
 		BINCLUDE	"level/collision/MTZ 16x16 collision index.bin"
-Hidden_Palace_Colision_1:  ; loc_2FEEA:		
+Hidden_Palace_Colision_1:  ; loc_2FEEA:
 		BINCLUDE	"level/collision/HPZ primary 16x16 collision index.bin"
-Hidden_Palace_Colision_2:  ; loc_301EA:		
+Hidden_Palace_Colision_2:  ; loc_301EA:
 		BINCLUDE	"level/collision/HPZ secondary 16x16 collision index.bin"
 Oil_Ocean_Colision:        ; loc_304EA:
 		BINCLUDE	"level/collision/OOZ 16x16 collision index.bin"
-Dust_Hill_Colision:        ; loc_307EA:		
-		BINCLUDE  "data\dhz\dhz_col.dat"  
-Casino_Night_Colision_1:   ; loc_30AEA:		
-		BINCLUDE  "data\cnz\cnz_col1.dat"  
-Casino_Night_Colision_2:   ; loc_30DEA:		
-		BINCLUDE  "data\cnz\cnz_col2.dat"  
-Chemical_Plant_Colision_1: ; loc_310EA:		
-		BINCLUDE  "data\cpz\cpz_col1.dat" 
-Chemical_Plant_Colision_2: ; loc_313EA:		
-		BINCLUDE  "data\cpz\cpz_col2.dat" 
-Neo_Green_Hill_Colision_1: ; loc_316EA:		
+Dust_Hill_Colision:        ; loc_307EA:
+		BINCLUDE  "data\dhz\dhz_col.dat"
+Casino_Night_Colision_1:   ; loc_30AEA:
+		BINCLUDE  "data\cnz\cnz_col1.dat"
+Casino_Night_Colision_2:   ; loc_30DEA:
+		BINCLUDE  "data\cnz\cnz_col2.dat"
+Chemical_Plant_Colision_1: ; loc_310EA:
+		BINCLUDE  "data\cpz\cpz_col1.dat"
+Chemical_Plant_Colision_2: ; loc_313EA:
+		BINCLUDE  "data\cpz\cpz_col2.dat"
+Neo_Green_Hill_Colision_1: ; loc_316EA:
 		BINCLUDE  "data\nghz\nghzcol1.dat"
-Neo_Green_Hill_Colision_2: ; loc_319EA:		
-		BINCLUDE  "data\nghz\nghzcol2.dat"																				              
+Neo_Green_Hill_Colision_2: ; loc_319EA:
+		BINCLUDE  "data\nghz\nghzcol2.dat"
 		even
 ;===============================================================================
 ; 16x16 Colision Index
 ; [ End ]
-;===============================================================================		  
-;=============================================================================== 
+;===============================================================================
+;===============================================================================
 ; Special Stage Layout
 ; [ Begin ]
-;===============================================================================        
+;===============================================================================
 Special_Stage_1: ; loc_31CEA:
 		BINCLUDE  ".\data\ss\stage_1.eni"
 		even
@@ -42314,21 +42256,21 @@ Special_Stage_6: ; loc_3305C:
 ;===============================================================================
 ; Special Stage Layout
 ; [ End ]
-;===============================================================================  
-;=============================================================================== 
+;===============================================================================
+;===============================================================================
 ; Level Layout
 ; [ Begin ]
-;===============================================================================		  
+;===============================================================================
 ; off_3334E;
 Off_Level: zoneOrderedOffsetTable 2,4
 	zoneOffsetTableEntry.w Ghz_1_Foreground
 	zoneOffsetTableEntry.w Ghz_Background ; $0000
 	zoneOffsetTableEntry.w Ghz_2_Foreground
-	zoneOffsetTableEntry.w Ghz_Background ; $0001		
+	zoneOffsetTableEntry.w Ghz_Background ; $0001
 	zoneOffsetTableEntry.w Null_Layout_1
 	zoneOffsetTableEntry.w Null_Layout_1 ; $0100
 	zoneOffsetTableEntry.w Null_Layout_1
-	zoneOffsetTableEntry.w Null_Layout_1 ; $0101		
+	zoneOffsetTableEntry.w Null_Layout_1 ; $0101
 	zoneOffsetTableEntry.w Wz_1_Foreground
 	zoneOffsetTableEntry.w Wz_1_Background ; $0200
 	zoneOffsetTableEntry.w Wz_2_Foreground
@@ -42344,7 +42286,7 @@ Off_Level: zoneOrderedOffsetTable 2,4
 	zoneOffsetTableEntry.w Mz_3_Foreground
 	zoneOffsetTableEntry.w Mz_Background ; $0500
 	zoneOffsetTableEntry.w Mz_3_Foreground
-	zoneOffsetTableEntry.w Mz_Background ; $0501		  
+	zoneOffsetTableEntry.w Mz_Background ; $0501
 	zoneOffsetTableEntry.w Null_Layout_3
 	zoneOffsetTableEntry.w Null_Layout_3 ; $0600
 	zoneOffsetTableEntry.w Null_Layout_3
@@ -42391,93 +42333,93 @@ Off_Level: zoneOrderedOffsetTable 2,4
 	zoneOffsetTableEntry.w Null_Layout_6 ; $1001
     zoneTableEnd
 
-Ghz_1_Foreground:  ; loc_333D6:               
+Ghz_1_Foreground:  ; loc_333D6:
 		BINCLUDE	"level/layout/GHZ_1.bin"
-Ghz_2_Foreground:  ; loc_33BD8:		
+Ghz_2_Foreground:  ; loc_33BD8:
 		BINCLUDE	"level/layout/GHZ_2.bin"
 
-Ghz_Background:    ; loc_343DA:            
+Ghz_Background:    ; loc_343DA:
 		BINCLUDE	"level/layout/GHZ_BG.bin"
-Null_Layout_1:     ; loc_343E4:             
-		dc.b    $00, $00, $00, $00		  
-Wz_1_Foreground:   ; loc_343E8:           
+Null_Layout_1:     ; loc_343E4:
+		dc.b    $00, $00, $00, $00
+Wz_1_Foreground:   ; loc_343E8:
 		BINCLUDE	"level/layout/WZ_1.bin"
-Wz_2_Foreground:   ; loc_34BEA: 
+Wz_2_Foreground:   ; loc_34BEA:
 		BINCLUDE	"level/layout/WZ_2.bin"
-Wz_1_Background:   ; loc_353EC: 
+Wz_1_Background:   ; loc_353EC:
 		BINCLUDE	"level/layout/WZ_1_BG.bin"
-Wz_2_Background:   ; loc_35BEE:  
+Wz_2_Background:   ; loc_35BEE:
 		BINCLUDE	"level/layout/WZ_2_BG.bin"
-Null_Layout_2:     ; loc_363F0:             
-		dc.b    $00, $00, $00, $00		  
-Mz_1_Foreground:   ; loc_363F4: 
+Null_Layout_2:     ; loc_363F0:
+		dc.b    $00, $00, $00, $00
+Mz_1_Foreground:   ; loc_363F4:
 		BINCLUDE	"level/layout/MTZ_1.bin"
-Mz_2_Foreground:   ; loc_36BF6: 
+Mz_2_Foreground:   ; loc_36BF6:
 		BINCLUDE	"level/layout/MTZ_2.bin"
-Mz_Background:     ; loc_373F8:            
-		BINCLUDE	"level/layout/MTZ_BG.bin"          
-Mz_3_Foreground:   ; loc_3741E:  
+Mz_Background:     ; loc_373F8:
+		BINCLUDE	"level/layout/MTZ_BG.bin"
+Mz_3_Foreground:   ; loc_3741E:
 		BINCLUDE	"level/layout/MTZ_3.bin"
-Null_Layout_3:     ; loc_37C20:            
-		dc.b    $00, $00, $00, $00						
-Htz_1_Foreground:  ; loc_37C24: 
+Null_Layout_3:     ; loc_37C20:
+		dc.b    $00, $00, $00, $00
+Htz_1_Foreground:  ; loc_37C24:
 		BINCLUDE	"level/layout/HTZ_1.bin"
-Htz_2_Foreground:  ; loc_38426:  
+Htz_2_Foreground:  ; loc_38426:
 		BINCLUDE	"level/layout/HTZ_2.bin"
-Htz_1_Background:  ; loc_38C28:              
+Htz_1_Background:  ; loc_38C28:
 		BINCLUDE	"level/layout/HTZ_1_BG.bin"
 Htz_2_Background:  ; loc_3942A:
 		BINCLUDE	"level/layout/HTZ_2_BG.bin"
-Hpz_Foreground:    ; loc_39C2C:  
+Hpz_Foreground:    ; loc_39C2C:
 		BINCLUDE	"level/layout/HPZ_1.bin"
-Hpz_Background:    ; loc_3942E:		             
+Hpz_Background:    ; loc_3942E:
 		BINCLUDE	"level/layout/HPZ_BG.bin"
-Null_Layout_4:     ; loc_3A478:            
-		dc.b    $00, $00, $00, $00				          
-OOz_1_Foreground:  ; loc_3A47C:  
+Null_Layout_4:     ; loc_3A478:
+		dc.b    $00, $00, $00, $00
+OOz_1_Foreground:  ; loc_3A47C:
 		BINCLUDE	"level/layout/OOZ_1.bin"
-OOz_2_Foreground:  ; loc_3AC7E:   
+OOz_2_Foreground:  ; loc_3AC7E:
 		BINCLUDE	"level/layout/OOZ_2.bin"
-OOz_Background:    ; loc_3B480:             
+OOz_Background:    ; loc_3B480:
 		BINCLUDE	"level/layout/OOZ_BG.bin"
-Dhz_1_Foreground:  ; loc_3B49A:  
-		BINCLUDE  "data\dhz\foreact1.dat"		
-Dhz_2_Foreground:  ; loc_3BC9C:               
-		BINCLUDE  "data\dhz\foreact2.dat"		
-Dhz_Background:    ; loc_3C49E:              
+Dhz_1_Foreground:  ; loc_3B49A:
+		BINCLUDE  "data\dhz\foreact1.dat"
+Dhz_2_Foreground:  ; loc_3BC9C:
+		BINCLUDE  "data\dhz\foreact2.dat"
+Dhz_Background:    ; loc_3C49E:
 		dc.b    $03, $03 ; x / y
-		dc.b    $58, $5C, $63, $64, $65, $66, $6E, $6F, $73, $80, $86, $A3, $B0, $E7, $E8, $E9   
-Cnz_1_Foreground:  ; loc_3C4B0:  
-		BINCLUDE  "data\cnz\foreact1.dat" 
-Cnz_2_Foreground:  ; loc_3CCB2:          
+		dc.b    $58, $5C, $63, $64, $65, $66, $6E, $6F, $73, $80, $86, $A3, $B0, $E7, $E8, $E9
+Cnz_1_Foreground:  ; loc_3C4B0:
+		BINCLUDE  "data\cnz\foreact1.dat"
+Cnz_2_Foreground:  ; loc_3CCB2:
 		BINCLUDE  "data\cnz\foreact2.dat"
 Cnz_1_Background:  ; loc_3D4B4:
 		BINCLUDE  "data\cnz\backact1.dat"
-Cnz_2_Background:  ; loc_3DCB6: 
+Cnz_2_Background:  ; loc_3DCB6:
 		dc.b    $03, $01 ; x / y
 		dc.b    $8B, $8C, $8D, $8E, $8F, $90, $91, $92
-Cpz_1_Foreground:  ; loc_3DCC0:  
-		BINCLUDE  "data\cpz\foreact1.dat"		
-Cpz_2_Foreground:  ; loc_3E4C2: 
-		BINCLUDE  "data\cpz\foreact2.dat"		
-Cpz_Background:    ; loc_3ECC4: 
+Cpz_1_Foreground:  ; loc_3DCC0:
+		BINCLUDE  "data\cpz\foreact1.dat"
+Cpz_2_Foreground:  ; loc_3E4C2:
+		BINCLUDE  "data\cpz\foreact2.dat"
+Cpz_Background:    ; loc_3ECC4:
 		dc.b    $05, $06 ; x / y
 		dc.b    $A0, $A1, $A2, $00, $A4, $A5, $B0, $B1, $B2, $B3, $B4, $B5, $C0, $C1, $C2, $C3
 		dc.b    $C4, $C5, $D0, $D1, $D2, $D3, $D4, $D5, $E0, $E1, $E2, $E3, $E4, $E5, $E0, $E3
 		dc.b    $E2, $E3, $E4, $E5, $E0, $E4, $E2, $E1, $E4, $E5
-Null_Layout_5:     ; loc_3ECF0:            
-		dc.b    $00, $00, $00, $00      
-Nghz_1_Foreground: ; loc_3ECF4:    
-		BINCLUDE  "data\nghz\foreact1.dat"		
-Nghz_2_Foreground: ; loc_3F4F6: 
-		BINCLUDE  "data\nghz\foreact2.dat"		 
-Nghz_1_Background: ; loc_3ECF8:  
-		BINCLUDE  "data\nghz\backact1.dat"		 
-Nghz_2_Background: ; loc_404FA:  
-		BINCLUDE  "data\nghz\backact2.dat"		            
-Null_Layout_6:     ; loc_40CFC:             
+Null_Layout_5:     ; loc_3ECF0:
 		dc.b    $00, $00, $00, $00
-;=============================================================================== 
+Nghz_1_Foreground: ; loc_3ECF4:
+		BINCLUDE  "data\nghz\foreact1.dat"
+Nghz_2_Foreground: ; loc_3F4F6:
+		BINCLUDE  "data\nghz\foreact2.dat"
+Nghz_1_Background: ; loc_3ECF8:
+		BINCLUDE  "data\nghz\backact1.dat"
+Nghz_2_Background: ; loc_404FA:
+		BINCLUDE  "data\nghz\backact2.dat"
+Null_Layout_6:     ; loc_40CFC:
+		dc.b    $00, $00, $00, $00
+;===============================================================================
 ; Level Object Layout
 ; [ End ]
 ;===============================================================================
@@ -42487,7 +42429,7 @@ loc_40D00: ; Big Ring - Left Over from Sonic 1
 ;===============================================================================
 ; Level Object Layout
 ; [ Begin ]
-;===============================================================================		            
+;===============================================================================
 
 ; Macro for marking the boundaries of an object layout file
 ObjectLayoutBoundary macro
@@ -42552,7 +42494,6 @@ Hpz_1_Objects_Layout:	BINCLUDE	"level/objects/HPZ_1.bin"
 	ObjectLayoutBoundary
 Hpz_2_Objects_Layout:
 	ObjectLayoutBoundary
-	ObjectLayoutBoundary		; yes, there are two here for some reason
 OOz_1_Objects_Layout:	BINCLUDE	"level/objects/OOZ_1.bin"
 	ObjectLayoutBoundary
 OOz_2_Objects_Layout:	BINCLUDE	"level/objects/OOZ_2.bin"
