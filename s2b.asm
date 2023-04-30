@@ -317,7 +317,7 @@ GameClrRAM:
 		bsr.w	JoypadInit
 		; Strangely, this loads the title screen, and not the Sega screen,
 		; and the August 21st prototype suggests this was NOT done by the pirates...
-		move.b	#GameModeID_TitleScreen,(Game_Mode).w
+		move.b	#GameModeID_SegaScreen,(Game_Mode).w
 ; loc_38E:
 MainGameLoop:
 		move.b	(Game_Mode).w,d0
