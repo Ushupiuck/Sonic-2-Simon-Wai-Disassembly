@@ -418,7 +418,7 @@ ErrorMsg_TwoAddresses:
 		bsr.w	ShowErrAddress
 		bra.s	ErrorMsg_Wait
 ; ---------------------------------------------------------------------------
-; loc_45A:		  
+; loc_45A:
 ErrorMessage:
 		move	#$2700,sr
 		movem.l	d0-a7,(Object_Respawn_Table).w
@@ -988,7 +988,7 @@ Joypad_Read:
 		andi.b	#$C0,d0
 		move.b	#$40,(a1)
 		nop
-		nop  
+		nop
 		move.b	(a1),d1
 		andi.b	#$3F,d1
 		or.b	d1,d0
@@ -1348,7 +1348,7 @@ loc_1618:
 		lsl.w   #$01, D2
 		bcc.s   loc_1626
 		adda.w  #$000A, A3
-loc_1626:         
+loc_1626:
 		lsl.w   #$02, D2
 		move.w  D2, A5
 		moveq   #$08, D3 
@@ -1768,7 +1768,7 @@ loc_193A:
 loc_1942:		
 		bsr.w     loc_1998 
 loc_1946:  
-		move.w  D1, (A1)+ 
+		move.w  D1, (A1)+
 		addq.w  #$01, D1
 		dbf    D2, loc_1946 
 		bra.s   loc_18FA 
@@ -1948,7 +1948,7 @@ KosDec_RLE:
 		lsr.w	#1,d5
 		dbf	d4,+
 		move.b	(a0)+,1(sp)
-		move.b	(a0)+,(sp) 
+		move.b	(a0)+,(sp)
 		move.w	(sp),d5
 		moveq	#$F,d4
 ; loc_1AA6:
@@ -2128,7 +2128,7 @@ loc_1BAA:
 		bcc.s   loc_1BBE
 		move.b  (A6)+, (A2)+ 
 loc_1BBE:   
-		move.b  (A6)+, (A2)+ 
+		move.b  (A6)+, (A2)+
 		move.b  (A6)+, (A2)+
 		cmp.w   A2, D7
 		bls.s   loc_1C12
@@ -2158,7 +2158,7 @@ loc_1BEC:
 loc_1BF2: 
 		move.b  (A6)+, (A2)+		 
 loc_1BF4:
-		move.b  (A6)+, (A2)+ 
+		move.b  (A6)+, (A2)+
 loc_1BF6:
 		move.b  (A6)+, (A2)+ 
 		move.b  (A6)+, (A2)+
@@ -2458,7 +2458,7 @@ loc_1E10:
 		rts
 loc_1E18:
 		move.b  (A1)+, (A2)+
-loc_1E1A:		  
+loc_1E1A:
 		add.b   D1, D1
 		bcs.s   loc_1E96
 		move.l  A2, A6
@@ -2578,7 +2578,7 @@ loc_1EE6:
 		cmp.w   A2, D7
 		bls.s   loc_1F0A
 		bra.w     loc_1E1A
-loc_1EF4: 
+loc_1EF4:
 		move.w  #$0000, D0
 		rts
 loc_1EFA:  
@@ -2878,7 +2878,7 @@ Pal_HTzCyc1: ; loc_22A4: ; $07 - Hill Top Rotating Palette
 Pal_WzCyc: ; loc_2324: ; $02 - Wood Rotating Palette 
 		dc.w    $0248, $046A, $048C, $06CE, $0248, $046A, $048C, $06CE
 Pal_MzCyc1: ; loc_2334: ; $04/$05 - Metropolis Rotating Palette 
-		dc.w    $0006, $0008, $000A, $000C, $000A, $0008		 
+		dc.w    $0006, $0008, $000A, $000C, $000A, $0008
 Pal_MzCyc2: ; loc_2340: ; $04/$05 - Metropolis Rotating Palette 
 		dc.w    $0422, $0866, $0ECC, $0422, $0866, $0ECC 
 Pal_MzCyc3: ;loc_234C: ; $04/$05 - Metropolis Rotating Palette 
@@ -3118,7 +3118,7 @@ Pal_MakeWhite: ; loc_26B8:               ; Special Stage Blank Screen
 		adda.w  D0, A0
 		move.w  #$0EEE, D1
 		move.b  (Palette_fade_length).w, D0
-loc_26D2:		
+loc_26D2:
 		move.w  D1, (A0)+
 		dbf    D0, loc_26D2
 		move.w  #$0015, D4
@@ -3418,7 +3418,7 @@ PseudoRandomNumber: ; loc_31E4:
 		move.l  (RNG_seed).w, D1 
 		bne.s   loc_31F0
 		move.l  #$2A6D365A, D1
-loc_31F0:		
+loc_31F0:
 		move.l  D1, D0
 		asl.l   #$02, D1
 		add.l   D0, D1
@@ -3568,7 +3568,7 @@ SegaScreen: ; loc_360C: ; SEGA Logo
 		move.w  D0, (VDP_control_port)
 		bsr.w     ClearScreen             ; loc_1418
 		move.l  #$40000000, (VDP_control_port)
-		lea     (SegaLogo).l, A0          ; Load Sega Sprites ; loc_70960  
+		lea     (SegaLogo).l, A0          ; Load Sega Sprites ; loc_70960
 		bsr.w     NemDec              ; loc_15FC
 		lea     (Chunk_Table), A1
 		lea     (SegaLogo_Mappings).l, A0 ; Load Sega Mappings ; loc_70DD0
@@ -4258,7 +4258,7 @@ Unused_Code3_Loop2: ; loc_40DE:
 Unused_Code3_Loop3: ; loc_40E6:		
 		movem.l A1-A3, -(A7)
 		move.w  #$003F, D0
-Unused_Code3_Loop4: ; loc_40EE:		
+Unused_Code3_Loop4: ; loc_40EE:
 		cmpm.w  (A1)+, (A3)+
 		bne.s   Unused_Code3_loc_4104
 		dbf    D0, Unused_Code3_Loop4  ; loc_40EE
@@ -5518,7 +5518,7 @@ loc_53AE:
 		move.w  #$003C, (Demo_Time_left).w
 		move.w  #$003F, (Palette_fade_range).w
 		clr.w   (PalChangeSpeed).w
-loc_53BE:		
+loc_53BE:
 		move.b  #VintID_SSResults, (Vint_routine).w
 		bsr.w     DelayProgram            ; loc_31D8
 		bsr.w     Move_Sonic_In_Demo      ; loc_48DE
@@ -5638,7 +5638,7 @@ loc_5544:
 		moveq   #$3F, D1
 		moveq   #$3F, D2
 		bsr.w     PlaneMapToVRAM_H40         ; loc_154C
-		rts		             
+		rts
 S1_Pal_Cycle_Special_Stage: ; loc_5584:
 		tst.w   (Game_paused).w
 		bne.s   loc_5608
@@ -5668,7 +5668,7 @@ loc_55B4:
 		move.w  #$8400, D0
 		move.b  (A0)+, D0
 		move.w  D0, (A6) 
-		move.l  #$40000010, (VDP_control_port) 
+		move.l  #$40000010, (VDP_control_port)
 		move.l  (Vscroll_Factor).w, (VDP_data_port)
 		moveq   #$00, D0
 		move.b  (A0)+, D0
@@ -6028,7 +6028,7 @@ Bg_Scroll_Speed_Index: zoneOrderedOffsetTable 2,1
 	zoneOffsetTableEntry.w    Bg_Scroll_Speed_CNz ; $0C - Casino Night Background Position
 	zoneOffsetTableEntry.w    Bg_Scroll_Speed_CPz ; $0D - Chemical Plant Background Position 
 	zoneOffsetTableEntry.w    Bg_Scroll_Speed_Null3 ; $0E - Genocide City Background Position (Null)
-	zoneOffsetTableEntry.w    Bg_Scroll_Speed_NGHz ; $0F - Neo Green Hill Background Position 
+	zoneOffsetTableEntry.w    Bg_Scroll_Speed_NGHz ; $0F - Neo Green Hill Background Position
 	zoneOffsetTableEntry.w    Bg_Scroll_Speed_Null4 ; $10 - Death Egg Background Position (Null)
     zoneTableEnd
 
@@ -6238,7 +6238,7 @@ Bg_Scroll_Index: zoneOrderedOffsetTable 2,1
 	zoneOffsetTableEntry.w    Bg_Scroll_DHz; $0B - Dust Hill Background Scroll 
 	zoneOffsetTableEntry.w    Bg_Scroll_CNz; $0C - Casino Night Background Scroll 
 	zoneOffsetTableEntry.w    Bg_Scroll_CPz; $0D - Chemical Plant Background Scroll               
-	zoneOffsetTableEntry.w    Bg_Scroll_Null; $0E - Genocide City (Null) Background Scroll 
+	zoneOffsetTableEntry.w    Bg_Scroll_Null; $0E - Genocide City (Null) Background Scroll
 	zoneOffsetTableEntry.w    Bg_Scroll_NGHz; $0F - Neo Green Hill Background Scroll 
 	zoneOffsetTableEntry.w    Bg_Scroll_Null; $10 - Death Egg (Null) Background Scroll    
     zoneTableEnd
@@ -6478,7 +6478,7 @@ Bg_Scroll_Wz: ; loc_6098: ; Wood Background Scroll
 loc_60C8:
 		move.l  D0, (A1)+
 		dbf    D1, loc_60C8
-		rts               
+		rts
 Bg_Scroll_Mz: ; loc_60D0: ; Metropolis Background Scroll 
 		move.w  (Camera_X_pos_diff).w, D4
 		ext.l   D4
@@ -7138,7 +7138,7 @@ loc_679C:
 		move.b  (A3)+, D1
 		move.w  (A2)+, D0
 		neg.w   D0
-loc_67A8:		
+loc_67A8:
 		dbf    D2, loc_679C
 		rts		 
 Bg_Scroll_CNz: ; loc_67AE: ; Casino Night Background Scroll 
@@ -7378,7 +7378,7 @@ loc_6A36:
 		move.b  (A3)+, D0
 		addq.w  #$02, A2
 		sub.w   D0, D1
-		bcc.s   loc_6A36 
+		bcc.s   loc_6A36
 		neg.w   D1
 		subq.w  #$02, A2
 		move.w  #$00DF, D2
@@ -7918,7 +7918,7 @@ loc_6F34:
 		move.w  #$00E0, D4
 		moveq   #-$10, D5
 		bsr.w     loc_7350
-loc_6F4E: 
+loc_6F4E:
 		bclr    #$02, (A2)
 		beq.s   loc_6F64
 		moveq   #-$10, D4
@@ -8128,7 +8128,7 @@ loc_716C:
 		bsr.w     loc_72C4
 loc_718C:
 		rts
-loc_718E:		 
+loc_718E:
 		dc.b    $02 
 loc_718F:  
 		dc.b    $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02
@@ -8248,7 +8248,7 @@ loc_72DC:
 		andi.w  #$0070, D0
 		bne.s   loc_730C
 		bsr.w     loc_745C
-loc_730C:		 
+loc_730C:
 		dbf    D6, loc_72DC
 		rts		
 loc_7312:     
@@ -8278,7 +8278,7 @@ loc_7348:
 loc_7350:
 		moveq   #$15, D6
 		add.w   (A3), D5
-loc_7354:		
+loc_7354:
 		add.w   $0004(A3), D4  
 loc_7358:		 
 		tst.w   (Two_player_mode).w
@@ -8608,7 +8608,7 @@ loc_7666:
 		add.w   $0004(A3), D4
 loc_766A:		
 		andi.w  #$01F0, D4
-		andi.w  #$01F0, D5  
+		andi.w  #$01F0, D5
 		lsl.w   #3, D4
 		lsr.w   #2, D5
 		add.w   D5, D4
@@ -8698,7 +8698,7 @@ loc_773E
 		movem.l (A7)+, D4-D6
 		addi.w  #$0010, D4
 		dbf    D6, loc_773E
-		rts     
+		rts
 loc_776A:
 		moveq   #$00, D4
 		moveq   #$1F, D6
@@ -8758,7 +8758,7 @@ Main_Level_Load_16_Blocks_Loop: ; loc_77D2:
 Main_Level_Load_16_Blocks_Not2p: ; loc_77E8:		
 		move.w  D0, (A1)+
 		dbf    D2, Main_Level_Load_16_Blocks_Loop ; loc_77D2    
-loc_77EE:    
+loc_77EE:
 		cmpi.b  #hill_top_zone, (Current_Zone).w
 		bne.s   loc_7820
 		lea     (Block_Table+$980).w, A1
@@ -8788,7 +8788,7 @@ loc_7820:
 		
 ;=============================================================================== 
 ; Sub Routine Unused #1
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================		  
 ;loc_782E:
 		bra.s   loc_784E		
@@ -8818,7 +8818,7 @@ loc_7858:
 ;=============================================================================== 
 ; Sub Routine Load_Level_Sprites
 ; [ Begin ]		         
-;===============================================================================		  
+;===============================================================================
 Load_Level_Sprites: ; loc_785E: ; Load Palette for Levels
 		bsr.w     Load_Level_Layout ; loc_7886
 		move.l  (A7)+, A2
@@ -8848,7 +8848,7 @@ loc_7880:
 		rts  
 ;=============================================================================== 
 ; Sub Routine Load_Level_Palete
-; [ End ]		         
+; [ End ]
 ;===============================================================================
 		              
 ;=============================================================================== 
@@ -9928,7 +9928,7 @@ Obj11_MapUnc_85E0:	BINCLUDE	"mappings/sprite/obj11_GHZ.bin"	; GHZ bridge
 ;===============================================================================           
 ; Object 0x11 - Bridge 
 ; [ End ]
-;=============================================================================== 
+;===============================================================================
 
 ;=============================================================================== 
 ; Object 0x15 - Swing Platforms - Dust Hill / Oil Ocean
@@ -11188,7 +11188,7 @@ loc_99AE:
 		dc.l    ($02<<$18)|Obj1C_MapUnc_9B6A 
 		dc.w    $4346
 		dc.b    $08, $04
-		
+
 		dc.l    ($03<<$18)|Obj1C_MapUnc_9B6A 
 		dc.w    $4346
 		dc.b    $08, $04		  
@@ -11338,7 +11338,7 @@ Obj2A_MapUnc_9CAE:	BINCLUDE	"mappings/sprite/obj2A.bin"
 ; ===========================================================================
 
 ;=============================================================================== 
-; Object 0x2D - Hill Top / Chemical Plant - Automatic Door. 
+; Object 0x2D - Hill Top / Chemical Plant - Automatic Door.
 ; [ Begin ]
 ;===============================================================================		  
 Obj_0x2D_Automatic_Door: ; loc_9CE2:		
@@ -11578,7 +11578,7 @@ loc_9FFE:
 ;===============================================================================  
 
 ;=============================================================================== 
-; Object 0x24 
+; Object 0x24
 ; [ Begin ]
 ;===============================================================================		    
 Obj_0x24: ; loc_A012:
@@ -12178,7 +12178,7 @@ loc_A800:
 		bsr.w     SpeedToPos              ; loc_D27A
 		addi.w  #$0018, $0012(A0)
 		bra.w     DisplaySprite           ; loc_D3C2
-;=============================================================================== 
+;===============================================================================
 ; Object 0x29 - Enemy Points
 ; [ End ]
 ;===============================================================================		 
@@ -12928,7 +12928,7 @@ Big_Ring_Flash_Map_08: ; loc_B278:
 		dc.l    $000F1044, $1022FFE0, $000F1844, $18220000
 		nop		             ; Filler
 ;=============================================================================== 
-; Object 0x26 - Monitors 
+; Object 0x26 - Monitors
 ; [ Begin ]
 ;===============================================================================		  
 Obj_0x26_Monitors: ; loc_B29C:
@@ -14728,7 +14728,7 @@ Obj_Index:
 		dc.l    Obj_0x0A_Bubbles_And_Numbers      ; loc_1207C 
 		dc.l	Obj0B			; Section of pipe that tips you off from CPZ
 		dc.l	Obj0C			; Small floating platform (used in CPZ in the Nick Arcade prototype)
-		dc.l    Obj_0x0D_End_Panel		; loc_F1F4 
+		dc.l    Obj_0x0D_End_Panel		; loc_F1F4
 		dc.l	Obj0E			; Sonic and Tails on the title screen
 		dc.l	Obj0F			; Mappings test?
 		dc.l    Obj_0x10		          ; loc_223E2
@@ -14788,7 +14788,7 @@ Obj_Index:
 		dc.l    Obj_0x46_Spring_Ball              ; loc_18ABE 
 		dc.l    Obj_0x47_Switch		   ; loc_18D9C
 		dc.l    Obj_0x48_Cannon		   ; loc_19250
-		dc.l    Obj_0x49_Waterfall		; loc_15352 
+		dc.l    Obj_0x49_Waterfall		; loc_15352
 		dc.l    Obj_0x4A_Octus		    ; loc_1EBB8
 		dc.l    Obj_0x4B_Buzz_Bomber              ; loc_1E89C 
 		dc.l    Obj_0x4C_Batbot		   ; loc_1EE68 
@@ -14908,7 +14908,7 @@ SpeedToPos: ; loc_D27A:
 		rts     
 ;=============================================================================== 
 ; Sub Routine SpeedToPos
-; [ End ]		         
+; [ End ]
 ;=============================================================================== 
  
 ;=============================================================================== 
@@ -15628,7 +15628,7 @@ loc_D864:
 		bge.s   loc_D928
 		addi.w  #$0100, D2
 		bra.s   loc_D902
-loc_D8D8:		
+loc_D8D8:
 		move.w  $000A(A0), D2
 		move.w  $0008(A0), D3
 		addi.w  #$0080, D2
@@ -15718,7 +15718,7 @@ loc_D984:
 		move.b  $0016(A0), D0
 		move.w  $000C(A0), D2
 		sub.w   $0004(A1), D2
-		move.w  D2, D1 
+		move.w  D2, D1
 		add.w   D0, D1
 		bmi.s   loc_DA42
 		move.w  D2, D1
@@ -15958,7 +15958,7 @@ Adjust2PArtPointer: ; loc_DC30:
 		add.w   D0, $0002(A0)
 loc_DC4A:
 		rts  
-;=============================================================================== 
+;===============================================================================
 ; Sub Routine Adjust2PArtPointer         
 ; [ End ]				 2P Mode Objects Attributes #1
 ;===============================================================================		 
@@ -16018,7 +16018,7 @@ loc_DCAE:
 		dbf    D1, loc_DC88
 loc_DCB4:		
 		rts		
-loc_DCB6:               
+loc_DCB6:
 		dc.b    $00, $00, $01, $01, $04, $04, $05, $05, $08, $08, $09, $09, $0C, $0C, $0D, $0D
 loc_DCC6:
 		btst    #$01, D4
@@ -16048,7 +16048,7 @@ loc_DCCE:
 loc_DD00:
 		move.w  D0, (A2)+
 		dbf    D1, loc_DCCE
-		rts      
+		rts
 loc_DD08:
 		dc.b    $08, $08, $08, $08, $10, $10, $10, $10, $18, $18, $18, $18, $20, $20, $20, $20  
 loc_DD18: 
@@ -16348,7 +16348,7 @@ loc_DFC4:
 loc_DFDC:
 		cmp.w   D4, D0
 		bhi.w    loc_E010
-loc_DFE2:		
+loc_DFE2:
 		move.w  $0004(A1), D0
 		sub.w   D1, D0
 		sub.w   D3, D0
@@ -16678,7 +16678,7 @@ loc_E2C6:
 		addq.w  #$06, A0
 		bra.s   loc_E2B8
 loc_E2CA:
-		move.l  A0, (Obj_load_addr_right).w   
+		move.l  A0, (Obj_load_addr_right).w
 		move.l  A0, (Obj_load_addr_right_P2).w
 		move.l  (Obj_load_addr_left).w, A0
 		subi.w  #$0080, D6
@@ -17008,7 +17008,7 @@ loc_E5F2:
 loc_E612:
 		move.l  (A7)+, A1
 		rts
-loc_E616:		
+loc_E616:
 		lea     (Object_RAM_block_indices).w, A1
 		lea     ($FFFFBE00).w, A3
 		tst.b   (A1)+
@@ -17188,7 +17188,7 @@ loc_E7A2:
 ;=============================================================================== 
 ; Sub Routine SingleObjLoad2
 ; [ End ]		         
-;===============================================================================    
+;===============================================================================
              
 loc_E7A4: ; Load Object List Subroutine - Start 
 		move.l  A3, A1
@@ -17818,7 +17818,7 @@ loc_F0E8:
 ; [ End ]
 ;===============================================================================   
 		nop		             ; Filler  
-;=============================================================================== 
+;===============================================================================
 ; Object 0x44
 ; [ Begin ]
 ;===============================================================================		  
@@ -17878,7 +17878,7 @@ loc_F1D2:
 ; Object 0x44
 ; [ End ]
 ;===============================================================================		  
-		
+
 ;=============================================================================== 
 ; Object 0x0D - End Panel 
 ; [ Begin ]
@@ -18478,7 +18478,7 @@ loc_F8F4:
 		sub.w   $0008(A0), D2
 		sub.w   D2, $0008(A1)
 loc_F91C:
-		rts		
+		rts
 loc_F91E:
 		btst    #$03, $0022(A1)
 		beq.s   loc_F95E
@@ -20668,7 +20668,7 @@ Sonic_Animate_Duck: ; loc_10D62:
 		dc.b    $05, $7F, $80, $FE, $01
 Sonic_Animate_Spindash: ; loc_10D67:		
 		dc.b    $00, $71, $72, $71, $73, $71, $74, $71, $75, $71, $76, $71, $FF 
-Sonic_Animate_WallRecoil1: ; loc_10D74:		
+Sonic_Animate_WallRecoil1: ; loc_10D74:
 		dc.b    $3F, $82, $FF
 Sonic_Animate_WallRecoil2: ; loc_10D77:
 		dc.b    $07, $08, $08, $09, $FD, $05
@@ -20698,7 +20698,7 @@ Sonic_Animate_Drown: ; loc_10DB7:
 		dc.b    $20, $99, $FF
 Sonic_Animate_Death2: ; loc_10DBA:		 
 		dc.b    $20, $98, $FF
-Sonic_Animate_Unused_0x19: ; loc_10DBD: 
+Sonic_Animate_Unused_0x19: ; loc_10DBD:
 		dc.b    $03, $4E, $4F, $50, $51, $52, $00, $FE, $01
 Sonic_Animate_Hurt: ; loc_10DC6:		
 		dc.b    $40, $8D, $FF
@@ -20848,7 +20848,7 @@ Tails_MusicList:	zoneOrderedTable 1,1
 
 ;=============================================================================== 
 ; Sub Routine Tails_Display
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================				  
 Tails_Display: ; loc_10F12:
 		move.w  $0030(A0), D0
@@ -21028,7 +21028,7 @@ loc_11102:
 		bsr.w     Tails_JumpAngle         ; loc_11812
 		bsr.w     Tails_Floor             ; loc_11872
 		rts
-		
+
 ;=============================================================================== 
 ; Sub Routine Tails_Move
 ; [ Begin ]		         
@@ -21178,7 +21178,7 @@ loc_112AC:
 ;=============================================================================== 
 ; Sub Routine Tails_Move
 ; [ End ]		         
-;=============================================================================== 
+;===============================================================================
 
 ;=============================================================================== 
 ; Sub Routine Tails_MoveLeft
@@ -21388,7 +21388,7 @@ loc_1147E:
 		rts
 ;=============================================================================== 
 ; Sub Routine Tails_RollRight
-; [ End ]		         
+; [ End ]
 ;===============================================================================  
 		  
 ;=============================================================================== 
@@ -21448,7 +21448,7 @@ loc_114FC:
 ; [ End ]		         
 ;===============================================================================
 		    
-;=============================================================================== 
+;===============================================================================
 ; Sub Routine Tails_LevelBoundaries
 ; [ Begin ]		         
 ;=============================================================================== 
@@ -21538,7 +21538,7 @@ loc_115E6:
 ;=============================================================================== 
 ; Sub Routine Tails_Roll
 ; [ End ]		         
-;=============================================================================== 
+;===============================================================================
 		 
 ;=============================================================================== 
 ; Sub Routine Tails_Jump
@@ -21598,7 +21598,7 @@ loc_1168E:
 ;=============================================================================== 
 ; Sub Routine Tails_JumpHeight
 ; [ Begin ]		         
-;===============================================================================		   
+;===============================================================================
 Tails_JumpHeight: ; loc_11696:
 		tst.b   $003C(A0)
 		beq.s   loc_116C2
@@ -21628,7 +21628,7 @@ loc_116D0:
 		 
 ;=============================================================================== 
 ; Sub Routine Tails_Spindash
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================		  
 Tails_Spindash: ; loc_116D2:
 		tst.b   $0039(A0)
@@ -22468,7 +22468,7 @@ Load_Tails_Dynamic_PLC: ; loc_11F42:
 		subq.w  #$01, D5
 		bmi.s   loc_11F94
 		move.w  #$F400, D4
-loc_11F68:		
+loc_11F68:
 		moveq   #$00, D1
 		move.w  (A2)+, D1
 		move.w  D1, D3
@@ -22948,7 +22948,7 @@ loc_12616:
 		jsr     AnimateSprite           ; (loc_D412)
 		jmp     DisplaySprite           ; (loc_D3C2)
 loc_12646:
-		rts    
+		rts
 J_DeleteObject_03: ; loc_12648:
 		jmp     DeleteObject            ; (loc_D3B4)
 ;=============================================================================== 
@@ -23698,7 +23698,7 @@ loc_13308:
 		beq.s   loc_13318
 		addi.b  #$40, (A4)
 		neg.b   (A4)
-		subi.b  #$40, (A4)		
+		subi.b  #$40, (A4)
 loc_13318:
 		andi.w  #$000F, D1
 		add.w   D0, D1
@@ -24148,7 +24148,7 @@ loc_136CE:
 loc_136E6:
 		cmpi.b  #$40, D0
 		beq.w    loc_13B04
-		bra.w     loc_13982		    
+		bra.w     loc_13982
 loc_136F2:
 		move.l  #Primary_Collision, (Collision_addr).w
 		cmpi.b  #$0C, $003E(A0)
@@ -24268,7 +24268,7 @@ loc_13844:
 
 ;=============================================================================== 
 ; Sub Routine ChkFloorEdge2
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================		 
 ; loc_13846: Sonic_HitFloor2:
 ChkFloorEdge2:
@@ -24298,7 +24298,7 @@ loc_13896:
 ;=============================================================================== 
 ; Sub Routine ChkFloorEdge2
 ; [ End ]		         
-;===============================================================================   
+;===============================================================================
 
 ;=============================================================================== 
 ; Sub Routine ObjHitFloor
@@ -24418,7 +24418,7 @@ loc_139CA:
 		rts
 ;=============================================================================== 
 ; Sub Routine ObjHitWallRight
-; [ End ]		         
+; [ End ]
 ;===============================================================================		  
 		
 ;=============================================================================== 
@@ -25018,7 +25018,7 @@ loc_141CE:
 		subq.w  #$01, $0038(A0)
 		bpl.w    loc_142CA
 		move.w  #$0001, $0036(A0)
-loc_141F6:		
+loc_141F6:
 		jsr     (PseudoRandomNumber).l      ; loc_31E4
 		move.w  D0, D1
 		andi.w  #$0007, D0
@@ -26068,7 +26068,7 @@ Obj49_MapUnc_15404:	BINCLUDE	"mappings/sprite/obj49.bin"
 
 ;=============================================================================== 
 ; Object 0x31 - Hill Top / Metropolis - Lava Attributes 
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================   
 Obj_0x31_Lava_Attributes: ; loc_155A0:
 		moveq   #$00, D0
@@ -26848,7 +26848,7 @@ loc_16004:
 ;=============================================================================== 
 ; Object 0x16 - Hill Top Teleferics
 ; [ Begin ]		         
-;===============================================================================		    
+;===============================================================================
 Obj_0x16_Teleferics: ; loc_1600C:   
 		moveq   #$00, D0
 		move.b  $0024(A0), D0
@@ -27160,7 +27160,7 @@ loc_1647A:
 		dc.w    $1000, $0A00
 loc_1647E:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj1B_MapUnc_1658A, $0004(A0) ; loc_1658A
+		move.l  #Speed_Booster_Mappings, $0004(A0) ; loc_1658A
 		move.w  #$E39C, $0002(A0)
 		bsr.w     J_Adjust2PArtPointer_03 ; loc_165AA
 		ori.b   #$04, $0001(A0)
@@ -27232,13 +27232,13 @@ loc_16562:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj1B_MapUnc_1658A:	BINCLUDE	"mappings/sprite/obj1B.bin"
+Speed_Booster_Mappings:	BINCLUDE	"mappings/sprite/obj1B.bin"
 ; ===========================================================================
 J_MarkObjGone_01: ; loc_165A4:
 		jmp     MarkObjGone             ; (loc_D2A0)
 J_Adjust2PArtPointer_03: ; loc_165AA:
 		jmp     Adjust2PArtPointer     ; (loc_DC30)   
-;=============================================================================== 
+;===============================================================================
 ; Object 0x1D - Chemical Plant - Worms
 ; [ Begin ]		         
 ;===============================================================================  
@@ -27279,7 +27279,7 @@ loc_16600:
 		move.b  D5, $0024(A1)
 		move.w  $0008(A0), $0008(A1)
 		move.w  $000C(A0), $000C(A1)
-		move.l  #Obj1D_MapUnc_16702, $0004(A1) ; loc_16702
+		move.l  #Worms_Mappings, $0004(A1) ; loc_16702
 		move.w  #$643C, $0002(A1)
 		bsr.w     J_Adjust2PArtPointer2_00 ; loc_16716
 		move.b  #$04, $0001(A1)
@@ -27345,7 +27345,7 @@ loc_166FE:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj1D_MapUnc_16702:	BINCLUDE	"mappings/sprite/obj1D.bin"
+Worms_Mappings:	BINCLUDE	"mappings/sprite/obj1D.bin"
 ; ===========================================================================
 		nop
 
@@ -27358,7 +27358,7 @@ J_SpeedToPos_02: ; loc_1671C:
 		dc.w    $0000		   ; Filler
 ;=============================================================================== 
 ; Object 0x1E - Chemical Plant - Tube Attributes
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================		  
 Obj_0x1E_Tube_Attributes: ; loc_16724:
 		moveq   #$00, D0
@@ -28108,7 +28108,7 @@ J_Adjust2PArtPointer_04: ; loc_17470:
 J_SpeedToPos_03: ; loc_17476:
 		jmp     SpeedToPos              ; (loc_D27A)        
 ;=============================================================================== 
-; Object 0x20 - Fireball - Hill Top 
+; Object 0x20 - Fireball - Hill Top
 ; [ End ]		         
 ;=============================================================================== 
 ;=============================================================================== 
@@ -28280,13 +28280,13 @@ loc_17698:
 		dc.w    loc_177DA-loc_17698
 loc_1769E:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj32_MapUnc_179C2, $0004(A0) ; loc_179C2
+		move.l  #Rock_Mappings, $0004(A0) ; loc_179C2
 		move.w  #$43B2, $0002(A0)
 		move.b  #$18, $0019(A0)
 		move.l  #loc_177F0, $003C(A0)
 		cmpi.b  #chemical_plant_zone, (Current_Zone).w
 		bne.s   loc_176E2
-		move.l  #Obj32_MapUnc_179F6, $0004(A0) ; loc_179F6
+		move.l  #Tunel_Obstacule_Mappings, $0004(A0) ; loc_179F6
 		move.w  #$6430, $0002(A0)
 		move.b  #$10, $0019(A0)
 		move.l  #loc_17808, $003C(A0)
@@ -28409,8 +28409,8 @@ Obj2F_MapUnc_1786A:	BINCLUDE	"mappings/sprite/obj2F.bin"
 ; ---------------------------------------------------------------------------
 ; Sprite mappings - Obj32
 ; ---------------------------------------------------------------------------
-Obj32_MapUnc_179C2:	BINCLUDE	"mappings/sprite/obj32_HTZ.bin"	; HTZ rock
-Obj32_MapUnc_179F6:	BINCLUDE	"mappings/sprite/obj32_CPZ.bin" ; CPZ tube cover
+Rock_Mappings:	BINCLUDE	"mappings/sprite/obj32_HTZ.bin"	; HTZ rock
+Tunel_Obstacule_Mappings:	BINCLUDE	"mappings/sprite/obj32_CPZ.bin" ; CPZ tube cover
 ; ===========================================================================
 		nop
 
@@ -28785,7 +28785,7 @@ loc_17F50:
 		move.w  $000C(A0), $000C(A1)
 		move.b  #$01, $0036(A1)
 loc_17F74:
-		move.l  #Obj43_MapUnc_1808E, $0004(A1) ; loc_1808E
+		move.l  #Giant_Spikeball_Mappings, $0004(A1) ; loc_1808E
 		move.w  $0002(A0), $0002(A1)
 		move.b  #$04, $0001(A1)
 		move.b  #$04, $0018(A1)
@@ -28876,7 +28876,7 @@ loc_1808C:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj43_MapUnc_1808E:	BINCLUDE	"mappings/sprite/obj43.bin"
+Giant_Spikeball_Mappings:	BINCLUDE	"mappings/sprite/obj43.bin"
 ; ===========================================================================
 		nop
 
@@ -28982,7 +28982,7 @@ loc_181B2:
 		dc.w    loc_18322-loc_181B2
 loc_181B8:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj45_MapUnc_185C2, $0004(A0) ; loc_185C2
+		move.l  #Spring_Push_Boost_Mappings, $0004(A0) ; loc_185C2
 		move.w  #$43C5, $0002(A0)
 		ori.b   #$04, $0001(A0)
 		move.b  #$10, $0019(A0)
@@ -29280,7 +29280,7 @@ loc_185A0:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj45_MapUnc_185C2:	BINCLUDE	"mappings/sprite/obj45.bin"
+Spring_Push_Boost_Mappings:	BINCLUDE	"mappings/sprite/obj45.bin"
 ; ===========================================================================
 
 ;=============================================================================== 
@@ -29309,7 +29309,7 @@ loc_18AF0:
 		addq.b  #$02, $0024(A0)
 		move.b  #$0F, $0016(A0)
 		move.b  #$0F, $0017(A0)
-		move.l  #Obj46_MapUnc_18CFA, $0004(A0) ; loc_18CFA
+		move.l  #Spring_Ball_Mappings, $0004(A0) ; loc_18CFA
 		move.w  #$6354, $0002(A0)
 		bsr.w     J_Adjust2PArtPointer_08 ; loc_18D7E
 		move.b  #$04, $0001(A0)
@@ -29327,7 +29327,7 @@ loc_18AF0:
 		move.w  $0008(A0), $0008(A1)
 		move.w  $000C(A0), $000C(A1)
 		addi.w  #$0012, $000C(A1)
-		move.l  #Obj45_MapUnc_185C2, $0004(A1) ; loc_185C2
+		move.l  #Spring_Push_Boost_Mappings, $0004(A1) ; loc_185C2
 		move.w  #$43C5, $0002(A1)
 		ori.b   #$04, $0001(A1)
 		move.b  #$10, $0019(A1)
@@ -29461,7 +29461,7 @@ loc_18CF4:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj46_MapUnc_18CFA:	BINCLUDE	"mappings/sprite/obj46.bin"
+Spring_Ball_Mappings:	BINCLUDE	"mappings/sprite/obj46.bin"
 ; ===========================================================================
 		nop
 J_DeleteObject_11: ; loc_18D6C:
@@ -29488,7 +29488,7 @@ Obj_0x47_Switch: ; loc_18D9C:
 		moveq   #$00, D0
 		move.b  $0024(A0), D0
 		move.w  loc_18DAA(PC, D0), D1
-		jmp     loc_18DAA(PC, D1)  
+		jmp     loc_18DAA(PC, D1)
 loc_18DAA:		  
 		dc.w    loc_18DAE-loc_18DAA
 		dc.w    loc_18DDA-loc_18DAA
@@ -29548,7 +29548,7 @@ J_Adjust2PArtPointer_09 ; loc_18E6A:
 J_SolidObject_03: ; loc_18E70:
 		jmp     SolidObject             ; (loc_F4A0)
 		dc.w    $0000		   ; Filler
-;=============================================================================== 
+;===============================================================================
 ; Object 0x3D - Break to Boost - Oil Ocean
 ; [ Begin ]		         
 ;===============================================================================  
@@ -29564,7 +29564,7 @@ loc_18E86:
 		dc.w    loc_18FE2-loc_18E86
 loc_18E8E:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj3D_MapUnc_1916E, $0004(A0) ; loc_1916E
+		move.l  #Break_Boost_Mappings, $0004(A0) ; loc_1916E
 		move.w  #$6332, $0002(A0)
 		bsr.w     J_Adjust2PArtPointer_0A ; loc_19236
 		move.b  #$04, $0001(A0)
@@ -29765,7 +29765,7 @@ loc_1912E:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj3D_MapUnc_1916E:	BINCLUDE	"mappings/sprite/obj3D.bin"
+Break_Boost_Mappings:	BINCLUDE	"mappings/sprite/obj3D.bin"
 ; ===========================================================================
 		nop
 
@@ -29788,7 +29788,7 @@ J_SolidObject_04: ; loc_19242:
 J_SpeedToPos_06: ; loc_19248:
 		jmp     SpeedToPos              ; (loc_D27A)
 		dc.w    $0000		   ; Filler		    
-		
+
 ;=============================================================================== 
 ; Object 0x48 - Cannon - Oil Ocean 
 ; [ Begin ]		         
@@ -29811,9 +29811,9 @@ loc_19273:
 		dc.b    $00, $06, $07, $07, $00, $05, $07, $05, $00, $04, $07, $06, $00, $07, $07
 loc_19282:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj48_MapUnc_194CA, $0004(A0) ; loc_194CA
+		move.l  #Cannon_Mappings, $0004(A0) ; loc_194CA
 		move.w  #$6368, $0002(A0)
-		bsr.w     J_Adjust2PArtPointer_0B ; loc_19658
+		bsr.w   J_Adjust2PArtPointer_0B ; loc_19658
 		move.b  $0028(A0), D0
 		andi.w  #$000F, D0
 		btst    #$00, $0022(A0)
@@ -29983,7 +29983,7 @@ loc_194C8:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj48_MapUnc_194CA:	BINCLUDE	"mappings/sprite/obj48.bin"
+Cannon_Mappings:	BINCLUDE	"mappings/sprite/obj48.bin"
 ; ===========================================================================
 		nop
 
@@ -30538,7 +30538,7 @@ J_SolidObject_05: ; loc_1A0B6:
 J_SpeedToPos_08: ; loc_1A0BC:
 		jmp     SpeedToPos              ; (loc_D27A)
 		dc.w    $0000		   ; Filler
-;=============================================================================== 
+;===============================================================================
 ; Object 0x2C - Neo Green Hill - Leaves
 ; [ Begin ]		         
 ;===============================================================================		  
@@ -31225,7 +31225,7 @@ loc_1AA8A:
 		dc.b    $40, $0C, $80, $01, $20, $0C, $40, $03, $10, $10, $20, $00, $40, $0C, $80, $07
 loc_1AA9A:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj65_MapUnc_1AE2C, $0004(A0) ; loc_1AE2C
+		move.l  #Mz_Platform_Mappings, $0004(A0) ; loc_1AE2C
 		move.w  #$6000, $0002(A0)
 		bsr.w     J_Adjust2PArtPointer_11 ; loc_1AEB0
 		ori.b   #$04, $0001(A0)
@@ -31520,7 +31520,7 @@ loc_1AE26:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj65_MapUnc_1AE2C:	BINCLUDE	"mappings/sprite/obj65_a.bin"
+Mz_Platform_Mappings:	BINCLUDE	"mappings/sprite/obj65_a.bin"
 Obj65_MapUnc_1AE68:	BINCLUDE	"mappings/sprite/obj65_b.bin"
 
 ;=============================================================================== 
@@ -32008,7 +32008,7 @@ loc_1B4DA:
 		dc.l    $00050000, $0000FFEC, $00050000, $0000FFF8		             
 ;=============================================================================== 
 ; Object 0x67 - Metropolis - Teleport Attributes
-; [ End ]		         
+; [ End ]
 ;===============================================================================               
 J_DisplaySprite_09: ; loc_1B50C:
 		jmp     DisplaySprite           ; (loc_D3C2)
@@ -32158,7 +32158,7 @@ Obj68_MapUnc_1B6DC:	BINCLUDE	"mappings/sprite/obj68.bin"
 ; Object 0x68 - Metropolis - Block with Arrow
 ; [ End ]		         
 ;===============================================================================  
-;=============================================================================== 
+;===============================================================================
 ; Object 0x6D - Metropolis - Floor Harpoon
 ; [ Begin ]		         
 ;===============================================================================  
@@ -32409,7 +32409,7 @@ loc_1BA3E:
 		dc.w    loc_1BBE6-loc_1BA3E
 loc_1BA44:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj65_MapUnc_1AE2C, $0004(A0) ; loc_1AE2C
+		move.l  #Mz_Platform_Mappings, $0004(A0) ; loc_1AE2C
 		move.w  #$6000, $0002(A0)
 		ori.b   #$04, $0001(A0)
 		move.b  #$04, $0018(A0)
@@ -32420,7 +32420,7 @@ loc_1BA44:
 		cmpi.b  #dust_hill_zone, (Current_Zone).w
 		bne.w    loc_1BB44
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj6A_MapUnc_1BCB0, $0004(A0) ; loc_1BCB0
+		move.l  #Rotating_Boxes_Mappings, $0004(A0) ; loc_1BCB0
 		move.w  #$63D4, $0002(A0)
 		move.b  #$20, $0019(A0)
 		move.b  #$20, $0016(A0)
@@ -32563,7 +32563,7 @@ loc_1BC92:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj6A_MapUnc_1BCB0:	BINCLUDE	"mappings/sprite/obj6A.bin"
+Rotating_Boxes_Mappings:	BINCLUDE	"mappings/sprite/obj6A.bin"
 ; ===========================================================================
 J_SingleObjLoad2_06: ; loc_1BCD4:
 		jmp     SingleObjLoad2      ; (loc_E788)
@@ -32589,11 +32589,11 @@ loc_1BCFE:
 		dc.b    $20, $0C, $01, $00, $10, $10, $00, $00
 loc_1BD06:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj65_MapUnc_1AE2C, $0004(A0) ; loc_1AE2C
+		move.l  #Mz_Platform_Mappings, $0004(A0) ; loc_1AE2C
 		move.w  #$6000, $0002(A0)
 		cmpi.b  #chemical_plant_zone, (Current_Zone).w
 		bne.s   loc_1BD2E
-		move.l  #Obj6B_MapUnc_1BF4A, $0004(A0)       ; loc_1BF4A
+		move.l  #Block_Mappings, $0004(A0)       ; loc_1BF4A
 		move.w  #$6418, $0002(A0)
 loc_1BD2E:
 		bsr.w     J_Adjust2PArtPointer_16 ; loc_1BF58
@@ -32796,7 +32796,7 @@ loc_1BF34:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj6B_MapUnc_1BF4A:	BINCLUDE	"mappings/sprite/obj6B.bin"
+Block_Mappings:	BINCLUDE	"mappings/sprite/obj6B.bin"
 ; ===========================================================================
 		nop
 
@@ -33178,7 +33178,7 @@ J_DeleteObject_1C: ; loc_1C45E:
 ; ---------------------------------------------------------------------------
 Obj6E_MapUnc_1C464:	BINCLUDE	"mappings/sprite/obj6E.bin"
 
-;=============================================================================== 
+;===============================================================================
 ; Object 0x6E - Metropolis - Machine
 ; [ End ]		         
 ;===============================================================================		   
@@ -33328,7 +33328,7 @@ loc_1C6BE:
 		dc.w    $2020, $201F, $201E, $201D, $201C, $201B, $201A, $2019
 		dc.w    $2018, $2017, $2016, $2015, $2014, $2013, $2012, $2011
 		dc.w    $2010, $200F, $200E, $200D, $200C, $200B, $200A, $2009
-		dc.w    $2008, $2007, $2006, $2005, $2004, $2003, $2002, $2001   
+		dc.w    $2008, $2007, $2006, $2005, $2004, $2003, $2002, $2001
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
@@ -33448,7 +33448,7 @@ loc_1C95A:
 J_DeleteObject_1E: ; loc_1C990:
 		jmp     DeleteObject            ; (loc_D3B4)   
 
-loc_1C996:		  
+loc_1C996:
 		dc.b    $10
 loc_1C997:
 		dc.b    $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $0C, $10
@@ -33707,16 +33707,16 @@ Obj_0x75_Spikeball_Chain: ; loc_1CE48:
 		jmp     loc_1CE68(PC, D1)
 loc_1CE60:
 		move.w  #$0280, D0
-		bra.w     J_DisplaySprite_Param_00  ; loc_1D040
+		bra.w   J_DisplaySprite_Param_00  ; loc_1D040
 loc_1CE68:
 		dc.w    loc_1CE6E-loc_1CE68
 		dc.w    loc_1CF4A-loc_1CE68
 		dc.w    loc_1CFEC-loc_1CE68
 loc_1CE6E:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj75_MapUnc_1D00A, $0004(A0) ; loc_1D00A
+		move.l  #Spikeball_Chain_Mappings, $0004(A0) ; loc_1D00A
 		move.w  #$2000, $0002(A0)
-		bsr.w     J_Adjust2PArtPointer_1B ; loc_1D064
+		bsr.w   J_Adjust2PArtPointer_1B ; loc_1D064
 		move.b  #$04, $0001(A0)
 		move.b  #$05, $0018(A0)
 		move.b  #$10, $0019(A0)
@@ -33834,11 +33834,11 @@ loc_1CFEC:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj75_MapUnc_1D00A:	BINCLUDE	"mappings/sprite/obj75.bin"
+Spikeball_Chain_Mappings:	BINCLUDE	"mappings/sprite/obj75.bin"
 ; ============================================================================
 		nop
 
-J_DisplaySprite_Param_00: ; loc_1D040:		               
+J_DisplaySprite_Param_00: ; loc_1D040:
 		jmp     DisplaySprite_Param     ; (loc_D3FE)
 J_DisplaySprite_0C: ; loc_1D046:
 		jmp     DisplaySprite           ; (loc_D3C2)
@@ -33995,7 +33995,7 @@ loc_1D216:
 		dc.w    loc_1D23C-loc_1D216
 loc_1D21A:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj77_MapUnc_1D2E0, $0004(A0) ; loc_1D2E0
+		move.l  #Dhz_Bridge_Mappings, $0004(A0) ; loc_1D2E0
 		move.w  #$643C, $0002(A0)
 		bsr.w     J_Adjust2PArtPointer_1D ; loc_1D3B2
 		ori.b   #$04, $0001(A0)
@@ -34055,7 +34055,7 @@ loc_1D2DA:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj77_MapUnc_1D2E0:	BINCLUDE	"mappings/sprite/obj77.bin"
+Dhz_Bridge_Mappings:	BINCLUDE	"mappings/sprite/obj77.bin"
 ; ===========================================================================
 
 J_MarkObjGone_12: ; loc_1D3AC:
@@ -34099,7 +34099,7 @@ loc_1D3FA:
 		move.b  #$04, $0024(A1)
 loc_1D408:
 		_move.b  0(A0), 0(A1)
-		move.l  #Obj6B_MapUnc_1BF4A, $0004(A1) ; loc_1BF4A
+		move.l  #Block_Mappings, $0004(A1) ; loc_1BF4A
 		move.w  #$6418, $0002(A1)
 		bsr.w     J_Adjust2PArtPointer2_02 ; loc_1D582
 		move.b  #$04, $0001(A1)
@@ -34414,7 +34414,7 @@ loc_1D780:
 		dc.w    $F000, $F600
 loc_1D784:
 		addq.b  #$02, $0024(A0)
-		move.l  #Obj7B_MapUnc_1D920, $0004(A0) ; loc_1D920
+		move.l  #Spring_Tubes_Mappings, $0004(A0) ; loc_1D920
 		move.w  #$03E0, $0002(A0)
 		ori.b   #$04, $0001(A0)
 		move.b  #$10, $0019(A0)
@@ -34535,7 +34535,7 @@ loc_1D917:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj7B_MapUnc_1D920:	BINCLUDE	"mappings/sprite/obj7B.bin"
+Spring_Tubes_Mappings:	BINCLUDE	"mappings/sprite/obj7B.bin"
 ; ===========================================================================
 		nop
 
@@ -34858,7 +34858,7 @@ loc_1DE3C:
 		move.l  D2, $0008(A0)
 		move.l  D3, $000C(A0)
 		rts      
-loc_1DE4E:		 
+loc_1DE4E:
 		dc.w    loc_1DE56-loc_1DE4E
 		dc.w    loc_1DE5A-loc_1DE4E
 		dc.w    loc_1DE5E-loc_1DE4E
@@ -34888,7 +34888,7 @@ loc_1DE82:
 loc_1DE8C:
 		dc.w    $0001
 		dc.l    $F00F0030, $0018FFF0				  
-;=============================================================================== 
+;===============================================================================
 ; Object 0x52 - Piranha 
 ; [ End ]		         
 ;===============================================================================   
@@ -35008,7 +35008,7 @@ J_SpeedToPos_0C: ; loc_1E008:
 		jmp     SpeedToPos              ; loc_D27A  
 		dc.w    $0000		   ; Filler 
 ;=============================================================================== 
-; Object 0x50 - Oil Ocean - Aquis (Seahorse)  
+; Object 0x50 - Oil Ocean - Aquis (Seahorse)
 ; [ Begin ]		         
 ;===============================================================================  
 Obj_0x50_Aquis: ; loc_1E010:
@@ -35818,7 +35818,7 @@ loc_1EB05:
 Obj4B_MapUnc_1EB0E:	BINCLUDE	"mappings/sprite/obj4B.bin"
 
 ;=============================================================================== 
-; Object 0x4B - Green Hill - Buzz Bomber  
+; Object 0x4B - Green Hill - Buzz Bomber
 ; [ End ]		         
 ;===============================================================================  
 		align 4
@@ -36688,7 +36688,7 @@ J_ObjectFall_06: ; loc_1F990:
 J_SpeedToPos_12: ; loc_1F996:
 		jmp     SpeedToPos              ; loc_D27A   
 ;=============================================================================== 
-; Object 0x57 - 
+; Object 0x57 -
 ; [ Begin ]		         
 ;===============================================================================		    
 Obj_0x57: ; loc_1F99C:
@@ -37888,7 +37888,7 @@ J_Adjust2PArtPointer_25: ; loc_21158:
 ;=============================================================================== 
 ; Sub Routine TouchResponse
 ; [ Begin ]		         
-;===============================================================================  
+;===============================================================================
 TouchResponse: ; loc_21160:   
 		nop
 		bsr.w     loc_21502
@@ -38668,7 +38668,7 @@ loc_21AF2:
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
 		dc.w    $2142 
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w    $2142  
+		dc.w    $2142
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
 		dc.w    $2142  
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
@@ -38698,7 +38698,7 @@ loc_21AF2:
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
 		dc.w    $4142		      
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w    $4142 
+		dc.w    $4142
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
 		dc.w    $4142   
 		dc.l    SS_Reverse_Goal_Mappings ; loc_21CC6
@@ -38998,7 +38998,7 @@ loc_21EB2:
 		
 ;=============================================================================== 
 ; Sub Routine SonicInSS_MoveLeft
-; [ Begin ]		         
+; [ Begin ]
 ;===============================================================================		 
 SonicInSS_MoveLeft: ; loc_21EB8:
 		bset    #$00, $0022(A0)
@@ -39028,7 +39028,7 @@ loc_21EE2:
 ;=============================================================================== 
 ; Sub Routine SonicInSS_MoveRight
 ; [ Begin ]		         
-;===============================================================================		 
+;===============================================================================
 SonicInSS_MoveRight: ; loc_21EE8:
 		bclr    #$00, $0022(A0)
 		move.w  $0014(A0), D0
@@ -39088,7 +39088,7 @@ loc_21F58:
 ;===============================================================================		 
 SonicInSS_Null: ; loc_21F5A:   
 		rts
-;=============================================================================== 
+;===============================================================================
 ; Sub Routine SonicInSS_Null
 ; [ End ]		         
 ;===============================================================================		 
@@ -41011,9 +41011,9 @@ Debug_Mz: ; loc_23ECC:  ; Metropolis
 		dc.b    $01, $00, $20, $00
 		dc.l    ($64<<$18)|Obj64_MapUnc_1A9F0             ; loc_1A9F0
 		dc.b    $11, $01, $20, $00
-		dc.l    ($65<<$18)|Obj65_MapUnc_1AE2C        ; loc_1AE2C
+		dc.l    ($65<<$18)|Mz_Platform_Mappings        ; loc_1AE2C
 		dc.b    $80, $00, $60, $00
-		dc.l    ($65<<$18)|Obj65_MapUnc_1AE2C        ; loc_1AE2C
+		dc.l    ($65<<$18)|Mz_Platform_Mappings        ; loc_1AE2C
 		dc.b    $13, $01, $60, $00
 		dc.l    ($47<<$18)|Obj47_MapUnc_18E3E             ; loc_18E3E
 		dc.b    $00, $02, $04, $24
@@ -41027,9 +41027,9 @@ Debug_Mz: ; loc_23ECC:  ; Metropolis
 		dc.b    $00, $04, $64, $14
 		dc.l    ($69<<$18)|Obj69_MapUnc_1B9A6          ; loc_1B9A6
 		dc.b    $04, $00, $25, $00
-		dc.l    ($6A<<$18)|Obj65_MapUnc_1AE2C        ; loc_1AE2C
+		dc.l    ($6A<<$18)|Mz_Platform_Mappings        ; loc_1AE2C
 		dc.b    $00, $01, $60, $00
-		dc.l    ($6B<<$18)|Obj65_MapUnc_1AE2C        ; loc_1AE2C
+		dc.l    ($6B<<$18)|Mz_Platform_Mappings        ; loc_1AE2C
 		dc.b    $01, $01, $60, $00
 		dc.l    ($6D<<$18)|Obj68_MapUnc_1B6DC        ; loc_1B6DC
 		dc.b    $00, $00, $24, $1C
@@ -41051,7 +41051,7 @@ Debug_Mz: ; loc_23ECC:  ; Metropolis
 		dc.b    $01, $01, $43, $FD
 		dc.l    ($1C<<$18)|Obj1C_MapUnc_9B9A
 		dc.b    $03, $02, $23, $FD
-		dc.l    ($65<<$18)|Obj65_MapUnc_1AE2C        ; loc_1AE2C
+		dc.l    ($65<<$18)|Mz_Platform_Mappings        ; loc_1AE2C
 		dc.b    $B0, $00, $60, $00
 Debug_HTz: ; loc_23FAE:  ; Hill Top
 		dc.w    $0019
@@ -41097,7 +41097,7 @@ Debug_HTz: ; loc_23FAE:  ; Hill Top
 		dc.b    $07, $00, $40, $00
 		dc.l    ($1C<<$18)|Obj1C_MapUnc_9B3A
 		dc.b    $08, $01, $40, $00
-		dc.l    ($32<<$18)|Obj32_MapUnc_179C2               ; loc_179C2
+		dc.l    ($32<<$18)|Rock_Mappings               ; loc_179C2
 		dc.b    $00, $00, $43, $B2
 		dc.l    ($31<<$18)|Lava_Attributes_Mappings    ; loc_15612
 		dc.b    $00, $00, $86, $80
@@ -41128,7 +41128,7 @@ Debug_HPz: ; loc_24078:  ; Hidden Palace
 		dc.l    ($50<<$18)|Aquis_Mappings              ; loc_1E4E0  ; Out of Pointers
 		dc.b    $00, $00, $25, $70
 		dc.l    ($51<<$18)|Aquis_Mappings              ; loc_1E4E0  ; Out of Pointers
-		dc.b    $00, $00, $25, $70		 
+		dc.b    $00, $00, $25, $70
 		dc.l    ($4D<<$18)|Rhinobot_Mappings           ; loc_1DAEE  ; Out of Pointers
 		dc.b    $00, $00, $23, $C4		   
 		dc.l    ($4B<<$18)|Obj4B_MapUnc_1EB0E        ; Obj4B_MapUnc_1EB0E  ; Out of Pointers
@@ -41145,29 +41145,29 @@ Debug_OOz: ; loc_240F2:  ; Oil Ocean
 		dc.b    $07, $00, $06, $80
 		dc.l    ($33<<$18)|Obj33_MapUnc_17EE2      ; loc_17EE2
 		dc.b    $01, $00, $63, $2C
-		dc.l    ($43<<$18)|Obj43_MapUnc_1808E    ; loc_1808E
+		dc.l    ($43<<$18)|Giant_Spikeball_Mappings    ; loc_1808E
 		dc.b    $00, $00, $C3, $0C
 		dc.l    ($19<<$18)|Obj19_MapUnc_16412           ; loc_16412
 		dc.b    $23, $02, $63, $00
-		dc.l    ($45<<$18)|Obj45_MapUnc_185C2  ; loc_185C2
+		dc.l    ($45<<$18)|Spring_Push_Boost_Mappings  ; loc_185C2
 		dc.b    $02, $00, $43, $C5
-		dc.l    ($45<<$18)|Obj45_MapUnc_185C2  ; loc_185C2
+		dc.l    ($45<<$18)|Spring_Push_Boost_Mappings  ; loc_185C2
 		dc.b    $12, $0A, $43, $C5
-		dc.l    ($46<<$18)|Obj46_MapUnc_18CFA        ; loc_18CFA
+		dc.l    ($46<<$18)|Spring_Ball_Mappings        ; loc_18CFA
 		dc.b    $00, $01, $63, $54 
 		dc.l    ($47<<$18)|Obj47_MapUnc_18E3E             ; loc_18E3E
 		dc.b    $00, $02, $04, $24
 		dc.l    ($15<<$18)|Obj15_MapUnc_8AD8    ; loc_8AD8
 		dc.b    $88, $01, $43, $E3
-		dc.l    ($3D<<$18)|Obj3D_MapUnc_1916E        ; loc_1916E
+		dc.l    ($3D<<$18)|Break_Boost_Mappings        ; loc_1916E
 		dc.b    $00, $00, $63, $32
-		dc.l    ($48<<$18)|Obj48_MapUnc_194CA             ; loc_194CA
+		dc.l    ($48<<$18)|Cannon_Mappings             ; loc_194CA
 		dc.b    $80, $00, $63, $68
-		dc.l    ($48<<$18)|Obj48_MapUnc_194CA             ; loc_194CA
+		dc.l    ($48<<$18)|Cannon_Mappings             ; loc_194CA
 		dc.b    $81, $01, $63, $68
-		dc.l    ($48<<$18)|Obj48_MapUnc_194CA             ; loc_194CA
+		dc.l    ($48<<$18)|Cannon_Mappings             ; loc_194CA
 		dc.b    $82, $02, $63, $68
-		dc.l    ($48<<$18)|Obj48_MapUnc_194CA             ; loc_194CA
+		dc.l    ($48<<$18)|Cannon_Mappings             ; loc_194CA
 		dc.b    $83, $03, $63, $68
 		dc.l    ($1F<<$18)|Obj1A_MapUnc_9902 ; loc_9902
 		dc.b    $00, $00, $63, $9D
@@ -41191,7 +41191,7 @@ Debug_DHz: ; loc_24194:  ; Dust Hill
 		dc.b    $00, $00, $63, $F4
 		dc.l    ($73<<$18)|MapUnc_Obj73_1CE1C     ; loc_1CE1C
 		dc.b    $F5, $00, $26, $BC
-		dc.l    ($6A<<$18)|Obj6A_MapUnc_1BCB0     ; loc_1BCB0
+		dc.l    ($6A<<$18)|Rotating_Boxes_Mappings     ; loc_1BCB0
 		dc.b    $18, $00, $63, $D4
 		dc.l    ($2A<<$18)|Obj2A_MapUnc_9CAE     ; loc_9CAE
 		dc.b    $00, $00, $40, $00
@@ -41207,11 +41207,11 @@ Debug_DHz: ; loc_24194:  ; Dust Hill
 		dc.b    $01, $00, $04, $40
 		dc.l    ($74<<$18)|Obj74_MapUnc_156B2    ; loc_156B2
 		dc.b    $11, $00, $86, $80
-		dc.l    ($75<<$18)|Obj75_MapUnc_1D00A    ; loc_1D00A
+		dc.l    ($75<<$18)|Spikeball_Chain_Mappings    ; loc_1D00A
 		dc.b    $18, $02, $20, $00
 		dc.l    ($76<<$18)|Obj76_MapUnc_1D1BA    ; loc_1D1BA
 		dc.b    $00, $00, $00, $00
-		dc.l    ($77<<$18)|Obj77_MapUnc_1D2E0         ; loc_1D2E0
+		dc.l    ($77<<$18)|Dhz_Bridge_Mappings         ; loc_1D2E0
 		dc.b    $01, $00, $64, $3C
 Debug_CNz: ; loc_24216:  ; Casino Night
 		dc.w    $0002
@@ -41227,23 +41227,23 @@ Debug_CPz: ; loc_24228:  ; Chemical Plant
 		dc.b    $07, $00, $06, $80
 		dc.l    ($0B<<$18)|Obj0B_MapUnc_14996 ; loc_14996
 		dc.b    $70, $00, $E3, $B0
-		dc.l    ($1B<<$18)|Obj1B_MapUnc_1658A      ; loc_1658A
+		dc.l    ($1B<<$18)|Speed_Booster_Mappings      ; loc_1658A
 		dc.b    $00, $00, $E3, $9C
-		dc.l    ($1D<<$18)|Obj1D_MapUnc_16702              ; loc_16702
+		dc.l    ($1D<<$18)|Worms_Mappings              ; loc_16702
 		dc.b    $15, $00, $E4, $3C
 		dc.l    ($19<<$18)|Obj19_MapUnc_16412           ; loc_16412
 		dc.b    $06, $00, $63, $A0
 		dc.l    ($2D<<$18)|Obj2D_MapUnc_9E1E     ; loc_9E1E
 		dc.b    $02, $02, $23, $94
-		dc.l    ($32<<$18)|Obj32_MapUnc_179F6    ; loc_179F6
+		dc.l    ($32<<$18)|Tunel_Obstacule_Mappings    ; loc_179F6
 		dc.b    $00, $00, $64, $30
-		dc.l    ($6B<<$18)|Obj6B_MapUnc_1BF4A              ; loc_1BF4A
+		dc.l    ($6B<<$18)|Block_Mappings              ; loc_1BF4A
 		dc.b    $10, $00, $64, $18
-		dc.l    ($78<<$18)|Obj6B_MapUnc_1BF4A              ; loc_1BF4A
+		dc.l    ($78<<$18)|Block_Mappings              ; loc_1BF4A
 		dc.b    $00, $00, $64, $18        
 		dc.l    ($7A<<$18)|Obj7A_MapUnc_1D72C ; loc_1D72C
 		dc.b    $00, $00, $E4, $18
-		dc.l    ($7B<<$18)|Obj7B_MapUnc_1D920       ; loc_1D920
+		dc.l    ($7B<<$18)|Spring_Tubes_Mappings       ; loc_1D920
 		dc.b    $02, $00, $03, $E0
 		dc.l    ($03<<$18)|Obj03_MapUnc_147D0       ; loc_147D0
 		dc.b    $09, $01, $26, $BC
@@ -41430,7 +41430,7 @@ plreq macro toVRAMaddr,fromROMaddr
 ; PATTERN LOAD REQUEST LIST
 ; Standard 1 - loaded for every level
 ;---------------------------------------------------------------------------------------
-; PlrList_2447A: Standard_Sprites_1:  
+; PlrList_2447A: Standard_Sprites_1:
 PlrList_Std1:	plrlistheader
 		plreq $047C, ArtNem_Checkpoint
 		plreq $06CA, Head_up_display_Sprites
@@ -41458,7 +41458,7 @@ Standard_Sprites_3:
 		dc.w    $B000 
 		dc.l    White_Bird              ; loc_804A0 
 		dc.w    $B240
-Standard_Sprites_4:  
+Standard_Sprites_4:
 loc_244C2:
 		dc.w    (((loc_244CA-loc_244C2-$02)/$06)-$01)
 		dc.l    Game_Time_Over          ; loc_7F678
@@ -41488,9 +41488,9 @@ loc_244FC:
 		dc.l    ArtNem_Buzzer       ; loc_7A4BC
 		dc.w    $7CC0 
 		dc.l    ArtNem_Snail             ; loc_7C514
-		dc.w    $8040   
+		dc.w    $8040
 		dc.l    ArtNem_Masher             ; loc_7CA92
-		dc.w    $8380    
+		dc.w    $8380
 Wood_Sprites_1:   
 loc_24510:
 		dc.w    (((loc_24518-loc_24510-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
@@ -41548,7 +41548,7 @@ Metropolis_Sprites_2:
 		dc.l    ArtNem_MTZ_Platform  ; loc_74F52    
 		dc.w    $A7E0  
 		dc.l    ArtNem_MtzCog            ; loc_752A0
-		dc.w    $ABE0       
+		dc.w    $ABE0
 Hill_Top_Sprites_1:   
 loc_245A2:
 		dc.w    (((loc_245E0-loc_245A2-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
@@ -41578,9 +41578,9 @@ loc_245E0:
 		dc.l    ArtNem_HtzZipline           ; loc_73E68 
 		dc.w    $7CC0 
 		dc.l    Htz_Lava_Bubble         ; loc_73C42
-		dc.w    $82C0 
+		dc.w    $82C0
 		dc.l    ArtNem_HtzValveBarrier      ; loc_7415C 
-		dc.w    $84C0 
+		dc.w    $84C0
 Hidden_Palace_Sprites_1:   
 loc_245F4:
 		dc.w    (((loc_24626-loc_245F4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
@@ -41608,10 +41608,10 @@ loc_24626:
 		dc.l    ArtNem_Batbot              ; loc_7A6A2
 		dc.w    $A600		  
 loc_2463A: ; Not all sprites are loaded in to VRam               
-		dc.l    Hpz_Crocobot            ; loc_7A11A ; Left Over 
+		dc.l    Hpz_Crocobot            ; loc_7A11A ; Left Over
 		dc.w    $6000 
 		dc.l    ArtNem_Buzzer       ; loc_7A4BC
-		dc.w    $6580  
+		dc.w    $6580
 		dc.l    ArtNem_Batbot              ; loc_7A6A2
 		dc.w    $6A00  
 		dc.l    Hpz_Rhinobot            ; loc_7AD18 ; Left Over
@@ -41638,7 +41638,7 @@ loc_24658:
 		dc.l    ArtNem_Oilfall2           ; loc_764D6
 		dc.w    $68C0		  
 Oil_Ocean_Sprites_2:    
-loc_24684: 
+loc_24684:
 		dc.w    (((loc_246C2-loc_24684-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
 		dc.l    ArtNem_OOZBall		; loc_76602 
 		dc.w    $6A80 
@@ -41668,7 +41668,7 @@ loc_246C2:
 		dc.l    ArtNem_Crate		 ; loc_7708A
 		dc.w    $7A80  
 		dc.l    ArtNem_DHZCollapsePlat ; loc_772C8
-		dc.w    $7E80     
+		dc.w    $7E80
 		dc.l    ArtNem_VineSwitch               ; loc_77472
 		dc.w    $81C0   
 		dc.l    ArtNem_VinePulley             ; loc_7756A
@@ -41728,7 +41728,7 @@ loc_24730:
 		dc.l    ArtNem_CPZStairBlock           ; loc_77EB4
 		dc.w    $8300 
 		dc.l    ArtNem_CPZMetalBlock
-		dc.w    $8600 
+		dc.w    $8600
 Chemical_Plant_Sprites_2:      
 loc_2476E:
 		dc.w    (((loc_24794-loc_2476E-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
@@ -41788,7 +41788,7 @@ loc_247E4: ; Not all sprites are loaded in to VRam
 Green_Hill_Boss:
 loc_247F0:   
 		dc.w    (((loc_24804-loc_247F0-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    Robotnik_Ship           ; loc_7CC9E 
+		dc.l    Robotnik_Ship           ; loc_7CC9E
 		dc.w    $8C00
 		dc.l    ArtNem_GHZBoss            ; loc_7E124
 		dc.w    $9800
@@ -41848,7 +41848,7 @@ loc_24868:
 		dc.l    ArtNem_EggChoppers         ; loc_7E910
 		dc.w    $AD00
 		dc.w    (Boss_Smoke&$FFFF)      ; loc_7E03E ; Left over from previous build
-		dc.w    $9B00 
+		dc.w    $9B00
 		dc.l    ArtNem_GHZBoss            ; loc_7E124
 		dc.w    $9D00
 		dc.l    ArtNem_EggChoppers         ; loc_7E910
@@ -41878,7 +41878,7 @@ loc_248C2:
 		dc.l    ArtNem_VrtclSprng         ; loc_78658
 		dc.w    $8B80 
 		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w    $8E00 
+		dc.w    $8E00
 Chemical_Plant_Sprites_Previous_Build_1:		  
 loc_248DC:		 
 		dc.w    (((loc_2491A-loc_248DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
@@ -41908,7 +41908,7 @@ loc_2491A:
 		dc.l    ArtNem_Spikes		  ; loc_7914E
 		dc.w    $8680  
 		dc.l    ArtNem_CPZDroplet               ; loc_779AA
-		dc.w    $8780		         
+		dc.w    $8780
 		dc.l    (ArtNem_LeverSpring-$0188) ; loc_7976C 
 		dc.w    $8800  
 		dc.l    ArtNem_VrtclSprng         ; loc_78658
@@ -41938,7 +41938,7 @@ loc_2495A:
 		dc.l    ArtNem_VrtclSprng         ; loc_78658
 		dc.w    $8B80   
 		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w    $8E00   
+		dc.w    $8E00
 End_Level_Results_Sprites_Previous_Build:		    
 loc_24974:  
 		dc.w    (((loc_2497C-loc_24974-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
@@ -41968,7 +41968,7 @@ loc_249A4:
 		dc.l    Cpz_Boss-$07E2          ; loc_7CBF8   
 		dc.w    $8C00		 
 		dc.l    Ship_Boost-$07E2        ; loc_7D7DE 
-		dc.w    $9A00		   
+		dc.w    $9A00
 		dc.l    Boss_Smoke-$07E2        ; loc_7D85C 
 		dc.w    $9B00 
 		dc.l    ArtNem_GHZBoss-$07E2      ; loc_7D942
@@ -42003,7 +42003,7 @@ loc_249F8:
 		dc.l    ArtNem_EggChoppers-$07E2   ; loc_7E12E
 		dc.w    $A800 
 loc_24A0C: 
-		dc.l    Robotnik_Ship-$07E2     ; loc_7C4BC 
+		dc.l    Robotnik_Ship-$07E2     ; loc_7C4BC
 		dc.w    $8000		   
 		dc.l    Cpz_Boss-$07E2          ; loc_7CBF8   
 		dc.w    $8C00		 
@@ -42963,7 +42963,7 @@ Colision_Array_2: ; loc_2E2EA:
 ;===============================================================================				          
 Green_Hill_Colision_1:     ; loc_2F2EA:		
 		BINCLUDE	"level/collision/GHZ primary 16x16 collision index.bin"
-Green_Hill_Colision_2:     ; loc_2F5EA:		
+Green_Hill_Colision_2:     ; loc_2F5EA:
 		BINCLUDE	"level/collision/GHZ secondary 16x16 collision index.bin"
 Wood_Colision:             ; loc_2F8EA:
 		BINCLUDE	"level/collision/WZ 16x16 collision index.bin"
@@ -42993,7 +42993,7 @@ Neo_Green_Hill_Colision_2: ; loc_319EA:
 ; 16x16 Colision Index
 ; [ End ]
 ;===============================================================================		  
-;=============================================================================== 
+;===============================================================================
 ; Special Stage Layout
 ; [ Begin ]
 ;===============================================================================        
@@ -43108,12 +43108,12 @@ Wz_2_Background:   ; loc_35BEE:
 		BINCLUDE	"level/layout/WZ_2_BG.bin"
 Null_Layout_2:     ; loc_363F0:             
 		dc.b    $00, $00, $00, $00		  
-Mz_1_Foreground:   ; loc_363F4: 
+Mz_1_Foreground:   ; loc_363F4:
 		BINCLUDE	"level/layout/MTZ_1.bin"
 Mz_2_Foreground:   ; loc_36BF6: 
 		BINCLUDE	"level/layout/MTZ_2.bin"
 Mz_Background:     ; loc_373F8:            
-		BINCLUDE	"level/layout/MTZ_BG.bin"          
+		BINCLUDE	"level/layout/MTZ_BG.bin"
 Mz_3_Foreground:   ; loc_3741E:  
 		BINCLUDE	"level/layout/MTZ_3.bin"
 Null_Layout_3:     ; loc_37C20:            
@@ -43138,7 +43138,7 @@ OOz_2_Foreground:  ; loc_3AC7E:
 		BINCLUDE	"level/layout/OOZ_2.bin"
 OOz_Background:    ; loc_3B480:             
 		BINCLUDE	"level/layout/OOZ_BG.bin"
-Dhz_1_Foreground:  ; loc_3B49A:  
+Dhz_1_Foreground:  ; loc_3B49A:
 		BINCLUDE	"level/layout/DHZ_1.bin"
 Dhz_2_Foreground:  ; loc_3BC9C:               
 		BINCLUDE	"level/layout/DHZ_2.bin"
@@ -43168,12 +43168,12 @@ Nghz_1_Background: ; loc_3ECF8:
 		BINCLUDE	"level/layout/NGHZ_1_BG.bin"
 Nghz_2_Background: ; loc_404FA:  
 		BINCLUDE	"level/layout/NGHZ_2_BG.bin"
-Null_Layout_6:     ; loc_40CFC:             
+Null_Layout_6:     ; loc_40CFC:
 		dc.b    $00, $00, $00, $00    
 ;=============================================================================== 
 ; Level Object Layout
 ; [ End ]
-;===============================================================================		    
+;===============================================================================
 loc_40D00: ; Big Ring - Left Over from Sonic 1		
 		BINCLUDE  "data\sprites\bigring.dat"
 loc_41940: ; Neo Green Hill Foreground Act 2 overwrite by Big Ring- Left Over from previous build ???		 
@@ -43408,7 +43408,7 @@ Nghz_2_Objects_Layout:	BINCLUDE	"level/objects/NGHZ_2.bin"
 	ObjectLayoutBoundary
 Null_Objects_Layout:
 	ObjectLayoutBoundary
-;=============================================================================== 
+;===============================================================================
 ; Level Object Layout
 ; [ End ]
 ;===============================================================================		            
@@ -43888,7 +43888,7 @@ Rings_Layout: zoneOrderedOffsetTable 2,2
 	zoneOffsetTableEntry.w  Id_0100_Rings_Layout
 	zoneOffsetTableEntry.w  Id_0101_Rings_Layout    
 	zoneOffsetTableEntry.w  Wz_1_Rings_Layout
-	zoneOffsetTableEntry.w  Wz_2_Rings_Layout 
+	zoneOffsetTableEntry.w  Wz_2_Rings_Layout
 	zoneOffsetTableEntry.w  Id_0300_Rings_Layout
 	zoneOffsetTableEntry.w  Id_0301_Rings_Layout  
 	zoneOffsetTableEntry.w  Mz_1_Rings_Layout
@@ -43923,7 +43923,7 @@ Ghz_1_Rings_Layout:	BINCLUDE	"level/rings/GHZ_1.bin"
 Ghz_2_Rings_Layout:	BINCLUDE	"level/rings/GHZ_2.bin"
 Id_0100_Rings_Layout: ; loc_483DC:				   
 		dc.w    $FFFF            
-Id_0101_Rings_Layout: ; loc_483DE:				   
+Id_0101_Rings_Layout: ; loc_483DE:
 		dc.w    $FFFF				 
 Wz_1_Rings_Layout:	BINCLUDE	"level/rings/WZ_1.bin"
 Wz_2_Rings_Layout:	BINCLUDE	"level/rings/WZ_2.bin"
@@ -44638,7 +44638,7 @@ Unknow_Data_0x048DB4: ; loc_48DB4:
 		dc.b    $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01
 		dc.b    $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $0B, $08
 		dc.b    $09, $0A, $84, $E9, $00, $0D, $00, $00
-Rock_Splashing: ; loc_4B76C: 
+Rock_Splashing: ; loc_4B76C:
 		BINCLUDE  "data\sprites\rockspsh.dat"				
 Unknow_Palett_0x04BAAC: ; loc_4BAAC:
 		dc.w    $0000, $0A20, $0666, $0888, $0CAA, $0ECC, $0246, $0008
@@ -45621,7 +45621,7 @@ Tails_Sprites: ; loc_6254C:
 MapRUnc_Sonic:	BINCLUDE	"mappings/spriteDPLC/Sonic.bin"
 
 ArtNem_Shield: ; loc_6DF8E:
-		BINCLUDE  "data\sprites\shield.nem"  
+		BINCLUDE  "data\sprites\shield.nem"
 Invencibility_Stars: ; loc_6E114:		              
 		BINCLUDE  "data\sprites\invstars.nem"  
 Unused_Dust: ; loc_6E1FC:   
@@ -46971,7 +46971,7 @@ ArtNem_CPZStairBlock:	BINCLUDE	"art/nemesis/Moving block from CPZ.bin"
 ArtNem_CPZTubeSpring:	BINCLUDE	"art/nemesis/CPZ spintube exit cover.bin"
 
 Nghz_Water_Surface: ; loc_78270:      
-		BINCLUDE  "data\nghz\watrsurf.nem"   
+		BINCLUDE  "data\nghz\watrsurf.nem"
 Nghz_Leaves: ; loc_78356:     
 		BINCLUDE  "data\nghz\leaves.nem"						 
 ;--------------------------------------------------------------------------------------
@@ -47061,7 +47061,7 @@ ArtNem_Buzzer:	BINCLUDE	"art/nemesis/Buzzer enemy.bin"
 	even
 ArtNem_Batbot:	BINCLUDE	"art/nemesis/Batbot enemy.bin"
 OOz_Octus: ; loc_7A9F8: 
-		BINCLUDE  "data\ooz\octus.nem"		 
+		BINCLUDE  "data\ooz\octus.nem"
 Hpz_Rhinobot: ; loc_7AD18: 
 		BINCLUDE  "data\hpz\rhinobot.nem"				 
 ;--------------------------------------------------------------------------------------
@@ -47098,7 +47098,7 @@ ArtNem_Masher:	BINCLUDE	"art/nemesis/GHZ Pirahna badnik.bin"
 
 Robotnik_Ship: ; loc_7CC9E: 
 		BINCLUDE  "data\sprites\robotnik.nem"  
-Cpz_Boss: ; loc_7D3DA: 
+Cpz_Boss: ; loc_7D3DA:
 		BINCLUDE  "data\cpz\boss.nem" 
 Boss_Explosions: ; loc_7D938: 
 		BINCLUDE  "data\sprites\bossexpl.nem"		 
@@ -47128,7 +47128,7 @@ Vertical_Springs_Sonic_1: ; loc_7F80A:
 Horizontal_Springs_Sonic_1: ; loc_7F90C:		
 		BINCLUDE  "data\sprites\hspng_s1.nem"		 
 Big_Ring_Flash: ; loc_7F9E8:
-		BINCLUDE  "data\sprites\rngflash.nem"		  
+		BINCLUDE  "data\sprites\rngflash.nem"
 Hidden_Points: ; loc_7FB5C:
 		BINCLUDE  "data\sprites\h_points.nem" 
 Sonic_Continue_Screen: ; loc_7FE5E:
@@ -47751,7 +47751,7 @@ Sfx_AA: ; loc_FF1FE:
 		dc.b    $17, $F2, $F2, $EF, $00, $A6, $14, $F2, $00, $00, $02, $03, $00, $D9, $1F, $DF
 		dc.b    $1F, $12, $14, $11, $0F, $0A, $0A, $00, $0D, $FF, $FF, $FF, $FF, $22, $27, $07
 		dc.b    $80               
-Sfx_AB: ; loc_FF23F:   
+Sfx_AB: ; loc_FF23F:
 		dc.b    $00, $00, $01, $01, $80, $C0, $49, $F2, $00, $00, $F5, $00, $F3, $E7, $C6, $03
 		dc.b    $80, $03, $C6, $01, $E7, $01, $EC, $01, $E7, $F7, $00, $15, $54, $F2, $F2
 Sfx_AC: ; loc_FF25E:    
@@ -47908,7 +47908,7 @@ Sfx_C9: ; loc_FF8C7:
 Sfx_CA: ; loc_FF8F4:
 		dc.b    $08, $F9, $01, $01, $80, $05, $FE, $F8, $00, $02, $EF, $00, $F0, $01, $01, $5B
 		dc.b    $02, $CC, $65, $F2, $20, $36, $30, $35, $31, $41, $3B, $49, $4B, $09, $09, $06
-		dc.b    $08, $01, $02, $03, $A9, $0F, $0F, $0F, $0F, $29, $23, $27, $80               
+		dc.b    $08, $01, $02, $03, $A9, $0F, $0F, $0F, $0F, $29, $23, $27, $80
 Sfx_CB: ; loc_FF921:
 		dc.b    $79, $F2, $01, $02, $80, $05, $31, $F9, $00, $00, $80, $C0, $42, $F9, $00, $00
 		dc.b    $EF, $00, $F0, $03, $01, $20, $04, $81, $18, $E6, $0A, $F7, $00, $06, $38, $F9
@@ -47961,7 +47961,7 @@ Sfx_D6: ; loc_FFB0D:
 		dc.b    $EF, $00, $F0, $01, $01, $12, $FF, $8F, $45, $F0, $00, $00, $00, $00, $E7, $E6
 		dc.b    $03, $A0, $01, $E6, $02, $E7, $0A, $F7, $00, $07, $30, $FB, $F2, $34, $01, $0B
 		dc.b    $0E, $09, $9F, $AF, $AF, $CF, $02, $00, $02, $00, $07, $0A, $04, $05, $BF, $BF
-		dc.b    $BF, $BF, $50, $1C, $00, $80               
+		dc.b    $BF, $BF, $50, $1C, $00, $80
 Sfx_D7: ; loc_FFB53:
 		dc.b    $67, $FB, $01, $01, $80, $05, $5D, $FB, $00, $06, $EF, $00, $F0, $01, $01, $07
 		dc.b    $01, $99, $1B, $F2, $3E, $20, $0F, $1F, $0F, $1F, $1F, $1F, $1F, $1F, $1F, $1F
