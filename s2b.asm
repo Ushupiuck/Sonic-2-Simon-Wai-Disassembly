@@ -8716,7 +8716,7 @@ Main_Level_Load_16_Blocks_Loop:
 		beq.s	Main_Level_Load_16_Blocks_Not2p
 		move.w	d0,d1
 		andi.w	#$F800,d0
-		andi.w	#7FF,d1
+		andi.w	#$7FF,d1
 		lsr.w	#1,d1
 		or.w	d1,d0
 Main_Level_Load_16_Blocks_Not2p:
@@ -15258,6 +15258,13 @@ BuildSprites_ObjLoop:
 		andi.w	#$C,d0		; is it to be positioned by the screen coordinates?
 		beq.s	BuildSprites_ScreenSpaceObj	; if yes, branch
 		movea.l	BldSpr_ScrPos(pc,d0.w),a1
+		cmpi.b  #GameModeID_SpecialStage,(Game_Mode).w
+        bne.s   Build_Sprites_A1
+        move.l  SS_Build_Sprites_Screen_Pos(PC, D0), A1 
+        bra.s   Build_Sprites_A1
+SS_Build_Sprites_Screen_Pos:
+        dc.l    $00000000, $FFFFEE00, $FFFFEE08, $FFFFEE18
+Build_Sprites_A1:
 		moveq	#0,d0
 		move.b	$19(a0),d0
 		move.w	8(a0),d3
@@ -38957,8 +38964,32 @@ loc_215CA:
 		move.b	(a1)+,d1
 		subq.b	#1,d1
 		bmi.s	loc_21622
-		jsr	(DrawSprite_Loop)
-
+;		jsr	(DrawSprite_Loop)
+SS_Fix_Loop:
+        cmpi.b  #$50, D5
+        beq.s   SS_Fix_Exit
+        move.b  (A1)+, D0
+        ext.w   D0
+        add.w   D2, D0
+        move.w  D0, (A2)+
+        move.b  (A1)+, (A2)+
+        addq.b  #$01, D5
+        move.b  D5, (A2)+
+        move.b  (A1)+, D0
+        lsl.w   #$08, D0
+        move.b  (A1)+, D0
+        add.w   A3, D0
+        move.w  D0, (A2)+
+        move.b  (A1)+, D0
+        ext.w   D0
+        add.w   D3, D0
+        andi.w  #$01FF, D0
+        bne     SS_Fix_L001
+        addq.w  #$01, D0
+SS_Fix_L001:
+        move.w  D0, (A2)+
+        dbra    D1, SS_Fix_Loop 
+SS_Fix_Exit:
 loc_21622:
 		addq.w	#4,a4
 		dbf	d6,loc_215CA
@@ -39400,171 +39431,347 @@ loc_21AEA:
 ; Special stage	mappings and VRAM pointers
 ; ---------------------------------------------------------------------------
 SS_MapIndex:
-	dc.l Map_SSWalls	; address of mappings
-	dc.w $142		; VRAM setting
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $2142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $4142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SSWalls
-	dc.w $6142
-	dc.l Map_SS_Bumber
-	dc.w $23B
-	dc.l Map_SS_R
-	dc.w $570
-	dc.l Map_SS_R
-	dc.w $251
-	dc.l Map_SS_R
-	dc.w $370
-	dc.l Map_SS_Up
-	dc.w $263
-	dc.l Map_SS_Down
-	dc.w $263
-	dc.l Map_SS_R
-	dc.w $22F0
-	dc.l Map_SS_Glass
-	dc.w $470
-	dc.l Map_SS_Glass
-	dc.w $5F0
-	dc.l Map_SS_Glass
-	dc.w $65F0
-	dc.l Map_SS_Glass
-	dc.w $25F0
-	dc.l Map_SS_Glass
-	dc.w $45F0
-	dc.l Map_SS_R
-	dc.w $2F0
-	dc.l Map_SS_Bumber+$1000000	; add frame no.	* $1000000
-	dc.w $23B
-	dc.l Map_SS_Bumber+$2000000
-	dc.w $23B
-	dc.l Map_SS_R
-	dc.w $797
-	dc.l Map_SS_R
-	dc.w $7A0
-	dc.l Map_SS_R
-	dc.w $7A9
-	dc.l Map_SS_R
-	dc.w $797
-	dc.l Map_SS_R
-	dc.w $7A0
-	dc.l Map_SS_R
-	dc.w $7A9
-	dc.l Obj25_MapUnc_B036
-	dc.w $27B2
-	dc.l Map_SS_Chaos3
-	dc.w $770
-	dc.l Map_SS_Chaos3
-	dc.w $2770
-	dc.l Map_SS_Chaos3
-	dc.w $4770
-	dc.l Map_SS_Chaos3
-	dc.w $6770
-	dc.l Map_SS_Chaos1
-	dc.w $770
-	dc.l Map_SS_Chaos2
-	dc.w $770
-	dc.l Map_SS_R
-	dc.w $4F0
-	dc.l Obj25_MapUnc_B036+$4000000
-	dc.w $27B2
-	dc.l Obj25_MapUnc_B036+$5000000
-	dc.w $27B2
-	dc.l Obj25_MapUnc_B036+$6000000
-	dc.w $27B2
-	dc.l Obj25_MapUnc_B036+$7000000
-	dc.w $27B2
-	dc.l Map_SS_Glass
-	dc.w $23F0
-	dc.l Map_SS_Glass+$1000000
-	dc.w $23F0
-	dc.l Map_SS_Glass+$2000000
-	dc.w $23F0
-	dc.l Map_SS_Glass+$3000000
-	dc.w $23F0
-	dc.l Map_SS_R+$2000000
-	dc.w $4F0
-	dc.l Map_SS_Glass
-	dc.w $5F0
-	dc.l Map_SS_Glass
-	dc.w $65F0
-	dc.l Map_SS_Glass
-	dc.w $25F0
-	dc.l Map_SS_Glass
-	dc.w $45F0
-
-Map_SS_R:	include	"mappings/SS R Block.asm"
-Map_SS_Glass:	include	"mappings/SS Glass Block.asm"
-Map_SS_Up:	include	"mappings/SS UP Block.asm"
-Map_SS_Down:	include	"mappings/SS DOWN Block.asm"
-Map_SS_Bumber:	include	"mappings/SS Bumper.asm"
-
-Map_SSWalls:	include	"mappings/SS Walls.asm"
-		include	"mappings/SS Chaos Emeralds.asm"
+                dc.l    SS_Map_R        
+                dc.w    $0142 
+                dc.l    SS_Map_R        
+                dc.w    $0142
+                dc.l    SS_Map_R        
+                dc.w    $0142
+                dc.l    SS_Map_R        
+                dc.w    $0142
+                dc.l    SS_Map_R        
+                dc.w    $0142
+                dc.l    SS_Map_R        
+                dc.w    $0142
+                dc.l    SS_Map_R        
+                dc.w    $0142 
+                dc.l    SS_Map_R        
+                dc.w    $0142 
+                dc.l    SS_Map_R        
+                dc.w    $0142 
+                dc.l    SS_Map_R        
+                dc.w    $2142 
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $2142  
+                dc.l    SS_Map_R        
+                dc.w    $4142
+                dc.l    SS_Map_R        
+                dc.w    $4142
+                dc.l    SS_Map_R        
+                dc.w    $4142
+                dc.l    SS_Map_R        
+                dc.w    $4142
+                dc.l    SS_Map_R        
+                dc.w    $4142
+                dc.l    SS_Map_R        
+                dc.w    $4142
+                dc.l    SS_Map_R        
+                dc.w    $4142 
+                dc.l    SS_Map_R        
+                dc.w    $4142 
+                dc.l    SS_Map_R        
+                dc.w    $4142   
+                dc.l    SS_Map_R        
+                dc.w    $6142   
+                dc.l    SS_Map_R        
+                dc.w    $6142   
+                dc.l    SS_Map_R        
+                dc.w    $6142   
+                dc.l    SS_Map_R        
+                dc.w    $6142  
+                dc.l    SS_Map_R        
+                dc.w    $6142 
+                dc.l    SS_Map_R        
+                dc.w    $6142 
+                dc.l    SS_Map_R        
+                dc.w    $6142 
+                dc.l    SS_Map_R        
+                dc.w    $6142 
+                dc.l    SS_Map_R        
+                dc.w    $6142  
+                dc.l    SS_Bumpers                  
+                dc.w    $023B
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $0570
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $0251
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $0370
+                dc.l    SS_Up_Mappings         
+                dc.w    $0263
+                dc.l    SS_Down_Mappings      
+                dc.w    $0263
+                dc.l    SS_Reverse_Goal_Mappings                 
+                dc.w    $22F0
+                dc.l    SS_Red_White_Ball_Mappings 
+                dc.w    $0470
+                dc.l    SS_Red_White_Ball_Mappings 
+                dc.w    $05F0
+                dc.l    SS_Red_White_Ball_Mappings 
+                dc.w    $65F0
+                dc.l    SS_Red_White_Ball_Mappings 
+                dc.w    $25F0
+                dc.l    SS_Red_White_Ball_Mappings 
+                dc.w    $45F0
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $02F0
+                dc.l    (($01<<$18)|SS_Bumpers)   
+                dc.w    $023B
+                dc.l    (($02<<$18)|SS_Bumpers)   
+                dc.w    $023B 
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $0797
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $07A0
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $07A9
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $0797
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $07A0
+                dc.l    SS_Reverse_Goal_Mappings 
+                dc.w    $07A9
+                dc.l    SS_Obj25               
+                dc.w    $27B2
+                dc.l    SS_Emerald_Mappings   
+                dc.w    $0770  
+                dc.l    SS_Emerald_Mappings   
+                dc.w    $0770
+                dc.l    SS_Emerald_Mappings   
+                dc.w    $0770
+                dc.l    SS_Emerald_Mappings                      
+                dc.w    $0770
+                dc.l    SS_Red_Emerald_Mappings 
+                dc.w    $0770
+                dc.l    SS_Gray_Emerald_Mappings
+                dc.w    $0770
+                dc.l    SS_Reverse_Goal_Mappings
+                dc.w    $04F0
+                dc.l    (($04<<$18)|SS_Obj25)    
+                dc.w    $27B2
+                dc.l    (($05<<$18)|SS_Obj25)                   
+                dc.w    $27B2
+                dc.l    (($06<<$18)|SS_Obj25)    
+                dc.w    $27B2
+                dc.l    (($07<<$18)|SS_Obj25)    
+                dc.w    $27B2
+                dc.l    SS_Red_White_Ball_Mappings 
+                dc.w    $23F0
+                dc.l    (($01<<$18)|SS_Red_White_Ball_Mappings) 
+                dc.w    $23F0
+                dc.l    (($02<<$18)|SS_Red_White_Ball_Mappings) 
+                dc.w    $23F0
+                dc.l    (($03<<$18)|SS_Red_White_Ball_Mappings) 
+                dc.w    $23F0  
+                dc.l    (($02<<$18)|SS_Reverse_Goal_Mappings) 
+                dc.w    $04F0
+                dc.l    SS_Red_White_Ball_Mappings                   
+                dc.w    $05F0                   
+                dc.l    SS_Red_White_Ball_Mappings  
+                dc.w    $65F0
+                dc.l    SS_Red_White_Ball_Mappings  
+                dc.w    $25F0
+                dc.l    SS_Red_White_Ball_Mappings  
+                dc.w    $45F0  
+;-------------------------------------------------------------------------------
+SS_Map_R:                                       
+                dc.w    SS_Map_R_P01-SS_Map_R   
+                dc.w    SS_Map_R_P02-SS_Map_R   
+                dc.w    SS_Map_R_P03-SS_Map_R   
+                dc.w    SS_Map_R_P04-SS_Map_R   
+                dc.w    SS_Map_R_P05-SS_Map_R   
+                dc.w    SS_Map_R_P06-SS_Map_R  
+                dc.w    SS_Map_R_P07-SS_Map_R  
+                dc.w    SS_Map_R_P08-SS_Map_R  
+                dc.w    SS_Map_R_P09-SS_Map_R  
+                dc.w    SS_Map_R_P10-SS_Map_R  
+                dc.w    SS_Map_R_P11-SS_Map_R  
+                dc.w    SS_Map_R_P12-SS_Map_R  
+                dc.w    SS_Map_R_P13-SS_Map_R  
+                dc.w    SS_Map_R_P14-SS_Map_R  
+                dc.w    SS_Map_R_P15-SS_Map_R  
+                dc.w    SS_Map_R_P16-SS_Map_R            
+SS_Map_R_P01:                                  
+                dc.b    $01                    
+                dc.b    $F4, $0A, $00, $00, $F4 
+SS_Map_R_P02:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $09, $F0 
+SS_Map_R_P03:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $19, $F0          
+SS_Map_R_P04:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $29, $F0 
+SS_Map_R_P05:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $39, $F0 
+SS_Map_R_P06:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $49, $F0 
+SS_Map_R_P07:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $59, $F0 
+SS_Map_R_P08:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $69, $F0 
+SS_Map_R_P09:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $79, $F0 
+SS_Map_R_P10:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $89, $F0 
+SS_Map_R_P11:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $99, $F0 
+SS_Map_R_P12:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $A9, $F0 
+SS_Map_R_P13:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $B9, $F0 
+SS_Map_R_P14:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $C9, $F0 
+SS_Map_R_P15:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $D9, $F0 
+SS_Map_R_P16:                                   
+                dc.b    $01                     
+                dc.b    $F0, $0F, $00, $E9, $F0                 
+;-------------------------------------------------------------------------------                   
+SS_Bumpers:   
+                dc.w    SS_Obj47_P01-SS_Bumpers 
+                dc.w    SS_Obj47_P02-SS_Bumpers 
+                dc.w    SS_Obj47_P03-SS_Bumpers 
+SS_Obj47_P01:   
+                dc.b    $02                                               
+                dc.b    $F0, $07, $00, $00, $F0, $F0, $07, $08, $00, $00 
+                dc.b    $00   
+SS_Obj47_P02:                                                             
+                dc.b    $02                                               
+                dc.b    $F4, $06, $00, $08, $F4, $F4, $02, $08, $08, $04    
+                dc.b    $00                                          
+SS_Obj47_P03:                                                             
+                dc.b    $02                                               
+                dc.b    $F0, $07, $00, $0E, $F0, $F0, $07, $08, $0E, $00  
+                dc.b    $00                   
+;-------------------------------------------------------------------------------                    
+SS_Obj25:       dc.w    SS_Obj25_P01-SS_Obj25   
+                dc.w    SS_Obj25_P02-SS_Obj25   
+                dc.w    SS_Obj25_P03-SS_Obj25   
+                dc.w    SS_Obj25_P04-SS_Obj25   
+                dc.w    SS_Obj25_P05-SS_Obj25   
+                dc.w    SS_Obj25_P06-SS_Obj25   
+                dc.w    SS_Obj25_P07-SS_Obj25 
+                dc.w    SS_Obj25_P08-SS_Obj25           
+SS_Obj25_P01:                                    
+                dc.b    $01                        
+                dc.b    $F8, $05, $00, $00, $F8    
+SS_Obj25_P02:                                    
+                dc.b    $01                       
+                dc.b    $F8, $05, $00, $04, $F8   
+SS_Obj25_P03:                                    
+                dc.b    $01                       
+                dc.b    $F8, $01, $00, $08, $FC   
+SS_Obj25_P04:                                   
+                dc.b    $01                       
+                dc.b    $F8, $05, $08, $04, $F8   
+SS_Obj25_P05:                                    
+                dc.b    $01                       
+                dc.b    $F8, $05, $00, $0A, $F8   
+SS_Obj25_P06:                                    
+                dc.b    $01                       
+                dc.b    $F8, $05, $18, $0A, $F8   
+SS_Obj25_P07:                                    
+                dc.b    $01                       
+                dc.b    $F8, $05, $08, $0A, $F8   
+SS_Obj25_P08:                                    
+                dc.b    $01                       
+                dc.b    $F8, $05, $10, $0A, $00                        
+SS_Reverse_Goal_Mappings: ; loc_21CC6:   
+        dc.w    loc_21CCC-SS_Reverse_Goal_Mappings
+        dc.w    loc_21CD2-SS_Reverse_Goal_Mappings
+        dc.w    loc_21CD8-SS_Reverse_Goal_Mappings
+loc_21CCC:
+        dc.b    $1
+        dc.b    $F4, $A, $00, $00, $F4        ; Sonic 1 Mappings Format
+loc_21CD2:
+        dc.b    $1
+        dc.b    $F4, $A, $00, $9, $F4        ; Sonic 1 Mappings Format
+loc_21CD8:
+        dc.b    $00
+        dc.b    $00             ; Filler     
+SS_Red_White_Ball_Mappings: ; loc_21CDA:
+        dc.w    loc_21CE2-SS_Red_White_Ball_Mappings
+        dc.w    loc_21CE8-SS_Red_White_Ball_Mappings
+        dc.w    loc_21CEE-SS_Red_White_Ball_Mappings
+        dc.w    loc_21CF4-SS_Red_White_Ball_Mappings
+loc_21CE2:
+        dc.b    $1
+        dc.b    $F4, $A, $00, $00, $F4        ; Sonic 1 Mappings Format
+loc_21CE8:
+        dc.b    $1
+        dc.b    $F4, $A, $8, $00, $F4        ; Sonic 1 Mappings Format
+loc_21CEE:
+        dc.b    $1
+        dc.b    $F4, $A, $18, $00, $F4        ; Sonic 1 Mappings Format
+loc_21CF4:
+        dc.b    $1
+        dc.b    $F4, $A, $10, $00, $F4        ; Sonic 1 Mappings Format   
+SS_Up_Mappings: ; loc_21CFA:
+        dc.w    loc_21CFE-SS_Up_Mappings
+        dc.w    loc_21D04-SS_Up_Mappings
+loc_21CFE:
+        dc.b    $1
+        dc.b    $F4, $A, $00, $00, $F4        ; Sonic 1 Mappings Format
+loc_21D04:
+        dc.b    $1
+        dc.b    $F4, $A, $00, $12, $F4        ; Sonic 1 Mappings Format 
+SS_Down_Mappings: ; loc_21D0A:
+        dc.w    loc_21D0E-SS_Down_Mappings
+        dc.w    loc_21D14-SS_Down_Mappings
+loc_21D0E:
+        dc.b    $1
+        dc.b    $F4, $A, $00, $9, $F4        ; Sonic 1 Mappings Format 
+loc_21D14:
+        dc.b    $1
+        dc.b    $F4, $A, $00, $12, $F4        ; Sonic 1 Mappings Format
+SS_Red_Emerald_Mappings: ; loc_21D1A:
+        dc.w    loc_21D26-SS_Red_Emerald_Mappings
+        dc.w    loc_21D38-SS_Red_Emerald_Mappings
+SS_Gray_Emerald_Mappings: ; loc_21D1E:
+        dc.w    loc_21D2C-SS_Gray_Emerald_Mappings
+        dc.w    loc_21D38-SS_Gray_Emerald_Mappings        
+SS_Emerald_Mappings: ; loc_21D22:  {Blue / Yellow / Purple / Green}  
+        dc.w    loc_21D32-SS_Emerald_Mappings
+        dc.w    loc_21D38-SS_Emerald_Mappings
+loc_21D26:
+        dc.b    $1
+        dc.b    $F8, $5, $00, $00, $F8        ; Sonic 1 Mappings Format   
+loc_21D2C:
+        dc.b    $1
+        dc.b    $F8, $5, $00, $4, $F8        ; Sonic 1 Mappings Format        
+loc_21D32:
+        dc.b    $1
+        dc.b    $F8, $5, $00, $8, $F8        ; Sonic 1 Mappings Format
+loc_21D38:
+        dc.b    $1
+        dc.b    $F8, $5, $00, $C, $F8        ; Sonic 1 Mappings Format          
 ;===============================================================================
 ; Special Stage - Sub-routine
 ; [ End ]
