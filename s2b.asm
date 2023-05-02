@@ -5350,7 +5350,7 @@ SpecialStage:
 
 S1SS_WaitForDMA:
 		move.w	(a5),d1		; read control port ($C00004)
-		btst	#$01,d1		; is DMA running?
+		btst	#1,d1		; is DMA running?
 		bne.s	S1SS_WaitForDMA	; if yes, branch
 		move.w	#$8F02,(a5)	; set VDP increment to 2 bytes
 		bsr.w	SS_Background_Load
@@ -5368,7 +5368,7 @@ S1SS_WaitForDMA:
 		move.l	#0,(Camera_X_pos).w
 		move.l	#0,(Camera_Y_pos).w
 		move.b	#9,(Object_RAM).w ; load special stage Sonic object
-		bsr.w	S1_Pal_Cycle_Special_Stage
+		jsr	(S1_Pal_Cycle_Special_Stage).l
 		clr.w	(SpecialStage_angle).w	; set stage angle to "upright"
 		move.w	#$40,(SpecialStage_speed).w ; set stage rotation speed
 		move.w	#MusID_SpecStg,d0
@@ -5394,7 +5394,7 @@ SS_NoDebug:
 		move.w	(VDP_Reg1_val).w,d0
 		ori.b	#$40,d0
 		move.w	d0,(VDP_control_port)
-		bsr.w	Pal_MakeWhite 	  ; loc_26B8
+		bsr.w	Pal_MakeWhite
 
 ; ---------------------------------------------------------------------------
 ; Main Special Stage loop
@@ -5470,7 +5470,7 @@ loc_53F8:
 		mulu.w	#10,d0		; multiply rings by 10
 		move.w	d0,(Bonus_Countdown_2).w ; set rings bonus
 		move.w	#MusID_ActClear,d0
-		jsr	(PlaySound).l		   ; loc_14C6
+		jsr	(PlayMusic).l
 		clearRAM Object_RAM,Object_RAM_End
 		move.b	#$7E,(Object_RAM+$5C0).w
 
@@ -6864,133 +6864,133 @@ loc_646A:
 		move.w	(Camera_BG_Y_pos).w, D1
 		moveq	#$00, D0
 loc_6526:
-		move.b	(A3)+, D0
-		addq.w	#$02, A2
-		sub.w	D0, D1
+		move.b	(a3)+,d0
+		addq.w	#2,a2
+		sub.w	d0,d1
 		bcc.s	loc_6526
-		neg.w	D1
-		subq.w	#$02, A2
-		move.w	#$00DF, D2
-		move.w	(Camera_X_pos).w, D0
-		neg.w	D0
-		swap  D0
-		move.w	(A2)+, D0
-		neg.w	D0
+		neg.w	d1
+		subq.w	#2,a2
+		move.w	#$DF,d2
+		move.w	(Camera_X_pos).w,d0
+		neg.w	d0
+		swap	d0
+		move.w	(a2)+,d0
+		neg.w	d0
 loc_6542:
-		move.l	D0, (A1)+
-		subq.w	#$01, D1
+		move.l	d0,(a1)+
+		subq.w	#1,d1
 		bne.s	loc_654E
-		move.b	(A3)+, D1
-		move.w	(A2)+, D0
-		neg.w	D0
+		move.b	(a3)+,d1
+		move.w	(a2)+,d0
+		neg.w	d0
 loc_654E:
-		dbf    D2, loc_6542
+		dbf	d2,loc_6542
 		rts
 loc_6554:
 		dc.b	$25, $17, $12, $07, $07, $02, $02, $30, $0D, $13, $20, $40, $20, $13, $0D, $30
 		dc.b	$02, $02, $07, $07, $20, $12, $17, $25
 loc_656C:
-		moveq	#$00, D0
-		move.w	(Camera_Y_pos).w, D0
+		moveq	#0,d0
+		move.w	(Camera_Y_pos).w,d0
 		tst.b	(Current_Act).w
 		bne.s	loc_6582
-		divu.w	#$0003, D0
-		subi.w	#$0140, D0
+		divu.w	#3,d0
+		subi.w	#$140,d0
 		bra.s	loc_658A
 loc_6582:
-		divu.w	#$0006, D0
-		subi.w	#$0010, D0
+		divu.w	#6,d0
+		subi.w	#$10,d0
 loc_658A:
-		move.w	D0, (Camera_BG_Y_pos).w
-		move.w	D0, (Vscroll_Factor_BG).w
-		andi.l	#$FFFEFFFE, (Vscroll_Factor).w
-		lea	(TempArray_LayerDef).w, A2
-		lea	$001E(A2), A3
-		move.w	(Camera_X_pos).w, D0
-		ext.l	D0
-		asl.l	#$04, D0
-		divs.w	#$000A, D0
-		ext.l	D0
-		asl.l	#$04, D0
-		asl.l	#$08, D0
-		move.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, $000E(A2)
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, $000C(A2)
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, $000A(A2)
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, $0008(A2)
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, $0006(A2)
-		move.w	D1, $0010(A2)
-		move.w	D1, $001C(A2)
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, $0004(A2)
-		move.w	D1, $0012(A2)
-		move.w	D1, $001A(A2)
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, $0002(A2)
-		move.w	D1, $0014(A2)
-		move.w	D1, $0018(A2)
-		swap  D1
-		add.l	D0, D1
-		swap  D1
-		move.w	D1, (A3)+
-		move.w	D1, (A2)
-		move.w	D1, $0016(A2)
-		lea	(loc_6678).l, A3
-		lea	(TempArray_LayerDef).w, A2
-		lea	(Horiz_Scroll_Buf).w, A1
-		move.w	(Camera_BG_Y_pos).w, D1
-		lsr.w	#$01, D1
-		moveq	#$00, D0
+		move.w	d0,(Camera_BG_Y_pos).w
+		move.w	d0,(Vscroll_Factor_BG).w
+		andi.l	#$FFFEFFFE,(Vscroll_Factor).w
+		lea	(TempArray_LayerDef).w,a2
+		lea	$1E(a2),a3
+		move.w	(Camera_X_pos).w,d0
+		ext.l	d0
+		asl.l	#4,d0
+		divs.w	#$A,d0
+		ext.l	d0
+		asl.l	#4,d0
+		asl.l	#8,d0
+		move.l	d0,d1
+		swap	d1
+		move.w	d1, (a3)+
+		move.w	d1,$E(a2)
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		move.w	d1,$C(a2)
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		move.w	d1,$A(a2)
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		move.w	d1,8(a2)
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		move.w	d1,6(a2)
+		move.w	d1,$10(a2)
+		move.w	d1,$1C(a2)
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		move.w	d1,4(a2)
+		move.w	d1,$12(a2)
+		move.w	d1,$1A(a2)
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		move.w	d1,2(a2)
+		move.w	d1,$14(a2)
+		move.w	d1,$18(a2)
+		swap	d1
+		add.l	d0,d1
+		swap	d1
+		move.w	d1,(a3)+
+		move.w	d1,(a2)
+		move.w	d1,$16(a2)
+		lea	(loc_6678).l,a3
+		lea	(TempArray_LayerDef).w,a2
+		lea	(Horiz_Scroll_Buf).w,a1
+		move.w	(Camera_BG_Y_pos).w,d1
+		lsr.w	#1,d1
+		moveq	#0,d0
 loc_664A:
-		move.b	(A3)+, D0
-		addq.w	#$02, A2
-		sub.w	D0, D1
+		move.b	(a3)+,d0
+		addq.w	#2,a2
+		sub.w	d0,d1
 		bcc.s	loc_664A
-		neg.w	D1
-		subq.w	#$02, A2
-		move.w	#$006F, D2
-		move.w	(Camera_X_pos).w, D0
-		neg.w	D0
-		swap  D0
-		move.w	(A2)+, D0
-		neg.w	D0
+		neg.w	d1
+		subq.w	#2,a2
+		move.w	#$6F,d2
+		move.w	(Camera_X_pos).w,d0
+		neg.w	d0
+		swap	d0
+		move.w	(a2)+,d0
+		neg.w	d0
 loc_6666:
-		move.l	D0, (A1)+
-		subq.w	#$01, D1
+		move.l	d0,(a1)+
+		subq.w	#1,d1
 		bne.s	loc_6672
-		move.b	(A3)+, D1
-		move.w	(A2)+, D0
-		neg.w	D0
+		move.b	(a3)+,d1
+		move.w	(a2)+,d0
+		neg.w	d0
 loc_6672:
-		dbf    D2, loc_6666
+		dbf	d2,loc_6666
 		bra.s	loc_6690
 loc_6678:
 		dc.b	$13
@@ -42232,8 +42232,8 @@ PlrList_Std2_End:
 ;---------------------------------------------------------------------------------------
 PlrList_Std3:	plrlistheader
 		plreq $05A0, Explosion
-;		plreq $0580, Rabbit
-;		plreq $0592, White_Bird
+		plreq $0580, Rabbit
+		plreq $0592, White_Bird
 PlrList_Std3_End:
 ;---------------------------------------------------------------------------------------
 ; PATTERN LOAD REQUEST LIST
