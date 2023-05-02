@@ -9065,82 +9065,82 @@ loc_7AE2:
 		rts
 loc_7AE4:
 		tst.b	(Current_Act).w
-		bne.w	  loc_7CF6
-		moveq	#$00, D0
-		move.b	(Dynamic_Resize_Routine).w, D0
-		move.w	loc_7AFA(PC, D0), D0
-		jmp	loc_7AFA(PC, D0)
+		bne.w	loc_7CF6
+		moveq	#0,d0
+		move.b	(Dynamic_Resize_Routine).w,d0
+		move.w	loc_7AFA(PC,d0.w),d0
+		jmp	loc_7AFA(PC,d0.w)
 loc_7AFA:
 		dc.w	loc_7B00-loc_7AFA
 		dc.w	loc_7B6C-loc_7AFA
 		dc.w	loc_7C20-loc_7AFA
 loc_7B00:
-		cmpi.w	#$0400, (Camera_Y_pos).w
+		cmpi.w	#$400,(Camera_Y_pos).w
 		bcs.s	loc_7B48
-		cmpi.w	#$1800, (Camera_X_pos).w
+		cmpi.w	#$1800,(Camera_X_pos).w
 		bcs.s	loc_7B48
-		move.b	#$01, (Screen_Shaking_Flag_HTZ).w
+		move.b	#1,(Screen_Shaking_Flag_HTZ).w
 		move.l	(Camera_X_pos).w, (Camera_BG_X_pos).w
 		move.l	(Camera_Y_pos).w, (Camera_BG_Y_pos).w
-		moveq	#$00, D0
-		move.w	D0, (Camera_BG_X_pos_diff).w
-		move.w	D0, (Camera_BG_Y_pos_diff).w
-		move.w	D0, (Camera_BG_X_offset).w
-		move.w	#$0140, (Camera_BG_Y_offset).w
-		subi.w	#$0100, (Camera_BG_Y_pos).w
-		move.w	#$0000, (HTZ_Terrain_Delay).w
-		addq.b	#$02, (Dynamic_Resize_Routine).w
+		moveq	#0,d0
+		move.w	d0,(Camera_BG_X_pos_diff).w
+		move.w	d0,(Camera_BG_Y_pos_diff).w
+		move.w	d0,(Camera_BG_X_offset).w
+		move.w	#$140,(Camera_BG_Y_offset).w
+		subi.w	#$100,(Camera_BG_Y_pos).w
+		move.w	#0,(HTZ_Terrain_Delay).w
+		addq.b	#2,(Dynamic_Resize_Routine).w
 loc_7B46:
 		rts
 loc_7B48:
 		tst.b	(Screen_Shaking_Flag_HTZ).w
 		beq.s	loc_7B46
-		move.w	#$0200, D0
-		moveq	#$00, D1
-		move.w	D1, (Camera_BG_X_pos_diff).w
-		move.w	D1, (Camera_BG_Y_pos_diff).w
-		bsr.w	  loc_7C84
-		or.w	D0, D1
+		move.w	#$200,d0
+		moveq	#0,d1
+		move.w	d1,(Camera_BG_X_pos_diff).w
+		move.w	d1,(Camera_BG_Y_pos_diff).w
+		bsr.w	loc_7C84
+		or.w	d0,d1
 		bne.s	loc_7B46
-		move.b	#$00, (Screen_Shaking_Flag_HTZ).w
+		move.b	#0,(Screen_Shaking_Flag_HTZ).w
 		rts
 loc_7B6C:
 		tst.b	(HTZ_Terrain_Direction).w
 		bne.s	loc_7B8A
-		cmpi.w	#$0140, (Camera_BG_Y_offset).w
+		cmpi.w	#$140,(Camera_BG_Y_offset).w
 		beq.s	loc_7BA2
-		move.w	(Timer_frames).w, D0
-		andi.w	#$0003, D0
+		move.w	(Timer_frames).w,d0
+		andi.w	#3,d0
 		bne.s	loc_7BC0
-		addq.w	#$01, (Camera_BG_Y_offset).w
+		addq.w	#1,(Camera_BG_Y_offset).w
 		bra.s	loc_7BC0
 loc_7B8A:
-		cmpi.w	#$00E0, (Camera_BG_Y_offset).w
+		cmpi.w	#$E0,(Camera_BG_Y_offset).w
 		beq.s	loc_7BA2
-		move.w	(Timer_frames).w, D0
-		andi.w	#$0003, D0
+		move.w	(Timer_frames).w,d0
+		andi.w	#3,d0
 		bne.s	loc_7BC0
-		subq.w	#$01, (Camera_BG_Y_offset).w
+		subq.w	#1,(Camera_BG_Y_offset).w
 		bra.s	loc_7BC0
 loc_7BA2:
-		move.b	#$00, (Screen_Shaking_Flag).w
-		subq.w	#$01, (HTZ_Terrain_Delay).w
+		move.b	#0,(Screen_Shaking_Flag).w
+		subq.w	#1,(HTZ_Terrain_Delay).w
 		bpl.s	loc_7BC0
-		move.w	#$0078, (HTZ_Terrain_Delay).w
-		eori.b	#$01, (HTZ_Terrain_Direction).w
-		move.b	#$01, (Screen_Shaking_Flag).w
+		move.w	#$78,(HTZ_Terrain_Delay).w
+		eori.b	#1,(HTZ_Terrain_Direction).w
+		move.b	#1,(Screen_Shaking_Flag).w
 loc_7BC0:
-		cmpi.w	#$1800, (Camera_X_pos).w
+		cmpi.w	#$1800,(Camera_X_pos).w
 		bcs.s	loc_7BE8
-		cmpi.w	#$1F00, (Camera_X_pos).w
+		cmpi.w	#$1F00,(Camera_X_pos).w
 		bcc.s	loc_7C04
 		move.w	(Camera_X_pos_diff).w, (Camera_BG_X_pos_diff).w
 		move.w	(Camera_Y_pos_diff).w, (Camera_BG_Y_pos_diff).w
-		move.w	(Camera_X_pos).w, D0
-		move.w	(Camera_Y_pos).w, D1
-		bra.w	  loc_7C84
+		move.w	(Camera_X_pos).w,d0
+		move.w	(Camera_Y_pos).w,d1
+		bra.w	loc_7C84
 loc_7BE8:
-		move.l	#$04000000, (Camera_BG_X_pos).w
+		move.l	#$4000000,(Camera_BG_X_pos).w
 		moveq	#$00, D0
 		move.l	D0, (Camera_BG_Y_pos).w
 		move.l	D0, (Camera_BG_X_offset).w
