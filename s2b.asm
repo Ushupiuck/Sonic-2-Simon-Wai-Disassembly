@@ -51,6 +51,8 @@ useFullWaterTables = 0
 ; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ; Equates section - Names for variables.
 	include	"s2b.constants.asm"
+	include	"Constants.asm"
+
 SonicDriverVer = 2
 	include	"sound/_smps2asm_inc.asm"
 
@@ -179,7 +181,7 @@ PSGInitLoop:
 		dbf	d5,PSGInitLoop	; repeat for other channels
 		move.w	d0,(a2)
 		movem.l	(a6),d0-a6	; clear all registers
-		move	#$2700,sr	; set the sr
+		disable_ints	; set the sr
  ; loc_292:
 PortC_OK:
 		bra.s	GameProgram	; Branch to game program.
@@ -406,7 +408,7 @@ ErrorExcept:
 ; ===========================================================================
 ; sub_432:
 ErrorMsg_TwoAddresses:
-		move	#$2700,sr
+		disable_ints
 		addq.w	#2,sp
 		move.l	(sp)+,(Object_Respawn_Table+$40).w
 		addq.w	#2,sp
@@ -420,7 +422,7 @@ ErrorMsg_TwoAddresses:
 ; ---------------------------------------------------------------------------
 ; loc_45A:
 ErrorMessage:
-		move	#$2700,sr
+		disable_ints
 		movem.l	d0-a7,(Object_Respawn_Table).w
 		bsr.w	ShowErrorMsg
 		move.l	2(sp),d0
@@ -429,7 +431,7 @@ ErrorMessage:
 ErrorMsg_Wait:
 		bsr.w	Error_WaitForC
 		movem.l	(Object_Respawn_Table).w,d0-a7
-		move	#$2300,sr
+		enable_ints
 		rte
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
@@ -521,7 +523,8 @@ ShowErrDigit_NoOverflow:
 ; loc_5D8:
 Error_WaitForC:
 		bsr.w	ReadJoypads
-		cmpi.b	#$20,(Ctrl_1_Press).w
+		cmpi.b	#$20,(Ctrl_1_Held).w
+;		cmpi.b	#$20,(Ctrl_1_Press).w
 		bne.w	Error_WaitForC
 		rts
 ; End of function ShowErrAddress
@@ -884,7 +887,7 @@ return_1226:
 ; ---------------------------------------------------------------------------
 ; loc_1228: H_int_Not2pMode:
 PalToCRAM:
-		move	#$2700,sr
+		disable_ints
 		move.w	#0,(Hint_flag).w
 		movem.l	a0-a1,-(sp)
 		lea	(VDP_data_port).l,a1
@@ -1079,9 +1082,8 @@ ClearScreen:
 		clr.l	(Vscroll_Factor).w
 		clr.l	(unk_F61A).w
 
-		; These '+4's shouldn't be here; clearRAM accidentally clears an additional 4 bytes
-		clearRAM Sprite_Table,Sprite_Table_End+$80+4
-		clearRAM Horiz_Scroll_Buf,Horiz_Scroll_Buf_End+4
+		clearRAM Sprite_Table,Sprite_Table_End+$80
+		clearRAM Horiz_Scroll_Buf,Horiz_Scroll_Buf_End
 
 		startZ80
 		rts
@@ -1673,16 +1675,19 @@ loc_1866:
 return_1896:
 		rts
 ; ===========================================================================
-; Pop one request off the buffer so that the next one can be filled, except
-; queue 16 can't be used due to a bug; link to the fix below:
-; https://forums.sonicretro.org/index.php?threads/how-to-fix-pattern-load-cues-queue-shifting-bug.28339/
+; Pop one request off the buffer so that the next one can be filled
 ; loc_1898:
 ProcessDPLC_Pop:
 		lea	(Plc_Buffer).w,a0
-
-		moveq	#bytesToLcnt(Plc_Buffer_Only_End-Plc_Buffer-6),d0
--		move.l	6(a0),(a0)+
+		lea	6(a0),a1
+		moveq	#$E,d0	; do $F cues
+-		move.l	(a1)+,(a0)+
+		move.w	(a1)+,(a0)+
 		dbf	d0,-
+
+		moveq	#0,d0
+		move.l	d0,(a0)+	; clear the last cue to avoid overcopying it
+		move.w	d0,(a0)+
 		rts
 ; End of function ProcessDPLC
 
@@ -2618,7 +2623,7 @@ PalCycle_Load:
 ; ===========================================================================
 ; off_1F30:
 PalCycle:	zoneOrderedOffsetTable 2,1
-	zoneOffsetTableEntry.w PalCycle_GHZ
+	zoneOffsetTableEntry.w PalCycle_EHZ
 	zoneOffsetTableEntry.w PalCycle_Null
 	zoneOffsetTableEntry.w PalCycle_WZ
 	zoneOffsetTableEntry.w PalCycle_Null
@@ -2643,8 +2648,8 @@ PalCycle_Null:
 		rts
 ; ===========================================================================
 ; loc_1F54:
-PalCycle_GHZ:
-		lea	(Pal_GHzCyc).l,a0
+PalCycle_EHZ:
+		lea	(Pal_EHZCyc).l,a0
 		subq.w	#1,(PalCycle_Timer).w
 		bpl.s	+ ; rts
 		move.w	#7,(PalCycle_Timer).w
@@ -2677,7 +2682,7 @@ return_1FB0:
 		rts
 ; ===========================================================================
 ; loc_1FB2:
-PalCycle_Mz:
+PalCycle_Mz: ; $04/$05 - Metropolis Rotating Palette routine
 		subq.w	#$01, (PalCycle_Timer).w
 		bpl.s	loc_1FE2
 		move.w	#$0011, (PalCycle_Timer).w
@@ -2847,7 +2852,7 @@ loc_2214:
 loc_2234:
 		rts
 PalCycle_NGHz: ; loc_2236: ; $0F - Neo Green Hill Rotating Palette routine
-		lea	(Pal_GHzCyc).l, A0	  ; loc_2284
+		lea	(Pal_EHZCyc).l, A0	  ; loc_2284
 		subq.w	#$01, (PalCycle_Timer).w
 		bpl.s	loc_2262
 		move.w	#$0005, (PalCycle_Timer).w
@@ -2863,7 +2868,7 @@ loc_2262:
 ;Pal_S1TitleCyc: ;loc_2264: ; Left Over - Unused Rotating Palette
 		dc.w	$0C42, $0E86, $0ECA, $0EEC, $0EEC, $0C42, $0E86, $0ECA
 		dc.w	$0ECA, $0EEC, $0C42, $0E86, $0E86, $0ECA, $0EEC, $0C42
-Pal_GHzCyc: ; loc_2284: ; $00 - Green Hill Rotating Palette
+Pal_EHZCyc: ; loc_2284: ; $00 - Emerald Hill Rotating Palette
 		dc.w	$0A86, $0E86, $0EA8, $0ECA, $0ECA, $0A86, $0E86, $0EA8
 		dc.w	$0EA8, $0ECA, $0A86, $0E86, $0E86, $0EA8, $0ECA, $0A86
 Pal_HTzCyc1: ; loc_22A4: ; $07 - Hill Top Rotating Palette
@@ -3366,23 +3371,23 @@ PalPtr_SEGA:		dc.l	Pal_SEGA, $FB00001F
 PalPtr_Title:		dc.l	Pal_Title, $FB00001F
 PalPtr_LevelSel:	dc.l	Pal_LevelSelect, $FB00001F
 PalPtr_SonicTails:	dc.l	Pal_SonicTails, $FB000007
-PalPtr_GHZ:	dc.l	Pal_GHZ, $FB200017
-PalPtr_OWZ:	dc.l	Pal_GHZ, $FB200017
+PalPtr_EHZ:	dc.l	Pal_EHZ, $FB200017
+PalPtr_OWZ:	dc.l	Pal_EHZ, $FB200017
 PalPtr_WZ:	dc.l	Pal_WZ, $FB200017
-PalPtr_SSZ:	dc.l	Pal_GHZ, $FB200017
+PalPtr_SSZ:	dc.l	Pal_EHZ, $FB200017
 PalPtr_MTZ:	dc.l	Pal_MTZ, $FB200017
 PalPtr_MTZ2:	dc.l	Pal_MTZ, $FB200017
 PalPtr_BLZ:	dc.l	Pal_BLZ, $FB200017	; also apparently meant for CNZ2 at one point
 PalPtr_HTZ:	dc.l	Pal_HTZ, $FB200017
 PalPtr_HPZ:	dc.l	Pal_HPZ, $FB200017
-PalPtr_RWZ:	dc.l	Pal_GHZ, $FB200017
+PalPtr_RWZ:	dc.l	Pal_EHZ, $FB200017
 PalPtr_OOZ:	dc.l	Pal_OOZ, $FB200017
 PalPtr_DHZ:	dc.l	Pal_DHZ, $FB200017
 PalPtr_CNZ:	dc.l	Pal_CNZ, $FB200017
 PalPtr_CPZ:	dc.l	Pal_CPZ, $FB200017
-PalPtr_GCZ:	dc.l	Pal_GHZ, $FB200017
+PalPtr_GCZ:	dc.l	Pal_EHZ, $FB200017
 PalPtr_NGHZ:	dc.l	Pal_NGHZ, $FB200017
-PalPtr_DEZ:	dc.l	Pal_GHZ, $FB200017
+PalPtr_DEZ:	dc.l	Pal_EHZ, $FB200017
 PalPtr_HPZ_U:	dc.l	Pal_HPZ_U, $FB00001F
 PalPtr_CPZ_U:	dc.l	Pal_CPZ_U, $FB00001F
 PalPtr_NGHZ_U:	dc.l	Pal_NGHZ_U, $FB00001F
@@ -3392,7 +3397,7 @@ Pal_SEGA:		BINCLUDE	"art/palettes/Sega screen.bin"
 Pal_Title:		BINCLUDE	"art/palettes/Title screen.bin"
 Pal_LevelSelect:	BINCLUDE	"art/palettes/Level select.bin"
 Pal_SonicTails:		BINCLUDE	"art/palettes/Sonic and Tails.bin"
-Pal_GHZ:		BINCLUDE	"art/palettes/GHZ.bin"
+Pal_EHZ:		BINCLUDE	"art/palettes/EHZ.bin"
 Pal_WZ:			BINCLUDE	"art/palettes/WZ.bin"
 Pal_MTZ:		BINCLUDE	"art/palettes/MTZ.bin"
 Pal_HTZ:		BINCLUDE	"art/palettes/HTZ.bin"
@@ -3407,7 +3412,7 @@ Pal_CPZ_U:		BINCLUDE	"art/palettes/CPZ underwater.bin"
 Pal_NGHZ:		BINCLUDE	"art/palettes/NGHZ.bin"
 Pal_NGHZ_U:		BINCLUDE	"art/palettes/NGHZ underwater.bin"
 Pal_SpecialStage:	BINCLUDE	"art/palettes/Special Stage.bin"
-		nop
+		even
 DelayProgram: ; loc_31D8:
 		move.w	#$2300, SR
 loc_31DC:
@@ -3637,7 +3642,7 @@ TitleScreen:
 		bsr.w	PlayMusic
 		bsr.w	ClearPLC
 		bsr.w	Pal_FadeFrom
-		move	#$2700,sr
+		disable_ints
 		lea	(VDP_control_port),a6
 		move.w	#$8004,(a6)
 		move.w	#$8230,(a6)
@@ -3661,7 +3666,7 @@ TitleScreen:
 		bsr.w	PalLoad1
 		bsr.w	Pal_FadeFromBlack
 
-		move	#$2700,sr
+		disable_ints
 		move.l	#$40000000,(VDP_control_port).l
 		lea	(Title_Screen_Bg_Wings).l,a0
 		bsr.w	NemDec
@@ -3685,7 +3690,7 @@ loc_3818:
 		move.w	#0,(PalCycle_Timer).w
 		bsr.w	Pal_FadeFrom
 
-		move	#$2700,sr
+		disable_ints
 		lea	(Chunk_Table).l,a1
 		lea	(TS_Wings_MapUnc_Sonic).l,a0
 		move.w	#0,d0
@@ -3822,7 +3827,7 @@ Title_ChkLevSel:
 		clearRAM Horiz_Scroll_Buf,Horiz_Scroll_Buf_End
 
 		move.l	d0,(Vscroll_Factor).w
-		move	#$2700,sr
+		disable_ints
 		lea	(VDP_data_port).l,a6
 		move.l	#$60000003,(VDP_control_port).l
 		move.w	#$3FF,d1
@@ -3863,10 +3868,7 @@ LevelSelect_PressStart:
 		add.w	d0,d0
 		move.w	LevelSelect_Order(pc,d0.w),d0
 		bmi.w	LevelSelect_Loop
-		; The original value was seemingly a hackish way to make the
-		; Special Stages inaccessable, remove the '+1' from here and
-		; from LevelSelect_Order to "access" the remnants
-		cmpi.w	#$7FFF+1,d0
+		cmpi.w	#$7FFF,d0
 		bne.s	LevelSelect_StartZone
 
 ; LevelSelect_SpecialStage:
@@ -3894,7 +3896,7 @@ LevelSelect_Order:
 		dc.w	genocide_city_zone_act_1, genocide_city_zone_act_2
 		dc.w	neo_green_hill_zone_act_1, neo_green_hill_zone_act_2
 		dc.w	death_egg_zone_act_1, death_egg_zone_act_2
-		dc.w	$7FFF+1			; SS
+		dc.w	$7FFF			; SS
 		dc.w	0			; Sound Test
 ; ===========================================================================
 ; loc_3B0A: Level_Select_Level:
@@ -4203,103 +4205,12 @@ Level_Select_Text: ; loc_3D7C: ; Level Select Menu Text
 		even
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
-; These subroutines seem to overwrite data in the ROM, likely similar
-; to ConvertCollisionArray (but need special read/write carts to work)
-; ---------------------------------------------------------------------------
-
-Unused_Code1: ; loc_4056:
-		lea	(Chunk_Table), A1
-		move.w	#$02EB, D2
-
-Unused_Code1_Loop: ; loc_4060:
-		move.w	(A1), D0
-		move.w	D0, D1
-		andi.w	#$F800, D1
-		andi.w	#$07FF, D0
-		lsr.w	#$01, D0
-		or.w	D0, D1
-		move.w	D1, (A1)+
-		dbf	D2, Unused_Code1_Loop   ; loc_4060
-		rts
-Unused_Code2: ; loc_4078:
-		lea	($00FE0000), A1
-		lea	($00FE0080), A2
-		lea	(Chunk_Table), A3
-		move.w	#$003F, D1
-Unused_Code2_Loop: ; loc_408E:
-		bsr.w	Unused_Code4		  ; loc_4120
-		bsr.w	Unused_Code4		  ; loc_4120
-		dbf	D1, Unused_Code2_Loop   ; loc_408E
-		lea	($00FE0000), A1
-		lea	($00FF0000), A2
-		move.w	#$003F, D1
-Unused_Code2_Loop2: ; loc_40AA:
-		move.w	#$0000, (A2)+
-		dbf	D1, Unused_Code2_Loop2  ; loc_40AA
-		move.w	#$3FBF, D1
-Unused_Code2_Loop3: ; loc_40B6:
-		move.w	(A1)+, (A2)+
-		dbf	D1, Unused_Code2_Loop3  ; loc_40B6
-		rts
-Unused_Code3: ; loc_40BE:
-		lea	($00FE0000), A1
-		lea	(Chunk_Table), A3
-		moveq	#$1F, D0
-Unused_Code3_Loop: ; loc_40CC:
-		move.l	(A1)+, (A3)+
-		dbf	D0, Unused_Code3_Loop   ; loc_40CC
-		moveq	#$00, D7
-		lea	($00FE0000), A1
-		move.w	#$00FF, D5
-Unused_Code3_Loop2: ; loc_40DE:
-		lea	(Chunk_Table), A3
-		move.w	D7, D6
-Unused_Code3_Loop3: ; loc_40E6:
-		movem.l A1-A3, -(A7)
-		move.w	#$003F, D0
-Unused_Code3_Loop4: ; loc_40EE:
-		cmpm.w	(A1)+, (A3)+
-		bne.s	Unused_Code3_loc_4104
-		dbf	D0, Unused_Code3_Loop4  ; loc_40EE
-		movem.l (A7)+, A1-A3
-		adda.w	#$0080, A1
-		dbf	D5, Unused_Code3_Loop2  ; loc_40DE
-		bra.s	Unused_Code3_loc_411E
-Unused_Code3_loc_4104:
-		movem.l (A7)+, A1-A3
-		adda.w	#$0080, A3
-		dbf	D6, Unused_Code3_Loop3  ; loc_40E6
-		moveq	#$1F, D0
-Unused_Code3_Loop5: ; loc_4112:
-		move.l	(A1)+, (A3)+
-		dbf	D0, Unused_Code3_Loop5  ; loc_4112
-		addq.l	#$01, D7
-		dbf	D5, Unused_Code3_Loop2  ; loc_40DE
-Unused_Code3_loc_411E:
-		bra.s	Unused_Code3_loc_411E
-Unused_Code4: ; loc_4120:
-		moveq	#$07, D0
-Unused_Code4_Loop: ; loc_4122:
-		move.l	(A3)+, (A1)+
-		move.l	(A3)+, (A1)+
-		move.l	(A3)+, (A1)+
-		move.l	(A3)+, (A1)+
-		move.l	(A3)+, (A2)+
-		move.l	(A3)+, (A2)+
-		move.l	(A3)+, (A2)+
-		move.l	(A3)+, (A2)+
-		dbf	D0, Unused_Code4_Loop   ; loc_4122
-		adda.w	#$0080, A1
-		adda.w	#$0080, A2
-		rts
-; ===========================================================================
-; ---------------------------------------------------------------------------
 ; Music Playlist
 ; ---------------------------------------------------------------------------
 ; byte_4140:
 MusicList:	zoneOrderedTable 1,1
-	zoneTableEntry.b	MusID_GHZ	; GHZ
-	zoneTableEntry.b	MusID_GHZ	; OWZ
+	zoneTableEntry.b	MusID_EHZ	; EHZ
+	zoneTableEntry.b	MusID_EHZ	; OWZ
 	zoneTableEntry.b	MusID_MTZ	; WZ
 	zoneTableEntry.b	MusID_SSZ	; SSZ
 	zoneTableEntry.b	MusID_MTZ	; MTZ
@@ -4314,8 +4225,7 @@ MusicList:	zoneOrderedTable 1,1
 	zoneTableEntry.b	MusID_CPZ	; CPZ
 	zoneTableEntry.b	MusID_CPZ	; GCZ
 	zoneTableEntry.b	MusID_NGHZ	; NGHZ
-	; no *proper* entry for DEZ, so it instead uses the alignment to play sound $08
-	;zoneTableEntry.b	MusID_DEZ	; DEZ
+	zoneTableEntry.b	MusID_DEZ	; DEZ
     zoneTableEnd
 	even
 
@@ -4336,12 +4246,12 @@ Level:
 		bsr.w	Pal_FadeFrom
 		tst.w	(Demo_mode_flag).w
 		bmi.s	Level_ClrRAM
-		move	#$2700,sr
+		disable_ints
 		move.l	#$70000002,(VDP_control_port).l
 		lea	(Title_Cards).l,a0	; load title card patterns
 		bsr.w	NemDec
 		bsr.w	ClearScreen
-		move	#$2300,sr
+		enable_ints
 		moveq	#0,d0
 		move.w	d0,(Timer_frames).w
 		move.b	(Current_Zone).w,d0
@@ -4480,7 +4390,6 @@ loc_434E:
 		bsr.w	Main_Level_Load_16_128_Blocks
 		jsr	(Load_16x16_Mappings_For_Dyn_Sprites).l
 		bsr.w	Load_Tiles_From_Start
-		jsr	(ConvertCollisionArray).l
 		bsr.w	LoadCollisionIndexes
 		bsr.w	WaterEffects
 		move.b	#1,($FFFFB000).w	; load Sonic object
@@ -4516,7 +4425,7 @@ loc_43F4:
 		jsr	RingsManager	       ; loc_DE34
 		jsr	RunObjects	      ; loc_CFD0
 		jsr	BuildSprites	       ; loc_D4DA
-		bsr.w	  JumpToDynamic_Art_Cues  ; loc_51F8
+		jsr	(Dynamic_Art_Cues).l  ; loc_51F8
 		moveq	#$00, D0
 		tst.b	(Last_star_pole_hit).w
 		bne.s	loc_4424
@@ -4531,7 +4440,7 @@ loc_4424:
 		move.b	D0, (unk_FE2F).w
 		move.w	D0, (Debug_placement_mode).w
 		move.w	D0, (Level_Inactive_flag).w
-		bsr.w	  OscillateNumInit	; loc_4B64
+		bsr.w	OscillateNumInit	; loc_4B64
 		move.b	#$01, (Update_HUD_score).w
 		move.b	#$01, (Update_HUD_rings).w
 		move.b	#$01, (Update_HUD_timer).w
@@ -4554,7 +4463,7 @@ loc_4424:
 loc_4498:
 		move.b	$0001(A1), (Demo_press_counter).w
 		subq.b	#$01, (Demo_press_counter).w
-		lea	(Demo_Tails_Ghz).l, A1	 ; loc_4DF8 Green Hill - Tails Demo control
+		lea	(Demo_Tails_EHZ).l, A1	 ; loc_4DF8 Green Hill - Tails Demo control
 		move.b	$0001(A1), (Demo_press_counter_2P).w
 		subq.b	#$01, (Demo_press_counter_2P).w
 		move.w	#$0668, (Demo_Time_left).w
@@ -4575,15 +4484,15 @@ loc_44D2:
 		beq.s	loc_44EE
 		moveq	#PalID_NGHZ_U, D0
 loc_44EE:
-		bsr.w	  PalLoad4_Water	  ; loc_2932
+		bsr.w	PalLoad4_Water	  ; loc_2932
 loc_44F2:
 		move.w	#$0003, D1
 loc_44F6:
 		move.b	#VintID_Level, (Vint_routine).w
-		bsr.w	  DelayProgram		  ; loc_31D8
+		bsr.w	DelayProgram		  ; loc_31D8
 		dbf    D1, loc_44F6
 		move.w	#$202F, (Palette_fade_range).w
-		bsr.w	  Pal_FadeFromBlack2		 ; loc_259C
+		bsr.w	Pal_FadeFromBlack2		 ; loc_259C
 		tst.w	(Demo_mode_flag).w
 		bmi.s	Level_ClrTitleCard	; loc_4526
 		addq.b	#$02, ($FFFFB0A4).w
@@ -4622,7 +4531,7 @@ loc_456A:
 loc_456E:
 		bsr.w	UpdateWaterSurface
 		jsr	(RingsManager).l
-		bsr.w	JumpToDynamic_Art_Cues
+		jsr	(Dynamic_Art_Cues).l
 		bsr.w	PalCycle_Load
 		bsr.w	RunPLC_RAM
 		bsr.w	Oscillate_Num_Do
@@ -4659,15 +4568,15 @@ loc_45E8:
 		clr.w	(PalChangeSpeed).w
 loc_45F8:
 		move.b	#VintID_Level, (Vint_routine).w
-		bsr.w	  DelayProgram		  ; loc_31D8
-		bsr.w	  Move_Sonic_In_Demo	  ; loc_48DE
+		bsr.w	DelayProgram		  ; loc_31D8
+		bsr.w	Move_Sonic_In_Demo	  ; loc_48DE
 		jsr	RunObjects	      ; loc_CFD0
 		jsr	BuildSprites	       ; loc_D4DA
 		jsr	ObjectsManager	       ; loc_E250
 		subq.w	#$01, (PalChangeSpeed).w
 		bpl.s	loc_4628
 		move.w	#$0002, (PalChangeSpeed).w
-		bsr.w	  Pal_FadeOut		  ; loc_265A
+		bsr.w	Pal_FadeOut		  ; loc_265A
 loc_4628:
 		tst.w	(Demo_Time_left).w
 		bne.s	loc_45F8
@@ -4752,7 +4661,7 @@ return_46B6:
 ; word_46B8: Water_Height_Array:
     if useFullWaterTables
 WaterHeight: zoneOrderedTable 2,2
-	zoneTableEntry.w  $600, $600	; GHZ
+	zoneTableEntry.w  $600, $600	; EHZ
 	zoneTableEntry.w  $600, $600	; OWZ
 	zoneTableEntry.w  $600, $600	; WZ
 	zoneTableEntry.w  $600, $600	; SSZ
@@ -4815,8 +4724,8 @@ loc_470A:
 ; off_470C:
     if useFullWaterTables
 DynamicWater_Index: zoneOrderedOffsetTable 2,2
-	zoneOffsetTableEntry.w DynamicWater_Null ; GHZ 1
-	zoneOffsetTableEntry.w DynamicWater_Null ; GHZ 2
+	zoneOffsetTableEntry.w DynamicWater_Null ; EHZ 1
+	zoneOffsetTableEntry.w DynamicWater_Null ; EHZ 2
 	zoneOffsetTableEntry.w DynamicWater_Null ; OWZ 1
 	zoneOffsetTableEntry.w DynamicWater_Null ; OWZ 2
 	zoneOffsetTableEntry.w DynamicWater_Null ; WZ 1
@@ -5082,7 +4991,7 @@ loc_4984:
 loc_49B2:
 		cmpi.b	#green_hill_zone, (Current_Zone).w
 		bne.s	loc_49EA
-		lea	(Demo_Tails_Ghz).l, A1	  ; loc_4DF8
+		lea	(Demo_Tails_EHZ).l, A1	  ; loc_4DF8
 		move.w	(Demo_button_index_2P).w, D0
 		adda.w	D0, A1
 		move.b	(A1), D0
@@ -5311,7 +5220,7 @@ loc_4CBE:
 		rts
 End_Level_Art_Load: ; loc_4CC0: ; Test for load end level sprites...
 		tst.w	(Debug_placement_mode).w
-		bne.w	  Skip_End_Level_Art_Load ; loc_4CF6
+		bne.w	Skip_End_Level_Art_Load ; loc_4CF6
 		cmpi.w	#green_hill_zone_act_2, (Current_ZoneAndAct).w
 		beq.s	Skip_End_Level_Art_Load ; loc_4CF6
 		move.w	(Camera_X_pos).w, D0
@@ -5325,7 +5234,7 @@ End_Level_Art_Load: ; loc_4CC0: ; Test for load end level sprites...
 		beq.s	Skip_End_Level_Art_Load ; loc_4CF6
 		move.w	D1, (Camera_Min_X_pos).w
 		moveq	#$27, D0
-		bra.w	  LoadPLC2		; loc_176E
+		bra.w	LoadPLC2		; loc_176E
 Skip_End_Level_Art_Load: ; loc_4CF6:
 		rts
 Demo_Green_Hill: ; loc_4CF8: ; $00 - Green Hill Sonic Demo control
@@ -5345,7 +5254,7 @@ Demo_Green_Hill: ; loc_4CF8: ; $00 - Green Hill Sonic Demo control
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
-Demo_Tails_Ghz: ; loc_4DF8: ; $00 - Green Hill Tails Demo control
+Demo_Tails_EHZ: ; loc_4DF8: ; $00 - Emerald Hill Tails Demo control
 		dc.w	$0046, $081E, $280A, $085E, $2830, $0866, $000F, $080F
 		dc.w	$282E, $0800, $001F, $0812, $0013, $080A, $0016, $040D
 		dc.w	$0008, $0410, $0030, $086B, $2814, $0880, $0A02, $0223
@@ -5413,9 +5322,7 @@ Demo_Chemical_Plant: ; loc_50F8: ; $07 - Chemical Plant Sonic Demo control
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
-JumpToDynamic_Art_Cues: ;  loc_51F8:
-		jmp	Dynamic_Art_Cues ; loc_223EC
-		dc.w	$0000 ; Filler
+		even
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Sonic 1 Special Stages
@@ -5423,295 +5330,335 @@ JumpToDynamic_Art_Cues: ;  loc_51F8:
 ; it has to be done on less accurate emulators such as Kega; more accurate
 ; emulations/hardware tends to hang before or after loading
 ; ---------------------------------------------------------------------------
-SpecialStage: ; loc_5200:
-		move.w	#$00CA, D0
-		bsr.w	  PlaySound		; loc_14C6
-		bsr.w	  Pal_MakeFlash 	  ; loc_2762
-		move	#$2700, SR
-		lea	(VDP_control_port), A6
-		move.w	#$8B03, (A6)
-		move.w	#$8004, (A6)
-		move.w	#$8AAF, (Hint_counter_reserve).w
-		move.w	#$9011, (A6)
-		move.w	(VDP_Reg1_val).w, D0
-		andi.b	#$BF, D0
-		move.w	D0, (VDP_control_port)
-		bsr.w	  ClearScreen		  ; loc_1418
-		move	#$2300, SR
-		lea	(VDP_control_port), A5
-		move.w	#$8F01, (A5)
-		move.l	#$946F93FF, (A5)
-		move.w	#$9780, (A5)
-		move.l	#$50000081, (A5)
-		move.w	#$0000, (VDP_data_port)
-loc_5260:
-		move.w	(A5), D1
-		btst	#$01, D1
-		bne.s	loc_5260
-		move.w	#$8F02, (A5)
-		bsr.w	  SS_Background_Load	  ; loc_54CA
-		moveq	#$14, D0
-		bsr.w	  RunPLC_ROM		  ; loc_18A8
-		clearRAM Primary_Collision,Primary_Collision+$2000	; this should be Object_RAM; leftover from Sonic 1
+
+SpecialStage:
+		move.w	#$CA,d0
+		bsr.w	PlaySound ; play special stage entry sound
+		bsr.w	Pal_MakeFlash
+		disable_ints
+		lea	(VDP_control_port),a6
+		move.w	#$8B03,(a6)	; line scroll mode
+		move.w	#$8004,(a6)	; 8-colour mode
+		move.w	#$8A00+175,(Hint_counter_reserve).w
+		move.w	#$9011,(a6)	; 128-cell hscroll size
+		move.w	(VDP_Reg1_val).w,d0
+		andi.b	#$BF,d0
+		move.w	d0,(VDP_control_port)
+		bsr.w	ClearScreen
+		enable_ints
+		fillVRAM	0,$6FFF,$5000
+
+S1SS_WaitForDMA:
+		move.w	(a5),d1		; read control port ($C00004)
+		btst	#$01,d1		; is DMA running?
+		bne.s	S1SS_WaitForDMA	; if yes, branch
+		move.w	#$8F02,(a5)	; set VDP increment to 2 bytes
+		bsr.w	SS_Background_Load
+		moveq	#$29,d0
+		bsr.w	RunPLC_ROM	; load special stage patterns
+		clearRAM Object_RAM,Object_RAM_End
 		clearRAM Misc_Variables,Misc_Variables_End
 		clearRAM Oscillating_Data,Oscillating_Numbers_End
 		clearRAM Decomp_Buffer,Decomp_Buffer_End
 		clr.b	(Water_fullscreen_flag).w
 		clr.w	(Level_Inactive_flag).w
-		moveq	#S1PalID_SpecStg,d0		; loads the wrong palette; should be PalID_SpecStg
-		bsr.w	  PalLoad1		; loc_28E2
-		jsr	(S1_Special_Stage_Load) ; loc_21A36
-		move.l	#$00000000, (Camera_X_pos).w
-		move.l	#$00000000, (Camera_Y_pos).w
-		move.b	#$09, ($FFFFB000).w
-		bsr.w	  S1_Pal_Cycle_Special_Stage ; loc_5584
-		clr.w	(SpecialStage_angle).w
-		move.w	#$0040, (SpecialStage_speed).w
-		move.w	#MusID_SpecStg, D0
-		bsr.w	  PlayMusic		 ; loc_14C0
-		move.w	#$0000, (Demo_button_index).w
-		lea	(Demo_Index).l, A1	  ; loc_49F2
-		moveq	#$06, D0
-		lsl.w	#$02, D0
-		move.l	$00(A1, D0), A1
-		move.b	$0001(A1), (Demo_press_counter).w
-		subq.b	#$01, (Demo_press_counter).w
+		moveq	#PalID_SpecStg,d0
+		bsr.w	PalLoad1	; load special stage palette
+		jsr	(S1_Special_Stage_Load).l		; load SS layout data
+		move.l	#0,(Camera_X_pos).w
+		move.l	#0,(Camera_Y_pos).w
+		move.b	#9,(Object_RAM).w ; load special stage Sonic object
+		bsr.w	S1_Pal_Cycle_Special_Stage
+		clr.w	(SpecialStage_angle).w	; set stage angle to "upright"
+		move.w	#$40,(SpecialStage_speed).w ; set stage rotation speed
+		move.w	#MusID_SpecStg,d0
+		bsr.w	PlayMusic	; play special stage BG	music
+		move.w	#0,(Demo_button_index).w
+		lea	(Demo_Index).l,a1
+		moveq	#6,d0
+		lsl.w	#2,d0
+		movea.l	(a1,d0.w),a1
+		move.b	1(a1),(Demo_press_counter).w
+		subq.b	#1,(Demo_press_counter).w
 		clr.w	(Ring_count).w
 		clr.b	(Extra_life_flags).w
-		move.w	#$0000, (Debug_placement_mode).w
-		move.w	#$0708, (Demo_Time_left).w
-		tst.b	(Debug_options_flag).w
-		beq.s	loc_533C
-		btst	#$06, (Ctrl_1_Held).w
-		beq.s	loc_533C
-		move.b	#$01, (Debug_mode_flag).w
-loc_533C:
-		move.w	(VDP_Reg1_val).w, D0
-		ori.b	#$40, D0
-		move.w	D0, (VDP_control_port)
-		bsr.w	  Pal_MakeWhite 	  ; loc_26B8
-loc_534E:
-		bsr.w	  PauseGame		   ; loc_14D2
-		move.b	#VintID_S1SS, (Vint_routine).w
-		bsr.w	  DelayProgram		  ; loc_31D8
-		bsr.w	  Move_Sonic_In_Demo	  ; loc_48DE
-		move.w	(Ctrl_1).w, (Ctrl_1_Logical).w
-		jsr	(RunObjects)	      ; loc_CFD0
-		jsr	(BuildSprites)	       ; loc_D4DA
-		jsr	(S1_SS_Show_Layout)	; loc_21508
-		bsr.w	  S1_SS_Bg_Animate	  ; loc_5806
-		tst.w	(Demo_mode_flag).w
-		beq.s	loc_538A
-		tst.w	(Demo_Time_left).w
-		beq.w	 loc_54B8
-loc_538A:
-		cmpi.b	#GameModeID_SpecialStage, (Game_Mode).w
-		beq.w	  loc_534E
-		tst.w	(Demo_mode_flag).w
-		bne.w	  loc_54C0
-		move.b	#GameModeID_Level, (Game_Mode).w
-		cmpi.w	#metropolis_zone_act_6, (Current_ZoneAndAct).w
-		bcs.s	loc_53AE
-		clr.w	(Current_ZoneAndAct).w
-loc_53AE:
-		move.w	#$003C, (Demo_Time_left).w
-		move.w	#$003F, (Palette_fade_range).w
+		move.w	#0,(Debug_placement_mode).w
+		move.w	#708,(Demo_Time_left).w
+		tst.b	(Debug_options_flag).w ; has debug cheat been entered?
+		beq.s	SS_NoDebug	; if not, branch
+		btst	#6,(Ctrl_1_Held).w ; is A button pressed?
+		beq.s	SS_NoDebug	; if not, branch
+		move.b	#1,(Debug_mode_flag).w ; enable debug mode
+
+SS_NoDebug:
+		move.w	(VDP_Reg1_val).w,d0
+		ori.b	#$40,d0
+		move.w	d0,(VDP_control_port)
+		bsr.w	Pal_MakeWhite 	  ; loc_26B8
+
+; ---------------------------------------------------------------------------
+; Main Special Stage loop
+; ---------------------------------------------------------------------------
+
+SS_MainLoop:
+		bsr.w	PauseGame
+		move.b	#VintID_S1SS,(Vint_routine).w
+		bsr.w	DelayProgram
+		bsr.w	Move_Sonic_In_Demo
+		move.w	(Ctrl_1).w,(Ctrl_1_Logical).w
+		jsr	(RunObjects).l
+		jsr	(BuildSprites).l
+		jsr	(S1_SS_Show_Layout).l
+		bsr.w	S1_SS_Bg_Animate
+		tst.w	(Demo_mode_flag).w	; is demo mode on?
+		beq.s	SS_ChkEnd	; if not, branch
+		tst.w	(Demo_Time_left).w ; is there time left on the demo?
+		beq.w	 SS_ToSegaScreen	; if not, branch
+
+SS_ChkEnd:
+		cmpi.b	#GameModeID_SpecialStage, (Game_Mode).w ; is game mode $10 (special stage)?
+		beq.w	SS_MainLoop		; if yes, branch
+		tst.w	(Demo_mode_flag).w	; is demo mode on?
+		bne.w	SS_ToLevel		; if yes, branch
+		move.b	#GameModeID_Level,(Game_Mode).w ; set screen mode to $0C (level)
+		cmpi.w	#metropolis_zone_act_6,(Current_ZoneAndAct).w ; is level number higher than FZ?
+		bcs.s	SS_Finish		; if not, branch
+		clr.w	(Current_ZoneAndAct).w	; set to EHZ1
+
+SS_Finish:
+		move.w	#60,(Demo_Time_left).w
+		move.w	#$3F,(Palette_fade_range).w
 		clr.w	(PalChangeSpeed).w
-loc_53BE:
-		move.b	#VintID_SSResults, (Vint_routine).w
-		bsr.w	  DelayProgram		  ; loc_31D8
-		bsr.w	  Move_Sonic_In_Demo	  ; loc_48DE
-		move.w	(Ctrl_1).w, (Ctrl_1_Logical).w
-		jsr	(RunObjects).l		; loc_CFD0
-		jsr	(BuildSprites).l	 ; loc_D4DA
-		jsr	(S1_SS_Show_Layout).l	  ; loc_21508
-		bsr.w	  S1_SS_Bg_Animate	  ; loc_5806
-		subq.w	#$01, (PalChangeSpeed).w
+
+SS_FinLoop:
+		move.b	#VintID_SSResults,(Vint_routine).w
+		bsr.w	DelayProgram
+		bsr.w	Move_Sonic_In_Demo
+		move.w	(Ctrl_1).w,(Ctrl_1_Logical).w
+		jsr	(RunObjects).l
+		jsr	(BuildSprites).l
+		jsr	(S1_SS_Show_Layout).l
+		bsr.w	S1_SS_Bg_Animate
+		subq.w	#1,(PalChangeSpeed).w
 		bpl.s	loc_53F8
-		move.w	#$0002, (PalChangeSpeed).w
-		bsr.w	  Pal_ToWhite		  ; loc_2782
+		move.w	#2,(PalChangeSpeed).w
+		bsr.w	Pal_ToWhite
+
 loc_53F8:
 		tst.w	(Demo_Time_left).w
-		bne.s	loc_53BE
-		move	#$2700, SR
-		lea	(VDP_control_port), A6
-		move.w	#$8230, (A6)
-		move.w	#$8407, (A6)
-		move.w	#$9001, (A6)
-		bsr.w	  ClearScreen		  ; loc_1418
-		move.l	#$70000002, (VDP_control_port)
-		lea	(Title_Cards).l, A0 ; loc_7EA04
-		bsr.w	  NemDec	      ; loc_15FC
-		jsr	(Head_Up_Display_Base)	; loc_23184
-		move	#$2300, SR
-		moveq	#S1PalID_SpecStg,d0	; same wrong palette
-		bsr.w	  PalLoad2		; loc_28FE
-		moveq	#PLCID_Std1, D0
-		bsr.w	  LoadPLC2		; loc_176E
-		moveq	#$1B, D0
-		bsr.w	  LoadPLC		 ; loc_173C
-		move.b	#$01, (Update_HUD_score).w
-		move.b	#$01, (Update_Bonus_score).w
-		move.w	(Ring_count).w, D0
-		mulu.w	#$000A, D0
-		move.w	D0, (Bonus_Countdown_2).w
-		move.w	#S1MusID_ActClear, D0
+		bne.s	SS_FinLoop
+		disable_ints
+		lea	(VDP_control_port),a6
+		move.w	#$8230,(a6) ; set foreground nametable address
+		move.w	#$8407,(a6) ; set background nametable address
+		move.w	#$9001,(a6)
+		bsr.w	ClearScreen
+		locVRAM	$B000
+		lea	(Title_Cards).l,a0 ; load title card patterns
+		bsr.w	NemDec
+		jsr	(Head_Up_Display_Base).l
+		enable_ints
+		moveq	#PalID_SpecStg,d0
+		bsr.w	PalLoad2	; load results screen palette
+		moveq	#PLCID_Std1,d0
+		bsr.w	LoadPLC2
+		moveq	#$1B,d0 ; CHECKME
+		bsr.w	LoadPLC		; load results screen patterns
+		move.b	#1,(Update_HUD_score).w ; update score counter
+		move.b	#1,(Update_Bonus_score).w ; update ring bonus counter
+		move.w	(Ring_count).w,d0
+		mulu.w	#10,d0		; multiply rings by 10
+		move.w	d0,(Bonus_Countdown_2).w ; set rings bonus
+		move.w	#MusID_ActClear,d0
 		jsr	(PlaySound).l		   ; loc_14C6
 		clearRAM Object_RAM,Object_RAM_End
-		move.b	#$7E, ($FFFFB5C0).w
-loc_5480:
-		bsr.w	  PauseGame		   ; loc_14D2
-		move.b	#VintID_TitleCard, (Vint_routine).w
-		bsr.w	  DelayProgram		  ; loc_31D8
-		jsr	(RunObjects)	      ; loc_CFD0
-		jsr	(BuildSprites)	       ; loc_D4DA
-		bsr.w	  RunPLC_RAM		  ; loc_17A8
+		move.b	#$7E,(Object_RAM+$5C0).w
+
+SS_NormalExit:
+		bsr.w	PauseGame
+		move.b	#VintID_TitleCard,(Vint_routine).w
+		bsr.w	DelayProgram
+		jsr	(RunObjects).l
+		jsr	(BuildSprites).l
+		bsr.w	RunPLC_RAM
 		tst.w	(Level_Inactive_flag).w
-		beq.s	loc_5480
+		beq.s	SS_NormalExit
 		tst.l	(Plc_Buffer).w
-		bne.s	loc_5480
-		move.w	#$00CA, D0
-		bsr.w	  PlaySound		; loc_14C6
-		bsr.w	  Pal_MakeFlash 	  ; loc_2762
+		bne.s	SS_NormalExit
+		move.w	#$CA,d0
+		bsr.w	PlaySound
+		bra.w	Pal_MakeFlash
+; ===========================================================================
+
+SS_ToSegaScreen:
+		move.b	#GameModeID_SegaScreen,(Game_Mode).w
 		rts
-loc_54B8:
-		move.b	#GameModeID_SegaScreen, (Game_Mode).w
+
+SS_ToLevel:	cmpi.b	#GameModeID_Level,(Game_Mode).w
+		beq.s	SS_ToSegaScreen
 		rts
-loc_54C0:
-		cmpi.b	#GameModeID_Level, (Game_Mode).w
-		beq.s	loc_54B8
-		rts
-SS_Background_Load: ; loc_54CA:
-		lea	(Chunk_Table), A1
-		move.w	#$4051, D0
-		bsr.w	  EniDec	       ; loc_18DA
-		move.l	#$50000001, D3
-		lea	(Chunk_Table+$80), A2
-		moveq	#$06, D7
+
+; ---------------------------------------------------------------------------
+; Special stage	background loading subroutine
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+SS_Background_Load:
+		lea	(Chunk_Table).l,a1
+		lea	(Eni_SSBg1).l,a0 ; load	mappings for the birds and fish
+		move.w	#$4051,d0
+		bsr.w	EniDec
+		move.l	#$50000001,d3
+		lea	(Chunk_Table+$80).l,a2
+		moveq	#6,d7
+
 loc_54E6:
-		move.l	D3, D0
-		moveq	#$03, D6
-		moveq	#$00, D4
-		cmpi.w	#$0003, D7
+		move.l	d3,d0
+		moveq	#3,d6
+		moveq	#0,d4
+		cmpi.w	#3,d7
 		bcc.s	loc_54F4
-		moveq	#$01, D4
+		moveq	#1,d4
+
 loc_54F4:
-		moveq	#$07, D5
+		moveq	#7,d5
+
 loc_54F6:
-		move.l	A2, A1
-		eori.b	#$01, D4
+		movea.l	a2,a1
+		eori.b	#1,d4
 		bne.s	loc_550A
-		cmpi.w	#$0006, D7
+		cmpi.w	#6,d7
 		bne.s	loc_551A
-		lea	(Chunk_Table), A1
+		lea	(Chunk_Table).l,a1
+
 loc_550A:
-		movem.l D0-D4, -(A7)
-		moveq	#$07, D1
-		moveq	#$07, D2
-		bsr.w	  PlaneMapToVRAM_H40	     ; loc_154C
-		movem.l (A7)+, D0-D4
+		movem.l d0-d4,-(sp)
+		moveq	#7,d1
+		moveq	#7,d2
+		bsr.w	PlaneMapToVRAM_H40
+		movem.l (sp)+,d0-d4
+
 loc_551A:
-		addi.l	#$00100000, D0
-		dbf    D5, loc_54F6
-		addi.l	#$03800000, D0
-		eori.b	#$01, D4
-		dbf    D6, loc_54F4
-		addi.l	#$10000000, D3
+		addi.l	#$100000,d0
+		dbf	d5,loc_54F6
+		addi.l	#$3800000,d0
+		eori.b	#1,d4
+		dbf	d6,loc_54F4
+		addi.l	#$10000000,d3
 		bpl.s	loc_5544
-		swap  D3
-		addi.l	#$0000C000, D3
-		swap  D3
+		swap	d3
+		addi.l	#$C000,d3
+		swap	d3
+
 loc_5544:
-		adda.w	#$0080, A2
-		dbf    D7, loc_54E6
-		lea	(Chunk_Table), A1
-		move.w	#$4000, D0
-		bsr.w	  EniDec	       ; loc_18DA
-		lea	(Chunk_Table), A1
-		move.l	#$40000003, D0
-		moveq	#$3F, D1
-		moveq	#$1F, D2
-		bsr.w	  PlaneMapToVRAM_H40	     ; loc_154C
-		lea	(Chunk_Table), A1
-		move.l	#$50000003, D0
-		moveq	#$3F, D1
-		moveq	#$3F, D2
-		bsr.w	  PlaneMapToVRAM_H40	     ; loc_154C
-		rts
+		adda.w	#$80,a2
+		dbf	d7,loc_54E6
+		lea	(Chunk_Table).l,a1
+		lea	(Eni_SSBg2).l,a0 ; load	mappings for the clouds
+		move.w	#$4000,d0
+		bsr.w	EniDec
+		lea	(Chunk_Table).l,a1
+		move.l	#$40000003,d0
+		moveq	#$3F,d1
+		moveq	#$1F,d2
+		bsr.w	PlaneMapToVRAM_H40
+		lea	(Chunk_Table).l,a1
+		move.l	#$50000003,d0
+		moveq	#$3F,d1
+		moveq	#$3F,d2
+		bra.w	PlaneMapToVRAM_H40
+; End of function SS_BGLoad
+
+; ---------------------------------------------------------------------------
+; Palette cycling routine - special stage
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
 S1_Pal_Cycle_Special_Stage: ; loc_5584:
 		tst.w	(Game_paused).w
 		bne.s	loc_5608
-		subq.w	#$01, (SSPalCycle_Timer).w
+		subq.w	#1,(SSPalCycle_Timer).w
 		bpl.s	loc_5608
-		lea	(VDP_control_port), A6
-		move.w	(SSPalCycle_Frame).w, D0
-		addq.w	#$01, (SSPalCycle_Frame).w
-		andi.w	#$001F, D0
-		lsl.w	#$02, D0
-		lea	(loc_565E).l, A0
-		adda.w	D0, A0
-		move.b	(A0)+, D0
+		lea	(VDP_control_port).l,a6
+		move.w	(SSPalCycle_Frame).w,d0
+		addq.w	#1,(SSPalCycle_Frame).w
+		andi.w	#$1F,d0
+		lsl.w	#2,d0
+		lea	(byte_4A3C).l,a0
+		adda.w	d0,a0
+		move.b	(a0)+,d0
 		bpl.s	loc_55B4
-		move.w	#$01FF, D0
+		move.w	#$1FF,d0
+
 loc_55B4:
-		move.w	D0, (SSPalCycle_Timer).w
-		moveq	#$00, D0
-		move.b	(A0)+, D0
-		move.w	D0, (unk_F7A0).w
-		lea	(loc_56DE).l, A1
-		lea	$00(A1, D0), A1
-		move.w	#$8200, D0
-		move.b	(A1)+, D0
-		move.w	D0, (A6)
-		move.b	(A1), (Vscroll_Factor_FG).w
-		move.w	#$8400, D0
-		move.b	(A0)+, D0
-		move.w	D0, (A6)
-		move.l	#$40000010, (VDP_control_port)
-		move.l	(Vscroll_Factor).w, (VDP_data_port)
-		moveq	#$00, D0
-		move.b	(A0)+, D0
+		move.w	d0,(SSPalCycle_Timer).w
+		moveq	#0,d0
+		move.b	(a0)+,d0
+		move.w	d0,(unk_F7A0).w
+		lea	(byte_4ABC).l,a1
+		lea	(a1,d0.w),a1
+		move.w	#$8200,d0
+		move.b	(a1)+,d0
+		move.w	d0,(a6)
+		move.b	(a1),(Vscroll_Factor_FG).w
+		move.w	#$8400,d0
+		move.b	(a0)+,d0
+		move.w	d0,(a6)
+		move.l	#$40000010,(VDP_control_port)
+		move.l	(Vscroll_Factor).w,(VDP_data_port).l
+		moveq	#0,d0
+		move.b	(a0)+,d0
 		bmi.s	loc_560A
-		lea	(Pal_S1_SS_Cycle1).l, A1  ; loc_56EC
-		adda.w	D0, A1
-		lea	(Normal_palette_line3+$E).w, A2
-		move.l	(A1)+, (A2)+
-		move.l	(A1)+, (A2)+
-		move.l	(A1)+, (A2)+
+		lea	(Pal_S1_SS_Cycle1).l,a1
+		adda.w	d0,a1
+		lea	(Normal_palette_line3+$E).w,a2
+		move.l	(a1)+,(a2)+
+		move.l	(a1)+,(a2)+
+		move.l	(a1)+,(a2)+
+
 loc_5608:
 		rts
+; ===========================================================================
+
 loc_560A:
-		move.w	(unk_F79E).w, D1
-		cmpi.w	#$008A, D0
+		move.w	(unk_F79E).w,d1
+		cmpi.w	#$8A,d0
 		bcs.s	loc_5616
-		addq.w	#$01, D1
+		addq.w	#1,d1
+
 loc_5616:
-		mulu.w	#$002A, D1
-		lea	(Pal_S1_SS_Cycle2).l, A1  ; loc_5734
-		adda.w	D1, A1
-		andi.w	#$007F, D0
-		bclr	#$00, D0
+		mulu.w	#$2A,d1
+		lea	(Pal_S1_SS_Cycle2).l,a1
+		adda.w	d1,a1
+		andi.w	#$7F,d0
+		bclr	#0,d0
 		beq.s	loc_563A
-		lea	(Normal_palette_line4+$E).w, A2
-		move.l	(A1), (A2)+
-		move.l	$0004(A1), (A2)+
-		move.l	$0008(A1), (A2)+
+		lea	(Normal_palette_line4+$E).w,a2
+		move.l	(a1),(a2)+
+		move.l	4(a1),(a2)+
+		move.l	8(a1),(a2)+
+
 loc_563A:
-		adda.w	#$000C, A1
-		lea	(Normal_palette_line3+$1A).w, A2
-		cmpi.w	#$000A, D0
+		adda.w	#$C,a1
+		lea	(Normal_palette_line3+$1A).w,a2
+		cmpi.w	#$A,d0
 		bcs.s	loc_5650
-		subi.w	#$000A, D0
-		lea	(Normal_palette_line4+$1A).w, A2
+		subi.w	#$A,d0
+		lea	(Normal_palette_line4+$1A).w,a2
+
 loc_5650:
-		move.w	D0, D1
-		add.w	D0, D0
-		add.w	D1, D0
-		adda.w	D0, A1
-		move.l	(A1)+, (A2)+
-		move.w	(A1)+, (A2)+
+		move.w	d0,d1
+		add.w	d0,d0
+		add.w	d1,d0
+		adda.w	d0,a1
+		move.l	(a1)+,(a2)+
+		move.w	(a1)+,(a2)+
 		rts
-loc_565E:
+byte_4A3C:
 		dc.w	$0300, $0792, $0300, $0790, $0300, $078E, $0300, $078C
 		dc.w	$0300, $078B, $0300, $0780, $0300, $0782, $0300, $0784
 		dc.w	$0300, $0786, $0300, $0788, $0708, $0700, $070A, $070C
@@ -5720,15 +5667,17 @@ loc_565E:
 		dc.w	$0300, $0681, $0300, $068A, $0300, $068C, $0300, $068E
 		dc.w	$0300, $0690, $0300, $0692, $0702, $0624, $0704, $0630
 		dc.w	$FF06, $063C, $FF06, $063C, $0704, $0630, $0702, $0624
-loc_56DE:
-		dc.w	$1001, $1800, $1801, $2000, $2001, $2800, $2801
-Pal_S1_SS_Cycle1: ; loc_56EC:
+		even
+byte_4ABC:	dc.w	$1001, $1800, $1801, $2000, $2001, $2800, $2801
+		even
+Pal_S1_SS_Cycle1:
 		dc.w	$0400, $0600, $0620, $0624, $0664, $0666, $0600, $0820
 		dc.w	$0A64, $0A68, $0AA6, $0AAA, $0800, $0C42, $0E86, $0ECA
 		dc.w	$0EEC, $0EEE, $0400, $0420, $0620, $0620, $0864, $0666
 		dc.w	$0420, $0620, $0842, $0842, $0A86, $0AAA, $0620, $0842
 		dc.w	$0A64, $0C86, $0EA8, $0EEE
-Pal_S1_SS_Cycle2: ; loc_5734:
+		even
+Pal_S1_SS_Cycle2:
 		dc.w	$0EEA, $0EE0, $0AA0, $0880, $0660, $0440, $0EE0, $0AA0
 		dc.w	$0440, $0AA0, $0AA0, $0AA0, $0860, $0860, $0860, $0640
 		dc.w	$0640, $0640, $0400, $0400, $0400, $0AEC, $06EA, $04C6
@@ -5743,94 +5692,111 @@ Pal_S1_SS_Cycle2: ; loc_5734:
 		dc.w	$0664, $0442, $0CCA, $0AA8, $0442, $0AA8, $0AA8, $0AA8
 		dc.w	$0864, $0864, $0864, $0642, $0642, $0642, $0400, $0400
 		dc.w	$0400
-S1_SS_Bg_Animate: ; loc_5806:
-		move.w	(unk_F7A0).w, D0
-		bne.s	loc_5818
-		move.w	#$0000, (Camera_BG_Y_pos).w
-		move.w	(Camera_BG_Y_pos).w, (Vscroll_Factor_BG).w
-loc_5818:
-		cmpi.w	#$0008, D0
-		bcc.s	loc_5870
-		cmpi.w	#$0006, D0
-		bne.s	loc_5832
-		addq.w	#$01, (Camera_BG3_X_pos).w
-		addq.w	#$01, (Camera_BG_Y_pos).w
-		move.w	(Camera_BG_Y_pos).w, (Vscroll_Factor_BG).w
-loc_5832:
-		moveq	#$00, D0
-		move.w	(Camera_BG_X_pos).w, D0
-		neg.w	D0
-		swap  D0
-		lea	(loc_58ED).l, A1
-		lea	(Decomp_Buffer).w, A3
-		moveq	#$09, D3
-loc_5848:
-		move.w	$0002(A3), D0
-		bsr.w	  CalcSine		; loc_320A
-		moveq	#$00, D2
-		move.b	(A1)+, D2
-		muls.w	D2, D0
-		asr.l	#$08, D0
-		move.w	D0, (A3)+
-		move.b	(A1)+, D2
-		ext.w	D2
-		add.w	D2, (A3)+
-		dbf    D3, loc_5848
-		lea	(Decomp_Buffer).w, A3
-		lea	(loc_58DA).l, A2
-		bra.s	loc_58A0
-loc_5870:
-		cmpi.w	#$000C, D0
-		bne.s	loc_5896
-		subq.w	#$01, (Camera_BG3_X_pos).w
-		lea	(Decomp_Buffer+$100).w, A3
-		move.l	#$00018000, D2
-		moveq	#$06, D1
-loc_5886:
-		move.l	(A3), D0
-		sub.l	D2, D0
-		move.l	D0, (A3)+
-		subi.l	#$00002000, D2
-		dbf    D1, loc_5886
-loc_5896:
-		lea	(Decomp_Buffer+$100).w, A3
-		lea	(loc_58E5).l, A2
-loc_58A0:
-		lea	(Horiz_Scroll_Buf).w, A1
-		move.w	(Camera_BG3_X_pos).w, D0
-		neg.w	D0
-		swap  D0
-		moveq	#$00, D3
-		move.b	(A2)+, D3
-		move.w	(Camera_BG_Y_pos).w, D2
-		neg.w	D2
-		andi.w	#$00FF, D2
-		lsl.w	#$02, D2
-loc_58BC:
-		move.w	(A3)+, D0
-		addq.w	#$02, A3
-		moveq	#$00, D1
-		move.b	(A2)+, D1
-		subq.w	#$01, D1
-loc_58C6:
-		move.l	D0, $00(A1, D2)
-		addq.w	#$04, D2
-		andi.w	#$03FC, D2
-		dbf    D1, loc_58C6
-		dbf    D3, loc_58BC
-		rts
-loc_58DA:
-		dc.b	$09, $28, $18, $10, $28, $18, $10, $30, $18, $08, $10
-loc_58E5:
-		dc.b	$06, $30, $30, $30, $28, $18, $18, $18
-loc_58ED:
-		dc.b	$08, $02, $04, $FF, $02, $03, $08, $FF, $04, $02, $02, $03, $08, $FD, $04, $02
-		dc.b	$02, $03, $02, $FF, $00
 		even
-;===============================================================================
-; Special Stage
-; [ End ]
-;===============================================================================
+
+; ---------------------------------------------------------------------------
+; Subroutine to	make the special stage background animated
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+S1_SS_Bg_Animate:
+		move.w	(unk_F7A0).w,d0
+		bne.s	loc_5818
+		move.w	#0,(Camera_BG_Y_pos).w
+		move.w	(Camera_BG_Y_pos).w,(Vscroll_Factor_BG).w
+
+loc_5818:
+		cmpi.w	#8,d0
+		bcc.s	loc_5870
+		cmpi.w	#6,d0
+		bne.s	loc_5832
+		addq.w	#1,(Camera_BG3_X_pos).w
+		addq.w	#1,(Camera_BG_Y_pos).w
+		move.w	(Camera_BG_Y_pos).w,(Vscroll_Factor_BG).w
+
+loc_5832:
+		moveq	#0,d0
+		move.w	(Camera_BG_X_pos).w,d0
+		neg.w	d0
+		swap	d0
+		lea	(byte_4CCC).l,a1
+		lea	(Decomp_Buffer).w,a3
+		moveq	#9,d3
+
+loc_5848:
+		move.w	2(a3),d0
+		bsr.w	CalcSine
+		moveq	#0,d2
+		move.b	(a1)+,d2
+		muls.w	d2,d0
+		asr.l	#8,d0
+		move.w	d0,(a3)+
+		move.b	(a1)+,d2
+		ext.w	d2
+		add.w	d2,(a3)+
+		dbf	d3,loc_5848
+		lea	(Decomp_Buffer).w,a3
+		lea	(byte_4CB8).l,a2
+		bra.s	loc_58A0
+; ===========================================================================
+
+loc_5870:
+		cmpi.w	#$C,d0
+		bne.s	loc_5896
+		subq.w	#$1,(Camera_BG3_X_pos).w
+		lea	(Decomp_Buffer+$100).w,a3
+		move.l	#$18000,d2
+		moveq	#6,d1
+
+loc_5886:
+		move.l	(a3),d0
+		sub.l	d2,d0
+		move.l	d0,(a3)+
+		subi.l	#$2000,d2
+		dbf	d1,loc_5886
+
+loc_5896:
+		lea	(Decomp_Buffer+$100).w,a3
+		lea	(byte_4CC4).l,a2
+
+loc_58A0:
+		lea	(Horiz_Scroll_Buf).w,a1
+		move.w	(Camera_BG3_X_pos).w,d0
+		neg.w	d0
+		swap	d0
+		moveq	#0,d3
+		move.b	(a2)+,d3
+		move.w	(Camera_BG_Y_pos).w,d2
+		neg.w	d2
+		andi.w	#$FF,d2
+		lsl.w	#2,d2
+
+loc_58BC:
+		move.w	(a3)+,d0
+		addq.w	#2,a3
+		moveq	#0,d1
+		move.b	(a2)+,d1
+		subq.w	#1,d1
+
+loc_58C6:
+		move.l	d0,(a1,d2.w)
+		addq.w	#4,d2
+		andi.w	#$3FC,d2
+		dbf	d1,loc_58C6
+		dbf	d3,loc_58BC
+		rts
+; End of function SS_BGAnimate
+
+; ===========================================================================
+byte_4CB8:	dc.b 9,	$28, $18, $10, $28, $18, $10, $30, $18,	8, $10,	0
+		even
+byte_4CC4:	dc.b 6,	$30, $30, $30, $28, $18, $18, $18
+		even
+byte_4CCC:	dc.b 8,	2, 4, $FF, 2, 3, 8, $FF, 4, 2, 2, 3, 8,	$FD, 4,	2, 2, 3, 2, $FF
+		even
+;============================================================================
 ; ---------------------------------------------------------------------------
 ; Subroutine to load level boundaries and start locations
 ; ---------------------------------------------------------------------------
@@ -5929,25 +5895,24 @@ LevelSize_PreventUnderflow:
 		moveq	#0,d1
 
 loc_5AD0:
-		move.w	(Camera_Max_X_pos).w, D2
-		cmp.w	D2, D1
+		move.w	(Camera_Max_X_pos).w,d2
+		cmp.w	d2,d1
 		bcs.s	loc_5ADA
-		move.w	D2, D1
+		move.w	d2,d1
 loc_5ADA:
-		move.w	D1, (Camera_X_pos).w
-		move.w	D1, (Camera_X_pos_P2).w
-		subi.w	#$0060, D0
+		move.w	d1,(Camera_X_pos).w
+		move.w	d1,(Camera_X_pos_P2).w
+		subi.w	#$0060,d0
 		bcc.s	loc_5AEA
-		moveq	#$00, D0
+		moveq	#$00,d0
 loc_5AEA:
-		cmp.w	(Camera_Max_Y_pos_now).w, D0
+		cmp.w	(Camera_Max_Y_pos_now).w,d0
 		blt.s	loc_5AF4
-		move.w	(Camera_Max_Y_pos_now).w, D0
+		move.w	(Camera_Max_Y_pos_now).w,d0
 loc_5AF4:
-		move.w	D0, (Camera_Y_pos).w
-		move.w	D0, (Camera_Y_pos_P2).w
-		bsr.w	  Background_Scroll_Speed ; loc_5B8A
-		rts
+		move.w	d0,(Camera_Y_pos).w
+		move.w	d0,(Camera_Y_pos_P2).w
+		bra.w	Background_Scroll_Speed ; loc_5B8A
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; CHARACTER START LOCATION ARRAY
@@ -5994,25 +5959,25 @@ StartLocations: zoneOrderedTable 2,4
 Background_Scroll_Speed: ; loc_5B8A: ; Background Position
 		tst.b	(Last_star_pole_hit).w
 		bne.s	loc_5BB8
-		move.w	D0, (Camera_BG_Y_pos).w
-		move.w	D0, (Camera_BG2_Y_pos).w
-		move.w	D1, (Camera_BG_X_pos).w
-		move.w	D1, (Camera_BG2_X_pos).w
-		move.w	D1, (Camera_BG3_X_pos).w
-		move.w	D0, (Camera_BG_Y_pos_P2).w
-		move.w	D0, (Camera_BG2_Y_pos_P2).w
-		move.w	D1, (Camera_BG_X_pos_P2).w
-		move.w	D1, (Camera_BG2_X_pos_P2).w
-		move.w	D1, (Camera_BG3_X_pos_P2).w
+		move.w	d0,(Camera_BG_Y_pos).w
+		move.w	d0,(Camera_BG2_Y_pos).w
+		move.w	d1,(Camera_BG_X_pos).w
+		move.w	d1,(Camera_BG2_X_pos).w
+		move.w	d1,(Camera_BG3_X_pos).w
+		move.w	d0,(Camera_BG_Y_pos_P2).w
+		move.w	d0,(Camera_BG2_Y_pos_P2).w
+		move.w	d1,(Camera_BG_X_pos_P2).w
+		move.w	d1,(Camera_BG2_X_pos_P2).w
+		move.w	d1,(Camera_BG3_X_pos_P2).w
 loc_5BB8:
-		moveq	#$00, D2
-		move.b	(Current_Zone).w, D2
-		add.w	D2, D2
-		move.w	Bg_Scroll_Speed_Index(PC, D2), D2 ; loc_5BC8
-		jmp	Bg_Scroll_Speed_Index(PC, D2) ; loc_5BC8
+		moveq	#$00,d2
+		move.b	(Current_Zone).w,d2
+		add.w	d2,d2
+		move.w	Bg_Scroll_Speed_Index(PC,d2),d2 ; loc_5BC8
+		jmp	Bg_Scroll_Speed_Index(PC,d2) ; loc_5BC8
 ; off_5BC8:
 Bg_Scroll_Speed_Index: zoneOrderedOffsetTable 2,1
-	zoneOffsetTableEntry.w	  Bg_Scroll_Speed_GHz ; $00 - Green Background Position
+	zoneOffsetTableEntry.w	  Bg_Scroll_Speed_EHZ ; $00 - Green Background Position
 	zoneOffsetTableEntry.w	  Bg_Scroll_Speed_Null ; $01 - Null Background Position
 	zoneOffsetTableEntry.w	  Bg_Scroll_Speed_Wz ; $02 - Wood Background Position
 	zoneOffsetTableEntry.w	  Bg_Scroll_Speed_Null ; $03 - Null Background Position
@@ -6031,15 +5996,15 @@ Bg_Scroll_Speed_Index: zoneOrderedOffsetTable 2,1
 	zoneOffsetTableEntry.w	  Bg_Scroll_Speed_Null4 ; $10 - Death Egg Background Position (Null)
     zoneTableEnd
 
-Bg_Scroll_Speed_GHz: ; loc_5BEA: ; Green Hill Background Position
+Bg_Scroll_Speed_EHZ: ; loc_5BEA: ; Green Hill Background Position
 		clr.l	(Camera_BG_X_pos).w
 		clr.l	(Camera_BG_Y_pos).w
 		clr.l	(Camera_BG2_Y_pos).w
 		clr.l	(Camera_BG3_Y_pos).w
-		lea	(TempArray_LayerDef).w, A2
-		clr.l	(A2)+
-		clr.l	(A2)+
-		clr.l	(A2)+
+		lea	(TempArray_LayerDef).w,a2
+		clr.l	(a2)+
+		clr.l	(a2)+
+		clr.l	(a2)+
 		clr.l	(Camera_BG_X_pos_P2).w
 		clr.l	(Camera_BG_Y_pos_P2).w
 		clr.l	(Camera_BG2_Y_pos_P2).w
@@ -6048,103 +6013,103 @@ Bg_Scroll_Speed_GHz: ; loc_5BEA: ; Green Hill Background Position
 Bg_Scroll_Speed_Null: ; loc_5C16: ; Null
 		rts
 Bg_Scroll_Speed_Wz: ; loc_5C18: ; Wood Background Position
-		asr.w	#$02, D0
-		addi.w	#$0400, D0
-		move.w	D0, (Camera_BG_Y_pos).w
-		asr.w	#$03, D1
-		move.w	D1, (Camera_BG_X_pos).w
+		asr.w	#$02,d0
+		addi.w	#$0400,d0
+		move.w	d0,(Camera_BG_Y_pos).w
+		asr.w	#$03,d1
+		move.w	d1,(Camera_BG_X_pos).w
 		rts
 Bg_Scroll_Speed_Mz: ; loc_5C2A: ; Metropolis Background Position
-		asr.w	#$02, D0
-		move.w	D0, (Camera_BG_Y_pos).w
-		asr.w	#$03, D1
-		move.w	D1, (Camera_BG_X_pos).w
+		asr.w	#$02,d0
+		move.w	d0,(Camera_BG_Y_pos).w
+		asr.w	#$03,d1
+		move.w	d1,(Camera_BG_X_pos).w
 		rts
 Bg_Scroll_Speed_HTz: ; loc_5C38: ; Hill Top Background Position
 		clr.l	(Camera_BG_X_pos).w
 		clr.l	(Camera_BG_Y_pos).w
 		clr.l	(Camera_BG2_Y_pos).w
 		clr.l	(Camera_BG3_Y_pos).w
-		lea	(TempArray_LayerDef).w, A2
-		clr.l	(A2)+
-		clr.l	(A2)+
-		clr.l	(A2)+
+		lea	(TempArray_LayerDef).w,a2
+		clr.l	(a2)+
+		clr.l	(a2)+
+		clr.l	(a2)+
 		clr.l	(Camera_BG_X_pos_P2).w
 		clr.l	(Camera_BG_Y_pos_P2).w
 		clr.l	(Camera_BG2_Y_pos_P2).w
 		clr.l	(Camera_BG3_Y_pos_P2).w
 		rts
 Bg_Scroll_Speed_HPz: ; loc_5C64: ; Hidden Palace Background Position
-		asr.w	#$01, D0
-		move.w	D0, (Camera_BG_Y_pos).w
+		asr.w	#$01,d0
+		move.w	d0,(Camera_BG_Y_pos).w
 		clr.l	(Camera_BG_X_pos).w
 		rts
 Bg_Scroll_Speed_S1_Spring_Yard: ; loc_5C70:
-		asl.l	#$04, D0
-		move.l	D0, D2
-		asl.l	#$01, D0
-		add.l	D2, D0
-		asr.l	#$08, D0
-		addq.w	#$01, D0
-		move.w	D0, (Camera_BG_Y_pos).w
+		asl.l	#$04,d0
+		move.l	d0,d2
+		asl.l	#$01,d0
+		add.l	d2,d0
+		asr.l	#$08,d0
+		addq.w	#$01,d0
+		move.w	d0,(Camera_BG_Y_pos).w
 		clr.l	(Camera_BG_X_pos).w
 		rts
 Bg_Scroll_Speed_Null2: ; loc_5C86:
 		rts
 Bg_Scroll_Speed_OOz: ; loc_5C88: ; Oil Ocean Background Position
-		lsr.w	#$03, D0
-		addi.w	#$0050, D0
-		move.w	D0, (Camera_BG_Y_pos).w
+		lsr.w	#$03,d0
+		addi.w	#$0050,d0
+		move.w	d0,(Camera_BG_Y_pos).w
 		clr.l	(Camera_BG_X_pos).w
 		rts
 Bg_Scroll_Speed_S1_Spring_Yard2: ; loc_5C98:
-		asl.l	#$04, D0
-		move.l	D0, D2
-		asl.l	#$01, D0
-		add.l	D2, D0
-		asr.l	#$08, D0
-		addq.w	#$01, D0
-		move.w	D0, (Camera_BG_Y_pos).w
+		asl.l	#$04,d0
+		move.l	d0,d2
+		asl.l	#$01,d0
+		add.l	d2,d0
+		asr.l	#$08,d0
+		addq.w	#$01,d0
+		move.w	d0,(Camera_BG_Y_pos).w
 		clr.l	(Camera_BG_X_pos).w
 		rts
 ;loc_5CAE:
-		asr.w	#$03, D0
-		move.w	D0, (Camera_BG_Y_pos).w
+		asr.w	#$03,d0
+		move.w	d0,(Camera_BG_Y_pos).w
 		rts
 Bg_Scroll_Speed_DHz: ; loc_5CB6: ; Dust Hill Background Position
 		clr.l	(Camera_BG_X_pos).w
 		clr.l	(Camera_BG_X_pos_P2).w
 		tst.b	(Current_Act).w
 		bne.s	loc_5CD6
-		divu.w	#$0003, D0
-		subi.w	#$0140, D0
-		move.w	D0, (Camera_BG_Y_pos).w
-		move.w	D0, (Camera_BG_Y_pos_P2).w
+		divu.w	#$0003,d0
+		subi.w	#$0140,d0
+		move.w	d0,(Camera_BG_Y_pos).w
+		move.w	d0,(Camera_BG_Y_pos_P2).w
 		rts
 loc_5CD6:
-		divu.w	#$0006, D0
-		subi.w	#$0010, D0
-		move.w	D0, (Camera_BG_Y_pos).w
-		move.w	D0, (Camera_BG_Y_pos_P2).w
+		divu.w	#$0006,d0
+		subi.w	#$0010,d0
+		move.w	d0,(Camera_BG_Y_pos).w
+		move.w	d0,(Camera_BG_Y_pos_P2).w
 		rts
 Bg_Scroll_Speed_CNz: ; loc_5CE8: ; Casino Night Background Position
-		lsr.w	#$06, D0
-		move.w	D0, (Camera_BG_Y_pos).w
-		move.w	D0, (Camera_BG_Y_pos_P2).w
+		lsr.w	#$06,d0
+		move.w	d0,(Camera_BG_Y_pos).w
+		move.w	d0,(Camera_BG_Y_pos_P2).w
 		clr.l	(Camera_BG_X_pos).w
-		lea	(TempArray_LayerDef).w, A2
-		clr.l	(A2)+
-		clr.l	(A2)+
-		clr.l	(A2)+
+		lea	(TempArray_LayerDef).w,a2
+		clr.l	(a2)+
+		clr.l	(a2)+
+		clr.l	(a2)+
 		clr.l	(Camera_BG_X_pos_P2).w
 		clr.l	(Camera_BG_Y_pos_P2).w
 		clr.l	(Camera_BG2_Y_pos_P2).w
 		clr.l	(Camera_BG3_Y_pos_P2).w
 		rts
 Bg_Scroll_Speed_CPz: ; loc_5D12: ; Chemical Plant Background Position
-		lsr.w	#$02, D0
-		move.w	D0, (Camera_BG_Y_pos).w
-		move.w	D0, (Camera_BG_Y_pos_P2).w
+		lsr.w	#$02,d0
+		move.w	d0,(Camera_BG_Y_pos).w
+		move.w	d0,(Camera_BG_Y_pos_P2).w
 		clr.l	(Camera_BG_X_pos).w
 		clr.l	(Camera_BG2_X_pos).w
 		rts
@@ -6153,21 +6118,21 @@ Bg_Scroll_Speed_Null3: ; loc_5D26: ; Genocide City Background Position (Null)
 Bg_Scroll_Speed_NGHz: ; loc_5D28: ; Neo Green Hill Background Position
 		tst.b	(Current_Act).w
 		beq.s	loc_5D3A
-		subi.w	#$00E0, D0
-		lsr.w	#$01, D0
-		move.w	D0, (Camera_BG_Y_pos).w
+		subi.w	#$00E0,d0
+		lsr.w	#$01,d0
+		move.w	d0,(Camera_BG_Y_pos).w
 		bra.s	loc_5D42
 loc_5D3A:
-		subi.w	#$0180, D0
-		move.w	D0, (Camera_BG_Y_pos).w
+		subi.w	#$0180,d0
+		move.w	d0,(Camera_BG_Y_pos).w
 loc_5D42:
 		clr.l	(Camera_BG_X_pos).w
 		clr.l	(Camera_BG2_Y_pos).w
 		clr.l	(Camera_BG3_Y_pos).w
-		lea	(TempArray_LayerDef).w, A2
-		clr.l	(A2)+
-		clr.l	(A2)+
-		clr.l	(A2)+
+		lea	(TempArray_LayerDef).w,a2
+		clr.l	(a2)+
+		clr.l	(a2)+
+		clr.l	(a2)+
 		rts
 Bg_Scroll_Speed_Null4: ; loc_5D5A: ; Death Egg Background Position (Null)
 		rts
@@ -6184,46 +6149,46 @@ loc_5D64:
 		clr.w	(Scroll_flags_BG_P2).w
 		clr.w	(Scroll_flags_BG2_P2).w
 		clr.w	(Scroll_flags_BG3_P2).w
-		lea	($FFFFB000).w, A0
-		lea	(Camera_X_pos).w, A1
-		lea	(Horiz_block_crossed_flag).w, A2
-		lea	(Scroll_flags).w, A3
-		lea	(Camera_X_pos_diff).w, A4
-		lea	(Horiz_scroll_delay_val).w, A5
-		lea	(Sonic_Pos_Record_Buf).w, A6
-		bsr.w	  Scroll_Horizontal	  ; loc_6AEC
-		lea	(Camera_Y_pos).w, A1
-		lea	(Verti_block_crossed_flag).w, A2
-		lea	(Camera_Y_pos_diff).w, A4
-		bsr.w	  Scroll_Vertical	  ; loc_6B84
+		lea	(Object_RAM).w,a0
+		lea	(Camera_X_pos).w,a1
+		lea	(Horiz_block_crossed_flag).w,a2
+		lea	(Scroll_flags).w,a3
+		lea	(Camera_X_pos_diff).w,a4
+		lea	(Horiz_scroll_delay_val).w,a5
+		lea	(Sonic_Pos_Record_Buf).w,a6
+		bsr.w	Scroll_Horizontal	  ; loc_6AEC
+		lea	(Camera_Y_pos).w,a1
+		lea	(Verti_block_crossed_flag).w,a2
+		lea	(Camera_Y_pos_diff).w,a4
+		bsr.w	Scroll_Vertical	  ; loc_6B84
 		tst.w	(Two_player_mode).w
 		beq.s	loc_5DEA
-		lea	($FFFFB040).w, A0
-		lea	(Camera_X_pos_P2).w, A1
-		lea	(Horiz_block_crossed_flag_P2).w, A2
-		lea	(Scroll_flags_P2).w, A3
-		lea	(Camera_X_pos_diff_P2).w, A4
-		lea	(Horiz_scroll_delay_val_P2).w, A5
-		lea	(Tails_Pos_Record_Buf).w, A6
-		bsr.w	  Scroll_Horizontal	  ; loc_6AEC
-		lea	(Camera_Y_pos_P2).w, A1
-		lea	(Verti_block_crossed_flag_P2).w, A2
-		lea	(Camera_Y_pos_diff_P2).w, A4
-		bsr.w	  Scroll_Vertical	  ; loc_6B84
+		lea	(Object_RAM+$40).w,a0
+		lea	(Camera_X_pos_P2).w,a1
+		lea	(Horiz_block_crossed_flag_P2).w,a2
+		lea	(Scroll_flags_P2).w,a3
+		lea	(Camera_X_pos_diff_P2).w,a4
+		lea	(Horiz_scroll_delay_val_P2).w,a5
+		lea	(Tails_Pos_Record_Buf).w,a6
+		bsr.w	Scroll_Horizontal	  ; loc_6AEC
+		lea	(Camera_Y_pos_P2).w,a1
+		lea	(Verti_block_crossed_flag_P2).w,a2
+		lea	(Camera_Y_pos_diff_P2).w,a4
+		bsr.w	Scroll_Vertical	  ; loc_6B84
 loc_5DEA:
-		bsr.w	  Dyn_Screen_Boss_Loader  ; loc_79C0
-		move.w	(Camera_Y_pos).w, (Vscroll_Factor_FG).w
-		move.w	(Camera_BG_Y_pos).w, (Vscroll_Factor_BG).w
-		move.l	(Camera_X_pos).w, (Camera_X_pos_copy).w
-		move.l	(Camera_Y_pos).w, (Camera_Y_pos_copy).w
-		moveq	#$00, D0
-		move.b	(Current_Zone).w, D0
-		add.w	D0, D0
-		move.w	Bg_Scroll_Index(PC, D0), D0 ; loc_5E16
-		jmp	Bg_Scroll_Index(PC, D0) ; loc_5E16
+		bsr.w	Dyn_Screen_Boss_Loader  ; loc_79C0
+		move.w	(Camera_Y_pos).w,(Vscroll_Factor_FG).w
+		move.w	(Camera_BG_Y_pos).w,(Vscroll_Factor_BG).w
+		move.l	(Camera_X_pos).w,(Camera_X_pos_copy).w
+		move.l	(Camera_Y_pos).w,(Camera_Y_pos_copy).w
+		moveq	#$00,d0
+		move.b	(Current_Zone).w,d0
+		add.w	d0,d0
+		move.w	Bg_Scroll_Index(PC,d0),d0 ; loc_5E16
+		jmp	Bg_Scroll_Index(PC,d0) ; loc_5E16
 ; off_5E16:
 Bg_Scroll_Index: zoneOrderedOffsetTable 2,1
-	zoneOffsetTableEntry.w	  Bg_Scroll_GHz; $00 - Green Hill Background Scroll
+	zoneOffsetTableEntry.w	  Bg_Scroll_EHZ; $00 - Green Hill Background Scroll
 	zoneOffsetTableEntry.w	  Bg_Scroll_Null; $01 - Null Background Scroll
 	zoneOffsetTableEntry.w	  Bg_Scroll_Wz; $02 - Wood Background Scroll
 	zoneOffsetTableEntry.w	  Bg_Scroll_Null; $03 - Null Background Scroll
@@ -6255,7 +6220,7 @@ loc_5E4A:
 		neg.w	D2
 		moveq	#$00, D0
 		bra.s	loc_5E78
-Bg_Scroll_GHz: ; loc_5E5C: ; $00 - Green Hill Background Scroll
+Bg_Scroll_EHZ: ; loc_5E5C: ; $00 - Green Hill Background Scroll
 		tst.w	(Two_player_mode).w
 		bne.w	 loc_5FA2
 		move.w	(Camera_BG_Y_pos).w, (Vscroll_Factor_BG).w
@@ -9484,6 +9449,25 @@ DynResize_NGHz: ;loc_7FD6:
 		rts
 DynResize_DEz: ;loc_7FD8:
 		rts
+; ===========================================================================
+; TODO
+; loc_F626:
+;PlayLevelMusic:
+;	move.w	(Level_Music).w,d0
+;	jmp	(PlayMusic).l
+; ===========================================================================
+; TODO
+; loc_F62E:
+LoadPLC_AnimalExplosion:
+	moveq	#0,d0
+	move.b	(Current_Zone).w,d0
+;	lea	(Animal_PLCTable).l,a2
+;	move.b	(a2,d0.w),d0
+	jsr	(LoadPLC).l
+;	moveq	#PLCID_Explosion,d0
+	jmp	(LoadPLC).l
+; ===========================================================================
+
 ;===============================================================================
 ; Object 0x11 - Bridge
 ; [ Begin ]
@@ -9505,13 +9489,13 @@ loc_7FFC:
 		dc.w	loc_8180-loc_7FFC
 loc_8004:
 		addq.b	#$02, $0024(A0)
-		move.l	#Obj11_MapUnc_85E0, $0004(A0) ; loc_85E0
+		move.l	#Bridge_Mappings, $0004(A0) ; loc_85E0
 		move.w	#$43C6, $0002(A0)
 		move.b	#$03, $0018(A0)
 		cmpi.b	#hidden_palace_zone, (Current_Zone).w
 		bne.s	loc_8036
 		addq.b	#$04, $0024(A0)
-		move.l	#Obj11_MapUnc_8598, $0004(A0) ; loc_8598
+		move.l	#HpzBridge, $0004(A0) ; loc_8598
 		move.w	#$6300, $0002(A0)
 loc_8036:
 		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
@@ -9618,11 +9602,11 @@ loc_814C:
 		rts
 loc_8160:
 		move.l	$0030(A0), A1
-		bsr.w	  loc_D3B6
+		bsr.w	  DeleteObject2
 		cmpi.b	#$08, $0028(A0)
 		bls.s	loc_8178
 		move.l	$0034(A0), A1
-		bsr.w	  loc_D3B6
+		bsr.w	  DeleteObject2
 loc_8178:
 		bra.w	  DeleteObject		  ; loc_D3B4
 loc_817C:
@@ -9921,8 +9905,8 @@ loc_8498:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj11_MapUnc_8598:	BINCLUDE	"mappings/sprite/obj11_HPZ.bin"	; HPZ bridge
-Obj11_MapUnc_85E0:	BINCLUDE	"mappings/sprite/obj11_GHZ.bin"	; GHZ bridge
+HpzBridge:	BINCLUDE	"mappings/sprite/obj11_HPZ.bin"	; HPZ bridge
+Bridge_Mappings:	BINCLUDE	"mappings/sprite/obj11_GHZ.bin"	; EHZ bridge
 ;===============================================================================
 ; Object 0x11 - Bridge
 ; [ End ]
@@ -9932,388 +9916,435 @@ Obj11_MapUnc_85E0:	BINCLUDE	"mappings/sprite/obj11_GHZ.bin"	; GHZ bridge
 ; Object 0x15 - Swing Platforms - Dust Hill / Oil Ocean
 ; [ Begin ]
 ;===============================================================================
+
 Obj_0x15_Swing_Platform: ; loc_85F8:
-		btst	#$06, $0001(A0)
-		bne.w	  loc_8610
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_8618(PC, D0), D1
-		jmp	loc_8618(PC, D1)
+		btst	#6,render_flags(a0)
+		bne.w	loc_8610
+		moveq	#0,d0
+		move.b	obRoutine(a0),d0
+		move.w	loc_8618(pc,d0),d1
+		jmp	loc_8618(pc,d1)
+; ===========================================================================
 loc_8610:
-		move.w	#$0200, D0
-		bra.w	  DisplaySprite_Param	  ; loc_D3FE
-loc_8618:
-		dc.w	loc_8626-loc_8618
-		dc.w	loc_8764-loc_8618
-		dc.w	loc_892A-loc_8618
-		dc.w	loc_892E-loc_8618
-		dc.w	loc_89E8-loc_8618
-		dc.w	loc_89F0-loc_8618
-		dc.w	loc_8A56-loc_8618
-loc_8626:
-		addq.b	#$02, $0024(A0)
-		move.l	#Obj15_MapUnc_8AD8, $0004(A0) ; loc_8AD8
-		move.w	#$43E3, $0002(A0)
-		move.b	#$04, $0001(A0)
-		move.b	#$03, $0018(A0)
-		move.b	#$20, $0019(A0)
-		move.b	#$10, $0016(A0)
-		move.w	$000C(A0), $0038(A0)
-		move.w	$0008(A0), $003A(A0)
-		cmpi.b	#dust_hill_zone, (Current_Zone).w
+		move.w	#$200,d0
+		bra.w	DisplaySprite_Param
+; ===========================================================================
+loc_8618:	dc.w	Obj15_Init-loc_8618
+		dc.w	Obj15_State2-loc_8618
+		dc.w	Obj15_Display-loc_8618
+		dc.w	Obj15_State4-loc_8618
+		dc.w	Obj15_State5-loc_8618
+		dc.w	Obj15_State6-loc_8618
+		dc.w	Obj15_State7-loc_8618
+swing_origX = $3A		; original x-axis position
+swing_origY = $38		; original y-axis position
+; ===========================================================================
+Obj15_Init:
+		addq.b	#2,obRoutine(a0)
+		move.l	#Swing_Platforms_Mappings,mappings(a0)
+		move.w	#$43E3,art_tile(a0)
+		move.b	#4,render_flags(a0)
+		move.b	#3,$18(a0)
+		move.b	#$20,$19(a0)
+		move.b	#$10,obHeight(a0)
+		move.w	y_pos(a0),swing_origY(a0)
+		move.w	x_pos(a0),swing_origX(a0)
+		cmpi.b	#dust_hill_zone,(Current_Zone).w
 		bne.s	loc_867E
-		move.l	#Dhz_Swing_Platforms_Mappings, $0004(A0) ; loc_8B46
-		move.w	#$0000, $0002(A0)
-		move.b	#$18, $0019(A0)
-		move.b	#$08, $0016(A0)
+
+		move.l	#Dhz_Swing_Platforms_Mappings,mappings(a0)
+		move.w	#0,art_tile(a0)
+		move.b	#$18,$19(a0)
+		move.b	#8,$16(a0)
+
 loc_867E:
-		cmpi.b	#neo_green_hill_zone, (Current_Zone).w
+		cmpi.b	#neo_green_hill_zone,(Current_Zone).w
 		bne.s	loc_86A0
-		move.l	#Obj15_MapUnc_8B0E, $0004(A0) ; loc_8B0E
-		move.w	#$0000, $0002(A0)
-		move.b	#$20, $0019(A0)
-		move.b	#$08, $0016(A0)
+
+		move.l	#Nghz_Swing_Platforms_Mappings,mappings(a0)
+		move.w	#0,art_tile(a0)
+		move.b	#$20,$19(a0)
+		move.b	#8,obHeight(a0)
+
 loc_86A0:
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
-		moveq	#$00, D1
-		move.b	$0028(A0), D1
+		moveq	#0,d1
+		move.b	obSubtype(a0),d1
 		bpl.s	loc_86B0
-		addq.b	#$04, $0024(A0)
+		addq.b	#4,$24(a0)
 loc_86B0:
-		andi.w	#$000F, D1
-		move.w	D1, D2
-		lsl.w	#$04, D2
-		addi.b	#$08, D2
-		move.b	D2, $003C(A0)
-		move.w	$0008(A0), D2
-		move.w	$000C(A0), D3
-		bsr.w	  SingleObjLoad2      ; loc_E788
+		andi.w	#$F,d1
+		move.w	d1,d2
+		lsl.w	#4,d2
+		addi.b	#8,d2
+		move.b	d2,$3C(a0)
+		move.w	x_pos(a0),d2
+		move.w	y_pos(a0),d3
+		bsr.w	SingleObjLoad2
 		bne.s	loc_8738
-		_move.b  0(A0), 0(A1)
-		move.l	$0004(A0), $0004(A1)
-		move.w	$0002(A0), $0002(A1)
-		move.b	#$04, $0001(A1)
-		bset	#$06, $0001(A1)
-		move.b	#$48, $000E(A1)
-		move.b	D1, $000F(A1)
-		subq.b	#$01, D1
-		lea	$0010(A1), A2
+		_move.b	0(a0),0(a1)
+		move.l	mappings(a0),mappings(a1)
+		move.w	art_tile(a0),art_tile(a1)
+		move.b	#4,render_flags(a1)
+		bset	#6,render_flags(a1)
+		move.b	#$48,$E(a1)
+		move.b	d1,$F(a1)
+		subq.b	#1,d1
+		lea	x_vel(a1),a2
+
 loc_86FC:
-		move.w	D2, (A2)+
-		move.w	D3, (A2)+
-		move.w	#$0001, (A2)+
-		addi.w	#$0010, D3
-		dbf    D1, loc_86FC
-		move.b	#$02, $0015(A1)
-		move.w	D2, $0008(A1)
-		move.w	D3, $000C(A1)
-		move.b	#$01, $000B(A1)
-		move.l	A1, $0030(A0)
-		addi.w	#$0008, D3
-		move.w	D3, $000C(A0)
-		move.b	#$50, $0014(A1)
-		bset	#$04, $0001(A1)
+		move.w	d2,(a2)+
+		move.w	d3,(a2)+
+		move.w	#1,(a2)+
+		addi.w	#$10,d3
+		dbf	d1,loc_86FC
+		move.b	#2,$15(a1)
+		move.w	d2,8(a1)
+		move.w	d3,$C(a1)
+		move.b	#1,$B(a1)
+		move.l	a1,$30(a0)
+		addi.w	#8,d3
+		move.w	d3,$C(a0)
+		move.b	#$50,$14(a1)
+		bset	#4,1(a1)
+
 loc_8738:
-		move.w	#$8000, $0026(A0)
-		move.w	#$0000, $003E(A0)
-		move.b	$0028(A0), D1
-		andi.w	#$0070, D1
-		move.b	D1, $0028(A0)
-		cmpi.b	#$40, D1
-		bne.s	loc_8764
-		move.l	#Dhz_Swing_Platforms_Mappings_2, $0004(A0) ; loc_8B7A
-		move.b	#$A7, $0020(A0)
-loc_8764:
-		move.w	$0008(A0), -(A7)
-		bsr.w	  loc_8784
-		moveq	#$00, D1
-		move.b	$0019(A0), D1
-		moveq	#$00, D3
-		move.b	$0016(A0), D3
-		addq.b	#$01, D3
-		move.w	(A7)+, D4
-		bsr.w	  loc_FA28
-		bra.w	  loc_88FC
+		move.w	#$8000,$26(a0)
+		move.w	#0,$3E(a0)
+		move.b	$28(a0),d1
+		andi.w	#$70,d1
+		move.b	d1,obSubtype(a0)
+		cmpi.b	#$40,d1
+		bne.s	Obj15_State2
+		move.l	#Dhz_Swing_Platforms_Mappings_2,4(a0)
+		move.b	#$A7,$20(a0)
+
+Obj15_State2:
+		move.w	8(a0),-(a7)
+		bsr.w	loc_8784
+		moveq	#0,d1
+		move.b	$19(a0),d1
+		moveq	#0,d3
+		move.b	obHeight(a0),d3
+		addq.b	#1,d3
+		move.w	(a7)+,d4
+		bsr.w	loc_FA28
+		bra.w	loc_88FC
 loc_8784:
-		move.b	(Oscillating_Data+$18).w, D0
-		move.b	$0028(A0), D1
+		move.b	(Oscillating_Data+$18).w,d0
+		move.b	obSubtype(a0),d1
 		beq.s	loc_87C4
-		cmpi.b	#$10, D1
+		cmpi.b	#$10,d1
 		bne.s	loc_879E
-		cmpi.b	#$40, D0
+		cmpi.b	#$40,d0
 		bcc.s	loc_87C4
-		moveq	#$40, D0
+		moveq	#$40,d0
 		bra.s	loc_87C4
 loc_879E:
-		cmpi.b	#$20, D1
+		cmpi.b	#$20,d1
 		bne.s	loc_87AA
-		moveq	#$40, D0
-		bra.w	  loc_885C
+		moveq	#$40,d0
+		bra.w	loc_885C
 loc_87AA:
-		cmpi.b	#$30, D1
+		cmpi.b	#$30,d1
 		bne.s	loc_87BA
-		cmpi.b	#$40, D0
+		cmpi.b	#$40,d0
 		bcs.s	loc_87C4
-		moveq	#$40, D0
+		moveq	#$40,d0
 		bra.s	loc_87C4
 loc_87BA:
-		cmpi.b	#$40, D1
+		cmpi.b	#$40,d1
 		bne.s	loc_87C4
-		bsr.w	  loc_885E
+		bsr.w	loc_885E
 loc_87C4:
-		move.w	#$0080, D1
-		btst	#$00, $0022(A0)
+		move.w	#$80,d1
+		btst	#0,$22(a0)
 		beq.s	loc_87D4
-		neg.w	D0
-		add.w	D1, D0
+		neg.w	d0
+		add.w	d1,d0
 loc_87D4:
-		bsr.w	  CalcSine		; loc_320A
-		move.w	$0038(A0), D2
-		move.w	$003A(A0), D3
-		moveq	#$00, D4
-		move.b	$003C(A0), D4
-		move.l	D4, D5
-		muls.w	D0, D4
-		asr.l	#$08, D4
-		muls.w	D1, D5
-		asr.l	#$08, D5
-		add.w	D2, D4
-		add.w	D3, D5
-		move.w	D4, $000C(A0)
-		move.w	D5, $0008(A0)
-		moveq	#$00, D6
-		move.l	$0030(A0), A1
-		move.b	$000F(A1), D6
-		subq.w	#$01, D6
+		bsr.w	CalcSine
+		move.w	swing_origY(a0),d2
+		move.w	swing_origX(a0),d3
+		moveq	#0,d4
+		move.b	$3C(a0),d4
+		move.l	d4,d5
+		muls.w	d0,d4
+		asr.l	#8,d4
+		muls.w	d1,d5
+		asr.l	#8,d5
+		add.w	d2,d4
+		add.w	d3,d5
+		move.w	d4,y_pos(a0)
+		move.w	d5,x_pos(a0)
+		moveq	#0,d6
+		move.l	$30(a0),a1
+		move.b	$F(a1),d6
+		subq.w	#1,d6
 		bcs.s	loc_885C
-		asl.w	#$04, D0
-		ext.l	D0
-		asl.l	#$08, D0
-		asl.w	#$04, D1
-		ext.l	D1
-		asl.l	#$08, D1
-		moveq	#$00, D4
-		moveq	#$00, D5
-		lea	$0010(A1), A2
+		asl.w	#4,d0
+		ext.l	d0
+		asl.l	#8,d0
+		asl.w	#4,d1
+		ext.l	d1
+		asl.l	#8,d1
+		moveq	#0,d4
+		moveq	#0,d5
+		lea	$10(a1),a2
 loc_881E:
-		movem.l D4/D5, -(A7)
-		swap  D4
-		swap  D5
-		add.w	D2, D4
-		add.w	D3, D5
-		move.w	D5, (A2)+
-		move.w	D4, (A2)+
-		movem.l (A7)+, D4/D5
-		add.l	D0, D4
-		add.l	D1, D5
-		addq.w	#$02, A2
-		dbf    D6, loc_881E
-		swap  D4
-		swap  D5
-		add.w	D2, D4
-		add.w	D3, D5
-		move.w	$0028(A1), D0
-		move.w	$002A(A1), D1
-		move.w	D5, $0028(A1)
-		move.w	D4, $002A(A1)
-		move.w	D0, $0008(A1)
-		move.w	D1, $000C(A1)
+		movem.l d4/d5,-(a7)
+		swap	d4
+		swap	d5
+		add.w	d2,d4
+		add.w	d3,d5
+		move.w	d5,(a2)+
+		move.w	d4,(a2)+
+		movem.l (a7)+,d4/d5
+		add.l	d0,d4
+		add.l	d1,d5
+		addq.w	#2,a2
+		dbf	d6,loc_881E
+		swap	d4
+		swap	d5
+		add.w	d2,d4
+		add.w	d3,d5
+		move.w	obSubtype(a1),d0
+		move.w	$2A(a1),d1
+		move.w	d5,obSubtype(a1)
+		move.w	d4,$2A(a1)
+		move.w	d0,x_pos(a1)
+		move.w	d1,y_pos(a1)
 loc_885C:
 		rts
 loc_885E:
-		tst.w	$0036(A0)
+		tst.w	$36(a0)
 		beq.s	loc_886C
-		subq.w	#$01, $0036(A0)
-		bra.w	  loc_88F6
+		subq.w	#1,$36(a0)
+		bra.w	loc_88F6
 loc_886C:
-		tst.b	$0034(A0)
-		bne.s	loc_8892
-		move.w	($FFFFB008).w, D0
-		sub.w	$003A(A0), D0
-		addi.w	#$0020, D0
-		cmpi.w	#$0040, D0
+		tst.b	$34(a0)
+		bne.s	loc_83EA
+		move.w	(Object_RAM+$8).w,d0
+		sub.w	swing_origX(a0),d0
+		addi.w	#$20,d0
+		cmpi.w	#$40,d0
 		bcc.s	loc_88F6
 		tst.w	(Debug_placement_mode).w
-		bne.w	  loc_88F6
-		move.b	#$01, $0034(A0)
-loc_8892:
-		tst.b	$003D(A0)
+		bne.w	loc_88F6
+		move.b	#1,$34(a0)
+
+loc_83EA:
+		tst.b	standonobject(a0)
 		beq.s	loc_88C8
-		move.w	$003E(A0), D0
-		addi.w	#$0008, D0
-		move.w	D0, $003E(A0)
-		add.w	D0, $0026(A0)
-		cmpi.w	#$0200, D0
+		move.w	$3E(a0),d0
+		addi.w	#8,d0
+		move.w	d0,$3E(a0)
+		add.w	d0,angle(a0)
+		cmpi.w	#$200,d0
 		bne.s	loc_88F6
-		move.w	#$0000, $003E(A0)
-		move.w	#$8000, $0026(A0)
-		move.b	#$00, $003D(A0)
-		move.w	#$003C, $0036(A0)
+		move.w	#0,$3E(a0)
+		move.w	#$8000,angle(a0)
+		move.b	#0,standonobject(a0)
+		move.w	#$3C,$36(a0)
 		bra.s	loc_88F6
+; ===========================================================================
+
 loc_88C8:
-		move.w	$003E(A0), D0
-		subi.w	#$0008, D0
-		move.w	D0, $003E(A0)
-		add.w	D0, $0026(A0)
-		cmpi.w	#$FE00, D0
+		move.w	$3E(a0),d0
+		subi.w	#8,d0
+		move.w	d0,$3E(a0)
+		add.w	d0,angle(a0)
+		cmpi.w	#$FE00,d0
 		bne.s	loc_88F6
-		move.w	#$0000, $003E(A0)
-		move.w	#$4000, $0026(A0)
-		move.b	#$01, $003D(A0)
-		move.w	#$003C, $0036(A0)
+		move.w	#0,$3E(a0)
+		move.w	#$4000,angle(a0)
+		move.b	#1,standonobject(a0)
+		move.w	#$3C,$36(a0)
 loc_88F6:
-		move.b	$0026(A0), D0
+		move.b	angle(a0),d0
 		rts
+; ===========================================================================
+
+loc_842E:
+		bsr.w	CalcSine
+		move.w	$38(a0),d2
+		move.w	$3A(a0),d3
+		lea	$28(a0),a2
+		moveq	#0,d6
+		move.b	(a2)+,d6
+
+loc_8442:
+		moveq	#0,d4
+		move.b	(a2)+,d4
+		lsl.w	#6,d4
+		addi.l	#Object_RAM,d4
+		movea.l	d4,a1
+		moveq	#0,d4
+		move.b	$3C(a1),d4
+		move.l	d4,d5
+		muls.w	d0,d4
+		asr.l	#8,d4
+		muls.w	d1,d5
+		asr.l	#8,d5
+		add.w	d2,d4
+		add.w	d3,d5
+		move.w	d4,y_pos(a1)
+		move.w	d5,x_pos(a1)
+		dbf	d6,loc_8442
+		rts
+; ===========================================================================
+
 loc_88FC:
 		tst.w	(Two_player_mode).w
 		beq.s	loc_8906
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bra.w	DisplaySprite
 loc_8906:
-		move.w	$003A(A0), D0
-		andi.w	#$FF80, D0
-		sub.w	(Camera_X_pos_coarse).w, D0
-		cmpi.w	#$0280, D0
-		bhi.w	  loc_891E
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		move.w	swing_origX(a0),d0
+		andi.w	#$FF80,d0
+		sub.w	(Camera_X_pos_coarse).w,d0
+		cmpi.w	#$280,d0
+		bhi.w	loc_891E
+		bra.w	DisplaySprite
 loc_891E:
-		move.l	$0030(A0), A1
-		bsr.w	  loc_D3B6
-		bra.w	  DeleteObject		  ; loc_D3B4
-loc_892A:
-		bra.w	  DisplaySprite 	  ; loc_D3C2
-loc_892E:
-		move.w	$0008(A0), -(A7)
-		bsr.w	  loc_8784
-		moveq	#$00, D1
-		move.b	$0019(A0), D1
-		moveq	#$00, D3
-		move.b	$0016(A0), D3
-		addq.b	#$01, D3
-		move.w	(A7)+, D4
-		bsr.w	  loc_FA28
-		move.b	$0022(A0), D0
-		andi.b	#$18, D0
-		beq.w	  loc_89E4
+		move.l	$30(a0),a1
+		bsr.w	DeleteObject2
+		bra.w	DeleteObject
+Obj15_Display:
+		bra.w	DisplaySprite
+Obj15_State4:
+		move.w	8(a0),-(a7)
+		bsr.w	loc_8784
+		moveq	#0,d1
+		move.b	$19(a0),d1
+		moveq	#0,d3
+		move.b	$16(a0),d3
+		addq.b	#1,d3
+		move.w	(a7)+,d4
+		bsr.w	loc_FA28
+		move.b	$22(a0),d0
+		andi.b	#$18,d0
+		beq.w	loc_89E4
 		tst.b	(Oscillating_Data+$18).w
-		bne.w	  loc_89E4
-		bsr.w	  SingleObjLoad2      ; loc_E788
+		bne.w	loc_89E4
+		bsr.w	SingleObjLoad2
 		bne.s	loc_89D4
-		moveq	#$00, D0
-		move.w	#$000F, D1
+		moveq	#0,d0
+		move.w	#$F,d1
 loc_896A:
-		move.l	$00(A0, D0), $00(A1, D0)
-		addq.w	#$04, D0
-		dbf    D1, loc_896A
-		move.b	#$0A, $0024(A1)
+		move.l	(a0,d0.w),(a1,d0.w)
+		addq.w	#4,d0
+		dbf	d1,loc_896A
+		move.b	#$A,$24(a1)
 		cmpi.b	#neo_green_hill_zone, (Current_Zone).w
 		bne.s	loc_8988
-		addq.b	#$02, $0024(A1)
+		addq.b	#2,$24(a1)
 loc_8988:
-		move.w	#$0200, $0010(A1)
-		btst	#$00, $0022(A0)
+		move.w	#$200,$10(a1)
+		btst	#0,$22(a0)
 		beq.s	loc_899A
-		neg.w	$0010(A1)
+		neg.w	$10(a1)
 loc_899A:
-		bset	#$01, $0022(A1)
-		move.w	A0, D0
-		subi.w	#$B000, D0
-		lsr.w	#$06, D0
-		andi.w	#$007F, D0
-		move.w	A1, D1
-		subi.w	#$B000, D1
-		lsr.w	#$06, D1
-		andi.w	#$007F, D1
-		lea	($FFFFB000).w, A1
-		cmp.b	$003D(A1), D0
+		bset	#1,$22(a1)
+		move.w	a0,d0
+		subi.w	#$B000,d0
+		lsr.w	#6,d0
+		andi.w	#$7F,d0
+		move.w	a1,d1
+		subi.w	#$B000,d1
+		lsr.w	#6,d1
+		andi.w	#$7F,d1
+		lea	(Object_RAM).w,a1
+		cmp.b	$3D(a1),d0
 		bne.s	loc_89C6
-		move.b	D1, $003D(A1)
+		move.b	d1,$3D(a1)
 loc_89C6:
-		lea	($FFFFB040).w, A1
-		cmp.b	$003D(A1), D0
+		lea	(Object_RAM+$40).w,a1
+		cmp.b	$3D(a1),d0
 		bne.s	loc_89D4
-		move.b	D1, $003D(A1)
+		move.b	d1,$3D(a1)
 loc_89D4:
-		move.b	#$03, $001A(A0)
-		addq.b	#$02, $0024(A0)
-		andi.b	#$E7, $0022(A0)
+		move.b	#3,$1A(a0)
+		addq.b	#2,$24(a0)
+		andi.b	#$E7,$22(a0)
 loc_89E4:
-		bra.w	  loc_88FC
-loc_89E8:
-		bsr.w	  loc_8784
-		bra.w	  loc_88FC
-loc_89F0:
-		move.w	$0008(A0), -(A7)
-		btst	#$01, $0022(A0)
+		bra.w	loc_88FC
+Obj15_State5:
+		bsr.w	loc_8784
+		bra.w	loc_88FC
+Obj15_State6:
+		move.w	x_pos(a0),-(a7)
+		btst	#1,$22(a0)
 		beq.s	loc_8A2E
-		bsr.w	  SpeedToPos		  ; loc_D27A
-		addi.w	#$0018, $0012(A0)
-		cmpi.w	#$0720, $000C(A0)
+		bsr.w	SpeedToPos
+		addi.w	#$18,y_vel(a0)
+		cmpi.w	#$720,y_pos(a0)
 		bcs.s	loc_8A3E
-		move.w	#$0720, $000C(A0)
-		bclr	#$01, $0022(A0)
-		move.w	#$0000, $0010(A0)
-		move.w	#$0000, $0012(A0)
-		move.w	$000C(A0), $0038(A0)
+		move.w	#$720,y_pos(a0)
+		bclr	#1,$22(a0)
+		move.w	#0,x_vel(a0)
+		move.w	#0,y_vel(a0)
+		move.w	y_pos(a0),$38(a0)
 		bra.s	loc_8A3E
 loc_8A2E:
-		moveq	#$00, D0
-		move.b	(Oscillating_Data+$14).w, D0
-		lsr.w	#$01, D0
-		add.w	$0038(A0), D0
-		move.w	D0, $000C(A0)
+		moveq	#0,d0
+		move.b	(Oscillating_Data+$14).w,d0
+		lsr.w	#1,d0
+		add.w	swing_origY(a0),d0
+		move.w	d0,y_pos(a0)
 loc_8A3E:
-		moveq	#$00, D1
-		move.b	$0019(A0), D1
-		moveq	#$00, D3
-		move.b	$0016(A0), D3
-		addq.b	#$01, D3
-		move.w	(A7)+, D4
-		bsr.w	  loc_FA28
-		bra.w	  MarkObjGone		  ; loc_D2A0
-loc_8A56:
-		move.w	$0008(A0), -(A7)
-		bsr.w	  SpeedToPos		  ; loc_D27A
-		btst	#$01, $0022(A0)
+		moveq	#0,d1
+		move.b	width_pixels(a0),d1
+		moveq	#0,d3
+		move.b	y_radius(a0),d3
+		addq.b	#1,d3
+		move.w	(a7)+,d4
+		bsr.w	loc_FA28
+		bra.w	MarkObjGone
+
+Obj15_State7:
+		move.w	8(a0),-(a7)
+		bsr.w	SpeedToPos
+		btst	#1,status(a0)
 		beq.s	loc_8A92
-		addi.w	#$0018, $0012(A0)
-		move.w	(Water_Level_2).w, D0
-		cmp.w	$000C(A0), D0
+		addi.w	#$18,y_vel(a0)
+		move.w	(Water_Level_2).w,d0
+		cmp.w	y_pos(a0),d0
 		bhi.s	loc_8AC0
-		move.w	D0, $000C(A0)
-		move.w	D0, $0038(A0)
-		bclr	#$01, $0022(A0)
-		move.w	#$0100, $0010(A0)
-		move.w	#$0000, $0012(A0)
+		move.w	d0,y_pos(a0)
+		move.w	d0,swing_origY(a0)
+		bclr	#1,status(a0)
+		move.w	#$100,x_vel(a0)
+		move.w	#0,y_vel(a0)
 		bra.s	loc_8AC0
+
 loc_8A92:
-		moveq	#$00, D0
-		move.b	(Oscillating_Data+$14).w, D0
-		lsr.w	#$01, D0
-		add.w	$0038(A0), D0
-		move.w	D0, $000C(A0)
-		tst.w	$0010(A0)
+		moveq	#0,d0
+		move.b	(Oscillating_Data+$14).w,d0
+		lsr.w	#1,d0
+		add.w	swing_origY(a0),d0
+		move.w	d0,y_pos(a0)
+		tst.w	x_vel(a0)
 		beq.s	loc_8AC0
-		moveq	#$00, D3
-		move.b	$0019(A0), D3
-		bsr.w	  JmpTo_ObjHitWallRight
-		tst.w	D1
+		moveq	#0,d3
+		move.b	width_pixels(a0),d3
+		jsr	(ObjHitWallRight).l
+		tst.w	d1
 		bpl.s	loc_8AC0
-		add.w	D1, $0008(A0)
-		move.w	#$0000, $0010(A0)
+		add.w	d1,x_pos(a0)
+		move.w	#0,x_vel(a0)
 loc_8AC0:
-		moveq	#$00, D1
-		move.b	$0019(A0), D1
-		moveq	#$00, D3
-		move.b	$0016(A0), D3
-		addq.b	#$01, D3
-		move.w	(A7)+, D4
-		bsr.w	  loc_FA28
-		bra.w	  MarkObjGone		  ; loc_D2A0
+		moveq	#0,d1
+		move.b	width_pixels(a0),d1
+		moveq	#0,d3
+		move.b	obHeight(a0),d3
+		addq.b	#1,d3
+		move.w	(a7)+,d4
+		bsr.w	loc_FA28
+		bra.w	MarkObjGone
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj15_MapUnc_8AD8:	BINCLUDE	"mappings/sprite/obj15_OOZ.bin"
-Obj15_MapUnc_8B0E:	BINCLUDE	"mappings/sprite/obj15_NGHZ.bin"
+Swing_Platforms_Mappings:	BINCLUDE	"mappings/sprite/obj15_OOZ.bin"
+Nghz_Swing_Platforms_Mappings:	BINCLUDE	"mappings/sprite/obj15_NGHZ.bin"
 
 Dhz_Swing_Platforms_Mappings: ; loc_8B46:
 		dc.w	Dhz_Swing_Platforms_Map_01-Dhz_Swing_Platforms_Mappings
@@ -10335,12 +10366,11 @@ Dhz_Swing_Platforms_Mappings_2: ; loc_8B7A:
 Dhz_Swing_Platforms_Map_04: ; loc_8B80:
 		dc.w	$0002
 		dc.l	$F80D6058, $602CFFE0, $F80D6858, $682C0000
+		even
 ;===============================================================================
 ; Object 0x15 - Swing Platforms - Dust Hill / Oil Ocean
 ; [ End ]
 ;===============================================================================
-		nop
-
 ; NOTE:
 ; It seems like the compiler the developers used (which evidently was for a Macintosh-like environment) automatically generated these "Jump To"s blocks
 ; whenever said subroutine referenced was very out of bounds; in fact, using this, we can even predict where the blocks of code compiled begin and end.
@@ -10370,7 +10400,7 @@ loc_8BB0:
 		addq.b	#$02, $0024(A0)
 		move.l	#loc_8CDE, $0004(A0)
 		move.w	#$4398, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		move.b	#$04, $0001(A0)
 		move.b	#$03, $0018(A0)
 		move.b	#$08, $0019(A0)
@@ -10389,7 +10419,7 @@ loc_8BB0:
 		bcs.s	loc_8C74
 		moveq	#$00, D6
 loc_8BFE:
-		bsr.w	  SingleObjLoad2      ; loc_E788
+		bsr.w	SingleObjLoad2      ; loc_E788
 		bne.s	loc_8C74
 		addq.b	#$01, $0028(A0)
 		move.w	A1, D5
@@ -10398,12 +10428,12 @@ loc_8BFE:
 		andi.w	#$007F, D5
 		move.b	D5, (A2)+
 		move.b	#$04, $0024(A1)
-		_move.b  D4, 0(A1)
+		_move.b D4,0(A1)
 		move.w	D2, $000C(A1)
 		move.w	D3, $0008(A1)
 		move.l	$0004(A0), $0004(A1)
 		move.w	#$4398, $0002(A1)
-		bsr.w	  Adjust2PArtPointer2	; loc_DC4C
+		bsr.w	Adjust2PArtPointer2	; loc_DC4C
 		move.b	#$04, $0001(A1)
 		move.b	#$03, $0018(A1)
 		move.b	#$08, $0019(A1)
@@ -10419,15 +10449,15 @@ loc_8BFE:
 		addi.w	#$0010, D3
 		addq.b	#$01, $0028(A0)
 loc_8C70:
-		dbf    D1, loc_8BFE
+		dbf	D1,loc_8BFE
 loc_8C74:
-		bsr.w	  loc_8CB6
+		bsr.w	loc_8CB6
 		move.w	$0008(A0), D0
 		andi.w	#$FF80, D0
 		sub.w	(Camera_X_pos_coarse).w, D0
 		cmpi.w	#$0280, D0
-		bhi.w	  loc_8C90
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bhi.w	loc_8C90
+		bra.w	DisplaySprite 	  ; loc_D3C2
 loc_8C90:
 		moveq	#$00, D2
 		lea	$0028(A0), A2
@@ -10440,10 +10470,10 @@ loc_8C9C:
 		lsl.w	#$06, D0
 		addi.l	#$FFFFB000, D0
 		move.l	D0, A1
-		bsr.w	  loc_D3B6
-		dbf    D2, loc_8C9C
+		bsr.w	DeleteObject2
+		dbf	D2,loc_8C9C
 loc_8CB2:
-		bra.w	  DeleteObject		  ; loc_D3B4
+		bra.w	DeleteObject		  ; loc_D3B4
 loc_8CB6:
 		move.b	(Logspike_anim_frame).w, D0
 		move.b	#$00, $0020(A0)
@@ -10455,8 +10485,8 @@ loc_8CB6:
 loc_8CD4:
 		rts
 loc_8CD6:
-		bsr.w	  loc_8CB6
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bsr.w	loc_8CB6
+		bra.w	DisplaySprite 	  ; loc_D3C2
 loc_8CDE:
 		dc.w	loc_8CEE-loc_8CDE
 		dc.w	loc_8CF8-loc_8CDE
@@ -10520,14 +10550,14 @@ loc_8D5A:
 		lea	loc_8D50(PC, D0), A2
 		move.b	(A2)+, $0019(A0)
 		move.b	(A2)+, $001A(A0)
-		move.l	#Obj18_MapUnc_9078, $0004(A0) ; loc_9078
+		move.l	#Ghz_Platform_Mappings, $0004(A0) ; loc_9078
 		move.w	#$4000, $0002(A0)
 		cmpi.b	#neo_green_hill_zone, (Current_Zone).w
 		bne.s	loc_8D9A
-		move.l	#Obj18_MapUnc_90D0, $0004(A0) ; loc_90D0
+		move.l	#Nghz_Platform_Mappings, $0004(A0) ; loc_90D0
 		move.w	#$4000, $0002(A0)
 loc_8D9A:
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		move.b	#$04, $0001(A0)
 		move.b	#$04, $0018(A0)
 		move.w	$000C(A0), $002C(A0)
@@ -10544,7 +10574,7 @@ loc_8D9A:
 		move.b	#$28, $0016(A0)
 loc_8DE6:
 		bset	#$04, $0001(A0)
-		bra.w	  loc_8E60
+		bra.w	loc_8E60
 loc_8DF0:
 		andi.b	#$0F, $0028(A0)
 loc_8DF6:
@@ -10561,30 +10591,30 @@ loc_8E0C:
 		addq.b	#$04, $0038(A0)
 loc_8E18:
 		move.w	$0008(A0), -(A7)
-		bsr.w	  loc_8EC4
-		bsr.w	  loc_8EAA
+		bsr.w	loc_8EC4
+		bsr.w	loc_8EAA
 		moveq	#$00, D1
 		move.b	$0019(A0), D1
 		moveq	#$08, D3
 		move.w	(A7)+, D4
-		bsr.w	  PlatformObject
+		bsr.w	PlatformObject
 		bra.s	loc_8E3C
 loc_8E34:
-		bsr.w	  loc_8EC4
-		bsr.w	  loc_8EAA
+		bsr.w	loc_8EC4
+		bsr.w	loc_8EAA
 loc_8E3C:
 		tst.w	(Two_player_mode).w
 		beq.s	loc_8E46
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bra.w	DisplaySprite 	  ; loc_D3C2
 loc_8E46:
 		move.w	$0032(A0), D0
 		andi.w	#$FF80, D0
 		sub.w	(Camera_X_pos_coarse).w, D0
 		cmpi.w	#$0280, D0
 		bhi.s	loc_8E5C
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bra.w	DisplaySprite 	  ; loc_D3C2
 loc_8E5C:
-		bra.w	  DeleteObject		  ; loc_D3B4
+		bra.w	DeleteObject		  ; loc_D3B4
 loc_8E60:
 		move.b	$0022(A0), D0
 		andi.b	#$18, D0
@@ -10599,8 +10629,8 @@ loc_8E76:
 		addq.b	#$04, $0038(A0)
 loc_8E82:
 		move.w	$0008(A0), -(A7)
-		bsr.w	  loc_8EC4
-		bsr.w	  loc_8EAA
+		bsr.w	loc_8EC4
+		bsr.w	loc_8EAA
 		moveq	#$00, D1
 		move.b	$0019(A0), D1
 		addi.w	#$000B, D1
@@ -10609,14 +10639,14 @@ loc_8E82:
 		move.w	D2, D3
 		addq.w	#$01, D3
 		move.w	(A7)+, D4
-		bsr.w	  SolidObject		  ; loc_F4A0
+		bsr.w	SolidObject		  ; loc_F4A0
 		bra.s	loc_8E3C
 loc_8EAA:
 		move.b	$0038(A0), D0
-		bsr.w	  CalcSine		; loc_320A
+		bsr.w	CalcSine		; loc_320A
 		move.w	#$0400, D1
 		muls.w	D1, D0
-		swap  D0
+		swap	D0
 		add.w	$002C(A0), D0
 		move.w	D0, $000C(A0)
 		rts
@@ -10658,7 +10688,7 @@ loc_8F12:
 		ext.w	D1
 		add.w	D1, D0
 		move.w	D0, $0008(A0)
-		bra.w	  loc_9070
+		bra.w	loc_9070
 loc_8F1E:
 		move.w	$0034(A0), D0
 		move.b	(Oscillating_Data+$C).w, D1
@@ -10684,7 +10714,7 @@ loc_8F58:
 		ext.w	D1
 		add.w	D1, D0
 		move.w	D0, $002C(A0)
-		bra.w	  loc_9070
+		bra.w	loc_9070
 loc_8F64:
 		tst.w	$003A(A0)
 		bne.s	loc_8F7A
@@ -10780,8 +10810,8 @@ loc_9070:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj18_MapUnc_9078:	BINCLUDE	"mappings/sprite/obj18_GHZ.bin"
-Obj18_MapUnc_90D0:	BINCLUDE	"mappings/sprite/obj18_NGHZ.bin"
+Ghz_Platform_Mappings:	BINCLUDE	"mappings/sprite/obj18_GHZ.bin"
+Nghz_Platform_Mappings:	BINCLUDE	"mappings/sprite/obj18_NGHZ.bin"
 ; ===========================================================================
 
 ;===============================================================================
@@ -10801,7 +10831,7 @@ loc_913C:
 		addq.b	#$02, $0024(A0)
 		move.l	#Collapsing_Platforms_Mappings, $0004(A0) ; loc_94A8
 		move.w	#$4000, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		ori.b	#$04, $0001(A0)
 		move.b	#$04, $0018(A0)
 		move.b	#$07, $0038(A0)
@@ -10809,9 +10839,9 @@ loc_913C:
 		move.l	#loc_9436, $0034(A0)
 		cmpi.b	#hidden_palace_zone, (Current_Zone).w
 		bne.s	loc_91A4
-		move.l	#Obj1A_MapUnc_9858, $0004(A0) ; loc_9858
+		move.l	#HPz_Collapsing_Platforms_Mappings, $0004(A0) ; loc_9858
 		move.w	#$434A, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		move.b	#$30, $0019(A0)
 		move.l	#loc_9828, $003C(A0)
 		move.l	#loc_944F, $0034(A0)
@@ -10819,9 +10849,9 @@ loc_913C:
 loc_91A4:
 		cmpi.b	#oil_ocean_zone, (Current_Zone).w
 		bne.s	loc_91CE
-		move.l	#Obj1A_MapUnc_9902, $0004(A0) ; loc_9902
+		move.l	#OOz_Collapsing_Platforms_Mappings, $0004(A0) ; loc_9902
 		move.w	#$639D, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		move.b	#$40, $0019(A0)
 		move.l	#loc_9818, $003C(A0)
 		bra.s	loc_91E8
@@ -10834,7 +10864,7 @@ loc_91E8:
 		tst.b	$003A(A0)
 		beq.s	loc_91FA
 		tst.b	$0038(A0)
-		beq.w	 loc_93AC
+		beq.w	loc_93AC
 		subq.b	#$01, $0038(A0)
 loc_91FA:
 		move.b	$0022(A0), D0
@@ -10846,17 +10876,17 @@ loc_920A:
 		move.b	$0019(A0), D1
 		move.l	$003C(A0), A2
 		move.w	$0008(A0), D4
-		bsr.w	  loc_F9D6
-		bra.w	  MarkObjGone		  ; loc_D2A0
+		bsr.w	loc_F9D6
+		bra.w	MarkObjGone		  ; loc_D2A0
 loc_9220:
 		tst.b	$0038(A0)
 		beq.s	loc_9264
 		tst.b	$003A(A0)
 		bne.s	loc_9234
 		subq.b	#$01, $0038(A0)
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bra.w	DisplaySprite 	  ; loc_D3C2
 loc_9234:
-		bsr.w	  loc_920A
+		bsr.w	loc_920A
 		subq.b	#$01, $0038(A0)
 		bne.s	loc_9262
 		lea	($FFFFB000).w, A1
@@ -10871,10 +10901,10 @@ loc_9248:
 loc_9262:
 		rts
 loc_9264:
-		bsr.w	  ObjectFall		  ; loc_D24E
+		bsr.w	ObjectFall		  ; loc_D24E
 		tst.b	$0001(A0)
-		bpl.w	 DeleteObject		 ; loc_D3B4
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bpl.w	DeleteObject		 ; loc_D3B4
+		bra.w	DisplaySprite 	  ; loc_D3C2
 ;===============================================================================
 ; Object 0x1A - Collapsing Platforms - Hidden Palace / Oil Ocean ...
 ; [ End ]
@@ -10909,24 +10939,24 @@ loc_92C6:
 		move.l	A4, $0034(A0)
 		cmpi.b	#oil_ocean_zone, (Current_Zone).w
 		bne.s	loc_92F2
-		move.l	#Obj1A_MapUnc_9902, $0004(A0) ; loc_9902
+		move.l	#OOz_Collapsing_Platforms_Mappings, $0004(A0) ; loc_9902
 		move.w	#$639D, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		move.b	#$40, $0019(A0)
 		move.l	#loc_946B, $0034(A0)
 loc_92F2:
 		cmpi.b	#dust_hill_zone, (Current_Zone).w
 		bne.s	loc_931A
-		move.l	#Obj1A_MapUnc_9942, $0004(A0) ; loc_9942
+		move.l	#Dhz_Collapsing_Platforms_Mappings, $0004(A0) ; loc_9942
 		move.w	#$63F4, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		move.b	#$20, $0019(A0)
 		move.l	#loc_9472, $0034(A0)
 loc_931A:
 		tst.b	$003A(A0)
 		beq.s	loc_932C
 		tst.b	$0038(A0)
-		beq.w	  loc_93A6
+		beq.w	loc_93A6
 		subq.b	#$01, $0038(A0)
 loc_932C:
 		move.b	$0022(A0), D0
@@ -10938,17 +10968,17 @@ loc_933C:
 		move.b	$0019(A0), D1
 		move.w	#$0010, D3
 		move.w	$0008(A0), D4
-		bsr.w	  PlatformObject
-		bra.w	  MarkObjGone		  ; loc_D2A0
+		bsr.w	PlatformObject
+		bra.w	MarkObjGone		  ; loc_D2A0
 loc_9352:
 		tst.b	$0038(A0)
 		beq.s	loc_9396
 		tst.b	$003A(A0)
 		bne.s	loc_9366
 		subq.b	#$01, $0038(A0)
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bra.w	DisplaySprite 	  ; loc_D3C2
 loc_9366:
-		bsr.w	  loc_933C
+		bsr.w	loc_933C
 		subq.b	#$01, $0038(A0)
 		bne.s	loc_9394
 		lea	($FFFFB000).w, A1
@@ -10963,10 +10993,10 @@ loc_937A:
 loc_9394:
 		rts
 loc_9396:
-		bsr.w	  ObjectFall		  ; loc_D24E
+		bsr.w	ObjectFall		  ; loc_D24E
 		tst.b	$0001(A0)
-		bpl.w	 DeleteObject		 ; loc_D3B4
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bpl.w	DeleteObject		 ; loc_D3B4
+		bra.w	DisplaySprite 	  ; loc_D3C2
 loc_93A6:
 		addq.b	#$01, $001A(A0)
 		bra.s	loc_93B0
@@ -10982,17 +11012,17 @@ loc_93B0:
 		move.w	(A3)+, D1
 		subq.w	#$01, D1
 		bset	#$05, $0001(A0)
-		_move.b  0(A0), D4
+		_move.b	0(A0), D4
 		move.b	$0001(A0), D5
 		move.l	A0, A1
 		bra.s	loc_93E2
 loc_93DA:
-		bsr.w	  SingleObjLoad        ; loc_E772
+		bsr.w	SingleObjLoad        ; loc_E772
 		bne.s	loc_9428
 		addq.w	#$08,  A3
 loc_93E2:
 		move.b	#$04, $0024(A1)
-		_move.b  D4, 0(A1)
+		_move.b	D4, 0(A1)
 		move.l	A3, $0004(A1)
 		move.b	D5, $0001(A1)
 		move.w	$0008(A0), $0008(A1)
@@ -11004,9 +11034,9 @@ loc_93E2:
 		move.b	(A4)+, $0038(A1)
 		cmpa.l	A0, A1
 		bcc.s	loc_9424
-		bsr.w	  DisplayA1Sprite	  ; loc_D3E0
+		bsr.w	DisplayA1Sprite	  ; loc_D3E0
 loc_9424:
-		dbf    D1, loc_93DA
+		dbf	D1,loc_93DA
 loc_9428:
 		bsr.w	  DisplaySprite 	  ; loc_D3C2
 		move.w	#$00B9, D0
@@ -11114,9 +11144,9 @@ loc_9828:
 		dc.b	$10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10
 		dc.b	$10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10
 		dc.b	$10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10
-Obj1A_MapUnc_9858:	BINCLUDE	"mappings/sprite/obj1A_HPZ.bin"
-Obj1A_MapUnc_9902:	BINCLUDE	"mappings/sprite/obj1A_OOZ.bin"
-Obj1A_MapUnc_9942:	BINCLUDE	"mappings/sprite/obj1F_DHZ.bin"
+HPz_Collapsing_Platforms_Mappings:	BINCLUDE	"mappings/sprite/obj1A_HPZ.bin"
+OOz_Collapsing_Platforms_Mappings:	BINCLUDE	"mappings/sprite/obj1A_OOZ.bin"
+Dhz_Collapsing_Platforms_Mappings:	BINCLUDE	"mappings/sprite/obj1F_DHZ.bin"
 		even
 ;===============================================================================
 ; Object 0x1F - Collapsing Platforms - Dust Hill / Oil Ocean ...
@@ -11143,7 +11173,7 @@ loc_99AE:
 		dc.w	$43FD
 		dc.b	$04, $06
 
-		dc.l	($01<<$18)|Obj11_MapUnc_85E0 ; loc_85E0
+		dc.l	($01<<$18)|Bridge_Mappings ; loc_85E0
 		dc.w	$43C6
 		dc.b	$04, $01
 
@@ -11151,15 +11181,15 @@ loc_99AE:
 		dc.w	$23FD
 		dc.b	$10, $06
 
-		dc.l	($03<<$18)|Obj16_MapUnc_1611E ; loc_1611E
+		dc.l	($03<<$18)|Teleferics_Mappings ; loc_1611E
 		dc.w	$43E6
 		dc.b	$08, $04
 
-		dc.l	($04<<$18)|Obj16_MapUnc_1611E ; loc_1611E
+		dc.l	($04<<$18)|Teleferics_Mappings ; loc_1611E
 		dc.w	$43E6
 		dc.b	$08, $04
 
-		dc.l	($01<<$18)|Obj16_MapUnc_1611E ; loc_1611E
+		dc.l	($01<<$18)|Teleferics_Mappings ; loc_1611E
 		dc.w	$43E6
 		dc.b	$20, $01
 
@@ -11224,13 +11254,13 @@ loc_9A62:
 		dc.w	loc_9A7E-loc_9A62
 		dc.w	loc_9AC0-loc_9A62
 loc_9A66:
-		dc.l	($03<<$18)|Obj11_MapUnc_8598 ; loc_8598
+		dc.l	($03<<$18)|HpzBridge ; loc_8598
 		dc.w	$6300
 		dc.b	$04, 01
-		dc.l	Obj71_MapUnc_9AFA	       ; loc_9AFA
+		dc.l	Hpz_Orbs_Mappings	       ; loc_9AFA
 		dc.w	$E35A
 		dc.b	$10, $01
-		dc.l	Obj71_MapUnc_9BBE	    ; loc_9BBE
+		dc.l	Lava_Bubble_Mappings	    ; loc_9BBE
 		dc.w	$4536
 		dc.b	$10, $01
 loc_9A7E:
@@ -11243,7 +11273,7 @@ loc_9A7E:
 		move.b	(A1), $001A(A0)
 		move.l	(A1)+, $0004(A0)
 		move.w	(A1)+, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		ori.b	#$04, $0001(A0)
 		move.b	(A1)+, $0019(A0)
 		move.b	(A1)+, $0018(A0)
@@ -11253,8 +11283,8 @@ loc_9A7E:
 		move.b	D0, $001C(A0)
 loc_9AC0:
 		lea	(loc_9ACE).l, A1
-		bsr.w	  AnimateSprite 	  ; loc_D412
-		bra.w	  MarkObjGone		  ; loc_D2A0
+		bsr.w	AnimateSprite 	  ; loc_D412
+		bra.w	MarkObjGone		  ; loc_D2A0
 loc_9ACE:
 		dc.w	loc_9AD6-loc_9ACE
 		dc.w	loc_9ADE-loc_9ACE
@@ -11271,12 +11301,12 @@ loc_9AF6:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj71_MapUnc_9AFA:	BINCLUDE	"mappings/sprite/obj71_a.bin"	; glowing orbs
+Hpz_Orbs_Mappings:	BINCLUDE	"mappings/sprite/obj71_a.bin"	; glowing orbs
 Obj1C_MapUnc_9B3A:	BINCLUDE	"mappings/sprite/obj1C_a.bin"	; level art
 Obj1C_MapUnc_9B52:	BINCLUDE	"mappings/sprite/obj1C_b.bin"	; ARZ waterfall
 Obj1C_MapUnc_9B6A:	BINCLUDE	"mappings/sprite/obj1C_OOZ.bin"	; OOZ oil
 Obj1C_MapUnc_9B9A:	BINCLUDE	"mappings/sprite/obj1C_d.bin"	; MTZ thingy
-Obj71_MapUnc_9BBE:	BINCLUDE	"mappings/sprite/obj71_b.bin"
+Lava_Bubble_Mappings:	BINCLUDE	"mappings/sprite/obj71_b.bin"
 ; ===========================================================================
 		nop
 
@@ -11294,9 +11324,9 @@ loc_9C1A:
 		dc.w	loc_9C58-loc_9C1A
 loc_9C1E:
 		addq.b	#$02, $0024(A0)
-		move.l	#Obj2A_MapUnc_9CAE, $0004(A0) ; loc_9CAE
+		move.l	#Up_Down_Pillar_Mappings, $0004(A0) ; loc_9CAE
 		move.w	#$4000, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
 		ori.b	#$04, $0001(A0)
 		move.b	#$10, $0019(A0)
 		move.b	#$04, $0018(A0)
@@ -11332,7 +11362,7 @@ loc_9C84:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj2A_MapUnc_9CAE:	BINCLUDE	"mappings/sprite/obj2A.bin"
+Up_Down_Pillar_Mappings:	BINCLUDE	"mappings/sprite/obj2A.bin"
 ; ===========================================================================
 
 ;===============================================================================
@@ -11349,7 +11379,7 @@ loc_9CF0:
 		dc.w	loc_9D76-loc_9CF0
 loc_9CF4:
 		addq.b	#$02, $0024(A0)
-		move.l	#Obj2D_MapUnc_9E1E, $0004(A0) ; loc_9E1E
+		move.l	#Automatic_Door_Mappings, $0004(A0) ; loc_9E1E
 		move.w	#$2426, $0002(A0)
 		move.b	#$08, $0019(A0)
 		cmpi.b	#metropolis_zone, (Current_Zone).w
@@ -11436,69 +11466,69 @@ loc_9E00:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj2D_MapUnc_9E1E:	BINCLUDE	"mappings/sprite/obj2D.bin"
+Automatic_Door_Mappings:	BINCLUDE	"mappings/sprite/obj2D.bin"
+		even
 ; ===========================================================================
-		nop
 ;===============================================================================
 ; Object ??? - Unknow Object 0x009E6C
 ; [ Begin ]    Sonic 1 Object 1E - leftover Ballhog object
 ;===============================================================================
 S1_Ballhog: ; Unknow_Obj_0x009E6C: ; loc_9E6C:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_9E7A(PC, D0), D1
-		jmp	loc_9E7A(PC, D1)
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	loc_9E7A(PC,d0),d1
+		jmp	loc_9E7A(PC,d1)
 loc_9E7A:
 		dc.w	loc_9E7E-loc_9E7A
 		dc.w	loc_9ED2-loc_9E7A
 loc_9E7E:
-		move.b	#$13, $0016(A0)
-		move.b	#$08, $0017(A0)
-		move.l	#S1_Ballhog_Mappings, $0004(A0) ;  loc_A18E
-		move.w	#$2302, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
-		move.b	#$04, $0001(A0)
-		move.b	#$04, $0018(A0)
-		move.b	#$05, $0020(A0)
-		move.b	#$0C, $0019(A0)
-		bsr.w	  ObjectFall		  ; loc_D24E
+		move.b	#$13,$16(a0)
+		move.b	#8,$17(a0)
+		move.l	#S1_Ballhog_Mappings,$4(a0) ;  loc_A18E
+		move.w	#$2302,$2(a0)
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
+		move.b	#4,$1(a0)
+		move.b	#4,$18(a0)
+		move.b	#5,$20(a0)
+		move.b	#$C,$19(a0)
+		bsr.w	ObjectFall		  ; loc_D24E
 		jsr	ObjHitFloor		; (loc_13898)
-		tst.w	D1
+		tst.w	d1
 		bpl.s	loc_9ED0
-		add.w	D1, $000C(A0)
-		move.w	#$0000, $0012(A0)
-		addq.b	#$02, $0024(A0)
+		add.w	d1,$C(a0)
+		move.w	#0,$12(a0)
+		addq.b	#2,$24(a0)
 loc_9ED0:
 		rts
 loc_9ED2:
-		lea	(Ani_S1_Ballhog).l, A1	  ; loc_A174
-		bsr.w	  AnimateSprite 	  ; loc_D412
-		cmpi.b	#$01, $001A(A0)
+		lea	(Ani_S1_Ballhog).l,a1	  ; loc_A174
+		bsr.w	AnimateSprite 	  ; loc_D412
+		cmpi.b	#1,$1A(a0)
 		bne.s	loc_9EEC
-		tst.b	$0032(A0)
+		tst.b	$32(a0)
 		beq.s	loc_9EF4
 		bra.s	loc_9EF0
 loc_9EEC:
-		clr.b	$0032(A0)
+		clr.b	$32(a0)
 loc_9EF0:
-		bra.w	  MarkObjGone		  ; loc_D2A0
+		bra.w	MarkObjGone		  ; loc_D2A0
 loc_9EF4:
-		move.b	#$01, $0032(A0)
-		bsr.w	  SingleObjLoad        ; loc_E772
+		move.b	#1,$32(a0)
+		bsr.w	SingleObjLoad        ; loc_E772
 		bne.s	loc_9F38
-		move.w	$0008(A0), $0008(A1)
-		move.w	$000C(A0), $000C(A1)
-		move.w	#$FF00, $0010(A1)
-		move.w	#$0000, $0012(A1)
-		moveq	#-4, D0
-		btst	#$00, $0022(A0)
+		move.w	$8(a0),$8(a1)
+		move.w	$C(a0),$C(a1)
+		move.w	#$FF00,$10(a1)
+		move.w	#$0000,$12(a1)
+		moveq	#-4,d0
+		btst	#0,$22(a0)
 		beq.s	loc_9F28
-		neg.w	D0
-		neg.w	$0010(A1)
+		neg.w	d0
+		neg.w	$10(a1)
 loc_9F28:
-		add.w	D0, $0008(A1)
-		addi.w	#$000C, $000C(A1)
-		move.b	$0028(A0), $0028(A1)
+		add.w	d0,$8(a1)
+		addi.w	#$C,$C(a1)
+		move.b	$0028(a0),$28(a1)
 loc_9F38:
 		bra.s	loc_9EF0
 ;===============================================================================
@@ -11510,66 +11540,65 @@ loc_9F38:
 ; [ Begin ]  Sonic1 Object 20 - leftover object for the ball that Ballhog throws
 ;===============================================================================
 S1_BallHog_Ball: ; Unknow_Obj_0x009F3A: ; loc_9F3A:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_9F48(PC, D0), D1
-		jmp	loc_9F48(PC, D1)
+		moveq	#0,d0
+		move.b	routine(a0),d0
+		move.w	loc_9F48(PC,d0),d1
+		jmp	loc_9F48(PC,d1)
 loc_9F48:
 		dc.w	loc_9F4C-loc_9F48
 		dc.w	loc_9F94-loc_9F48
 loc_9F4C:
-		addq.b	#$02, $0024(A0)
-		move.b	#$07, $0016(A0)
-		move.l	#S1_Ballhog_Mappings, $0004(A0) ; loc_A18E
-		move.w	#$2302, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
-		move.b	#$04, $0001(A0)
-		move.b	#$03, $0018(A0)
-		move.b	#$87, $0020(A0)
-		move.b	#$08, $0019(A0)
-		moveq	#$00, D0
-		move.b	$0028(A0), D0
-		mulu.w	#$003C, D0
-		move.w	D0, $0030(A0)
-		move.b	#$04, $001A(A0)
+		addq.b	#2,$24(a0)
+		move.b	#7,$16(a0)
+		move.l	#S1_Ballhog_Mappings,$4(a0) ; loc_A18E
+		move.w	#$2302,$2(a0)
+		move.b	#$4,$1(a0)
+		move.b	#$3,$18(a0)
+		move.b	#$87,$20(a0)
+		move.b	#$8,$19(a0)
+		moveq	#0,d0
+		move.b	$28(a0),d0
+		mulu.w	#$3C,d0
+		move.w	d0,$30(a0)
+		move.b	#4,$1A(a0)
 loc_9F94:
 		jsr	ObjectFall		; (loc_D24E)
-		tst.w	$0012(A0)
+		tst.w	$12(a0)
 		bmi.s	loc_9FD0
 		jsr	ObjHitFloor		; (loc_13898)
-		tst.w	D1
+		tst.w	d1
 		bpl.s	loc_9FD0
-		add.w	D1, $000C(A0)
-		move.w	#$FD00, $0012(A0)
-		tst.b	D3
+		add.w	d1,$C(a0)
+		move.w	#$FD00,$12(a0)
+		tst.b	d3
 		beq.s	loc_9FD0
 		bmi.s	loc_9FC6
-		tst.w	$0010(A0)
+		tst.w	$10(a0)
 		bpl.s	loc_9FD0
-		neg.w	$0010(A0)
+		neg.w	$10(a0)
 		bra.s	loc_9FD0
 loc_9FC6:
-		tst.w	$0010(A0)
+		tst.w	$10(a0)
 		bmi.s	loc_9FD0
-		neg.w	$0010(A0)
+		neg.w	$10(a0)
 loc_9FD0:
-		subq.w	#$01, $0030(A0)
+		subq.w	#1,$30(a0)
 		bpl.s	loc_9FEC
-		_move.b  #$24, 0(A0)
-		_move.b  #$3F, 0(A0)
-		move.b	#$00, $0024(A0)
-		bra.w	  Obj_0x3F		; loc_A11E
+		_move.b	#$24,0(a0)
+		_move.b	#$3F,0(a0)
+		move.b	#0,routine(a0)
+		bra.w	Obj3F		; loc_A11E
 loc_9FEC:
-		subq.b	#$01, $001E(A0)
+		subq.b	#1,$1E(a0)
 		bpl.s	loc_9FFE
-		move.b	#$05, $001E(A0)
-		bchg	#0, $001A(A0)
+		move.b	#5,$1E(a0)
+		bchg	#0,$1A(a0)
 loc_9FFE:
-		move.w	(Camera_Max_Y_pos_now).w, D0
-		addi.w	#$00E0, D0
-		cmp.w	$000C(A0), D0
-		bcs.w	 DeleteObject		 ; loc_D3B4
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		move.w	(Camera_Max_Y_pos_now).w,d0
+		addi.w	#$E0,d0
+		cmp.w	$C(a0),d0
+		bcs.w	DeleteObject
+		bra.w	DisplaySprite
 ;===============================================================================
 ; Object ??? - Unknow Object 0x009F3A
 ; [ End ]
@@ -11577,38 +11606,38 @@ loc_9FFE:
 
 ;===============================================================================
 ; Object 0x24
-; [ Begin ]
+; [ Begin ] Sonic1 object 24 - buzz bomber missile vanishing (unused?)
 ;===============================================================================
 Obj_0x24: ; loc_A012:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_A020(PC, D0), D1
-		jmp	loc_A020(PC, D1)
-loc_A020:
-		dc.w	loc_A024-loc_A020
-		dc.w	loc_A068-loc_A020
-loc_A024:
-		addq.b	#$02, $0024(A0)
-		move.l	#loc_A1F6, $0004(A0)
-		move.w	#$041C, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
-		move.b	#$04, $0001(A0)
-		move.b	#$01, $0018(A0)
-		move.b	#$00, $0020(A0)
-		move.b	#$0C, $0019(A0)
-		move.b	#$09, $001E(A0)
-		move.b	#$00, $001A(A0)
-		move.w	#$00A5, D0
-		jsr	(PlaySound).l		  ; loc_14C6
-loc_A068:
-		subq.b	#$01, $001E(A0)
+		moveq	#0,d0
+		move.b	routine(a0),d0
+		move.w	MDis_Index(pc,d0),d1
+		jmp	MDis_Index(pc,d1)
+MDis_Index:
+		dc.w	MDis_Main-MDis_Index
+		dc.w	MDis_Animate-MDis_Index
+MDis_Main:
+		addq.b	#$2,$24(a0)
+		move.l	#loc_A1F6,$4(a0)
+		move.w	#$41C,$2(a0)
+		bsr.w	Adjust2PArtPointer
+		move.b	#4,$1(a0)
+		move.b	#1,$18(a0)
+		move.b	#0,$20(a0)
+		move.b	#$C,$19(a0)
+		move.b	#9,$1E(a0)
+		move.b	#0,$1A(a0)
+		move.w	#$A5,d0
+		jsr	(PlaySound).l
+MDis_Animate:
+		subq.b	#1,$1E(a0)	; subtract 1 from frame duration
 		bpl.s	loc_A082
-		move.b	#$09, $001E(A0)
-		addq.b	#$01, $001A(A0)
-		cmpi.b	#$04, $001A(A0)
-		beq.w	 DeleteObject		 ; loc_D3B4
+		move.b	#9,$1E(a0)	; set frame duration to 9 frames
+		addq.b	#1,$1A(a0)	; next frame
+		cmpi.b	#4,$1A(a0)	; has animation completed?
+		beq.w	DeleteObject	; if yes, branch
 loc_A082:
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bra.w	DisplaySprite
 ;===============================================================================
 ; Object 0x24
 ; [ End ]
@@ -11619,75 +11648,73 @@ loc_A082:
 ; [ Begin ]
 ;===============================================================================
 Obj_0x27_Object_Hit: ; loc_A086:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	Object_Hit_Index(PC, D0), D1 ; loc_A094
-		jmp	Object_Hit_Index(PC, D1)     ; loc_A094
-Object_Hit_Index: ; loc_A094:
-		dc.w	loc_A09A-Object_Hit_Index
-		dc.w	loc_A0BC-Object_Hit_Index
-		dc.w	loc_A100-Object_Hit_Index
-loc_A09A:
-		addq.b	#$02, $0024(A0)
-		bsr.w	  SingleObjLoad        ; loc_E772
-		bne.s	loc_A0BC
-		_move.b  #$28, 0(A1)
-		move.w	$0008(A0), $0008(A1)
-		move.w	$000C(A0), $000C(A1)
-		move.w	$003E(A0), $003E(A1)
-loc_A0BC:
-		addq.b	#$02, $0024(A0)
-		move.l	#Object_Hit_Mappings, $0004(A0) ;  loc_A226
-		move.w	#$05A0, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
-		move.b	#$04, $0001(A0)
-		move.b	#$01, $0018(A0)
-		move.b	#$00, $0020(A0)
-		move.b	#$0C, $0019(A0)
-		move.b	#$07, $001E(A0)
-		move.b	#$00, $001A(A0)
-		move.w	#$00C1, D0
-		jsr	(PlaySound).l		  ; loc_14C6
-loc_A100:
-		subq.b	#$01, $001E(A0)
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	Object_Hit_Index(PC,d0),d1
+		jmp	Object_Hit_Index(PC,d1)
+Object_Hit_Index:
+		dc.w	ExItem_Animal-Object_Hit_Index
+		dc.w	ExItem_Main-Object_Hit_Index
+		dc.w	ExItem_Animate-Object_Hit_Index
+ExItem_Animal:
+		addq.b	#2,$24(a0)
+		bsr.w	SingleObjLoad
+		bne.s	ExItem_Main
+		_move.b	#$28,0(a1)	; load animal object
+		move.w	$8(a0),$8(a1)
+		move.w	$C(a0),$C(a1)
+		move.w	$3E(a0),$3E(a1)
+ExItem_Main:
+		addq.b	#2,$24(a0)
+		move.l	#Object_Hit_Mappings,$4(a0)
+		move.w	#$5A0,$2(a0)
+		move.b	#4,$1(a0)
+		move.b	#1,$18(a0)
+		move.b	#0,$20(a0)
+		move.b	#$C,$19(a0)
+		move.b	#7,$1E(a0)	; set frame duration to 7 frames
+		move.b	#0,$1A(a0)
+		move.w	#$C1,d0
+		jsr	(PlaySound).l
+ExItem_Animate:
+		subq.b	#1,$1E(a0)	; subtract 1 from frame duration
 		bpl.s	loc_A11A
-		move.b	#$07, $001E(A0)
-		addq.b	#$01, $001A(A0)
-		cmpi.b	#$05, $001A(A0)
-		beq.w	 DeleteObject		 ; loc_D3B4
+		move.b	#7,$1E(a0)	; set frame duration to 7 frames
+		addq.b	#1,$1A(a0)	; next frame
+		cmpi.b	#5,$1A(a0)	; is the final frame (05) displayed?
+		beq.w	DeleteObject	; if yes, branch
 loc_A11A:
-		bra.w	  DisplaySprite 	  ; loc_D3C2
+		bra.w	DisplaySprite
 ;===============================================================================
 ; Object 0x27 - Object Hit - Enemies / Monitors
 ; [ End ]
 ;===============================================================================
 ;===============================================================================
-; Object 0x3F
+; Object 0x3F - explosion from a destroyed boss, bomb or cannonball
 ; [ Begin ]
 ;===============================================================================
-Obj_0x3F: ; loc_A11E:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_A12C(PC, D0), D1
-		jmp	loc_A12C(PC, D1)
-loc_A12C:
-		dc.w	loc_A130-loc_A12C
-		dc.w	loc_A100-loc_A12C
-loc_A130:
-		addq.b	#$02, $0024(A0)
-		move.l	#loc_A292, $0004(A0)
-		move.w	#$05A0, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
-		move.b	#$04, $0001(A0)
-		move.b	#$01, $0018(A0)
-		move.b	#$00, $0020(A0)
-		move.b	#$0C, $0019(A0)
-		move.b	#$07, $001E(A0)
-		move.b	#$00, $001A(A0)
-		move.w	#$00C4, D0
-		jmp	(PlaySound).l		  ; loc_14C6
+Obj3F:
+		moveq	#0,d0
+		move.b	routine(a0),d0
+		move.w	ExBom_Index(pc,d0.w),d1
+		jmp	ExBom_Index(pc,d1.w)
+ExBom_Index:
+		dc.w	ExBom_Main-ExBom_Index
+		dc.w	ExItem_Animate-ExBom_Index
+ExBom_Main:
+		addq.b	#2,$24(a0)
+		move.l	#loc_A292,$4(a0)
+		move.w	#$5A0,$2(a0)
+		move.b	#4,render_flags(a0)
+		move.b	#1,$18(a0)
+		move.b	#0,$20(a0)
+		move.b	#$C,$19(a0)
+		move.b	#7,$1E(a0)
+		move.b	#0,$1A(a0)
+		move.w	#$C4,d0
+		jmp	(PlaySound).l
 ;===============================================================================
-; Object 0x3F
+; Object 0x3F - explosion from a destroyed boss, bomb or cannonball
 ; [ End ]
 ;===============================================================================
 Ani_S1_Ballhog: ; Unknow_Obj_0x009E6C_Data: ; loc_A174:
@@ -13754,7 +13781,7 @@ loc_BF94:
 ; that act finishes.
 ; -------------------------------------------------------------------------------
 word_BF9A: zoneOrderedTable 2,2
-	zoneTableEntry.w  green_hill_zone_act_2		; GHZ1
+	zoneTableEntry.w  green_hill_zone_act_2		; EHZ1
 	zoneTableEntry.w  wood_zone_act_1		; GHZ2
 	zoneTableEntry.w  green_hill_zone_act_1		; OWZ1
 	zoneTableEntry.w  green_hill_zone_act_1		; OWZ2
@@ -13830,6 +13857,7 @@ loc_C030:
 ; Object 0x?? - Special Stage Results Screen
 ; [ Begin ]
 ;===============================================================================
+Obj_0x7E_SS_Results:
 Special_Stage_Results: ; loc_C068:
 		moveq	#$00, D0
 		move.b	$0024(A0), D0
@@ -13964,6 +13992,7 @@ loc_C1E6:
 ; Object 0x?? - Emeralds From Special Stage Results Screen
 ; [ Begin ]
 ;===============================================================================
+Obj_0x7F_SS_Emeralds:
 Emeralds: ; loc_C20E:
 		moveq	#$00, D0
 		move.b	$0024(A0), D0
@@ -14234,7 +14263,7 @@ loc_C936:
 		dc.l	$F805200C, $2006FFF8
 loc_C940:
 		dc.w	$0000		   ; Filler
-		nop
+		even
 ;===============================================================================
 ; Object 0x36 - Vertical Spikes
 ; [ Begin ]
@@ -14490,8 +14519,8 @@ Obj3B_Main:
 ; Unused sprite mappings
 ; ---------------------------------------------------------------------------
 Obj3B_MapUnc_CD66:	BINCLUDE	"mappings/sprite/obj3B.bin"
+		even
 ; ===========================================================================
-		align 4
 
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
@@ -14523,7 +14552,7 @@ Obj3C_Init:
 		move.b	$28(a0),$1A(a0)
 ; loc_CDC2:
 Obj3C_Main:
-		move.w	($FFFFB010).w,$30(a0)
+		move.w	(Object_RAM+$10).w,$30(a0)
 		move.w	#$1B,d1
 		move.w	#$20,d2
 		move.w	#$20,d3
@@ -14537,7 +14566,7 @@ return_CDE4:
 ; ===========================================================================
 
 loc_CDE6:
-		lea	($FFFFB000).w,a1	; a1=character
+		lea	(Object_RAM).w,a1	; a1=character
 		cmpi.b	#2,$1C(a1)
 		bne.s	return_CDE4
 		move.w	$30(a0),d0
@@ -14728,7 +14757,7 @@ Obj_Index:
 		dc.l	Obj_0x0D_End_Panel		; loc_F1F4
 		dc.l	Obj0E			; Sonic and Tails on the title screen
 		dc.l	Obj0F			; Mappings test?
-		dc.l	Obj_0x10			  ; loc_223E2
+		dc.l	Obj_Null
 		dc.l	Obj_0x11_Bridge		   ; loc_7FDC
 		dc.l	Obj12			; Emerald from Hidden Palace Zone
 		dc.l	Obj_0x13_Hpz_Waterfalls 	  ; loc_14B78
@@ -14775,7 +14804,7 @@ Obj_Index:
 		dc.l	Obj3C			; Breakable wall (leftover from S1) (mostly unused)
 		dc.l	Obj_0x3D_Break_Boost		  ; loc_18E78
 		dc.l	Obj_0x3E_Egg_Prison		  ; loc_20E5C
-		dc.l	Obj_0x3F			  ; loc_A11E
+		dc.l	Obj3F			  ; loc_A11E
 		dc.l	Obj_0x40_Diagonal_Springs	  ; loc_1A30C
 		dc.l	Obj_0x41_Springs		  ; loc_E7B8
 		dc.l	Obj_0x42_Steam_Vent		  ; loc_1A5CC
@@ -14801,8 +14830,8 @@ Obj_Index:
 		dc.l	Obj_0x56			  ; loc_205A6
 		dc.l	Obj_0x57			  ; loc_1F99C
 		dc.l	Obj_0x58			  ; loc_1FC0A
-		dc.l	Obj_Null			  ; loc_D24A ; Object $59
-		dc.l	Obj_Null			  ; loc_D24A ; Object $5A
+		dc.l	Obj3D				  ; loc_D24A ; Object $59
+		dc.l	Obj48				  ; loc_D24A ; Object $5A
 		dc.l	Obj_Null			  ; loc_D24A ; Object $5B
 		dc.l	Obj_Null			  ; loc_D24A ; Object $5C
 		dc.l	Obj_Null			  ; loc_D24A ; Object $5D
@@ -14838,8 +14867,8 @@ Obj_Index:
 		dc.l	Obj_0x7B_Spring_Tubes		  ; loc_1D74C
 		dc.l	Obj_Null			  ; loc_D24A ; Object $7C
 		dc.l	Obj_0x7D_Hidden_Bonus		  ; loc_13DFC
-		dc.l	Obj_Null			  ; loc_D24A ; Object $7E
-		dc.l	Obj_Null			  ; loc_D24A ; Object $7F
+		dc.l	Obj_0x7E_SS_Results		  ; loc_D24A ; Object $7E
+		dc.l	Obj_0x7F_SS_Emeralds		  ; loc_D24A ; Object $7F
 		dc.l	Obj_Null			  ; loc_D24A ; Object $80
 		dc.l	Obj_Null			  ; loc_D24A ; Object $81
 		dc.l	Obj_Null			  ; loc_D24A ; Object $82
@@ -14865,20 +14894,21 @@ Obj_Null:
 ; Sub Routine ObjectFall
 ; [ Begin ]
 ;===============================================================================
+ObjectMoveAndFall:
 ObjectFall: ; loc_D24E:
-		move.l	$0008(A0), D2
-		move.l	$000C(A0), D3
-		move.w	$0010(A0), D0
-		ext.l	D0
-		asl.l	#$08, D0
-		add.l	D0, D2
-		move.w	$0012(A0), D0
-		addi.w	#$0038, $0012(A0)
-		ext.l	D0
-		asl.l	#$08, D0
-		add.l	D0, D3
-		move.l	D2, $0008(A0)
-		move.l	D3, $000C(A0)
+		move.l	$8(a0),d2
+		move.l	$C(a0),d3
+		move.w	$10(a0),d0
+		ext.l	d0
+		asl.l	#8,d0
+		add.l	d0,d2
+		move.w	$12(a0),d0
+		addi.w	#$38,$12(a0)
+		ext.l	d0
+		asl.l	#8,d0
+		add.l	D0,d3
+		move.l	D2,$8(a0)
+		move.l	D3,$C(a0)
 		rts
 ;===============================================================================
 ; Sub Routine ObjectFall
@@ -14889,19 +14919,20 @@ ObjectFall: ; loc_D24E:
 ; Sub Routine SpeedToPos
 ; [ Begin ]
 ;===============================================================================
+ObjectMove:
 SpeedToPos: ; loc_D27A:
-		move.l	$0008(A0), D2
-		move.l	$000C(A0), D3
-		move.w	$0010(A0), D0
-		ext.l	D0
-		asl.l	#$08, D0
-		add.l	D0, D2
-		move.w	$0012(A0), D0
-		ext.l	D0
-		asl.l	#$08, D0
-		add.l	D0, D3
-		move.l	D2, $0008(A0)
-		move.l	D3, $000C(A0)
+		move.l	$8(a0),d2
+		move.l	$C(a0),d3
+		move.w	$10(a0),d0
+		ext.l	d0
+		asl.l	#8,d0
+		add.l	d0,d2
+		move.w	$12(a0),d0
+		ext.l	d0
+		asl.l	#8,D0
+		add.l	d0,D3
+		move.l	d2,$8(a0)
+		move.l	d3,$C(a0)
 		rts
 ;===============================================================================
 ; Sub Routine SpeedToPos
@@ -15016,13 +15047,13 @@ loc_D3B0:
 ; [ Begin ]
 ;===============================================================================
 DeleteObject:  ; loc_D3B4: ; Delete Object / Null Object
-		move.l	A0, A1
-loc_D3B6:
-		moveq	#$00, D1
-		moveq	#$0F, D0
+		move.l	a0,a1
+DeleteObject2:
+		moveq	#$00,d1
+		moveq	#$0F,d0
 loc_D3BA:
-		move.l	D1, (A1)+
-		dbf    D0, loc_D3BA
+		move.l	d1,(a1)+
+		dbf	d0,loc_D3BA
 		rts
 ;===============================================================================
 ; Sub Routine DeleteObject
@@ -15948,11 +15979,11 @@ loc_DC2A:
 Adjust2PArtPointer: ; loc_DC30:
 		tst.w	(Two_player_mode).w
 		beq.s	loc_DC4A
-		move.w	$0002(A0), D0
-		andi.w	#$07FF, D0
-		lsr.w	#$01, D0
-		andi.w	#$F800, $0002(A0)
-		add.w	D0, $0002(A0)
+		move.w	$2(a0),d0
+		andi.w	#$7FF,d0
+		lsr.w	#1,d0
+		andi.w	#$F800,$2(a0)
+		add.w	d0,$2(a0)
 loc_DC4A:
 		rts
 ;===============================================================================
@@ -16490,8 +16521,7 @@ loc_E130:
 loc_E140: ; Load Rings routine
 		clearRAM Ring_Positions,Ring_Positions_End
 		lea	(Ring_consumption_table).w, A1
-		; Coding error, that '-$40' shouldn't be there: only half of 'Ring_consumption_table' is cleared.
-		move.w	#bytesToLcnt(Ring_consumption_table_End-Ring_consumption_table-$40),d1
+		move.w	#bytesToLcnt(Ring_consumption_table_End-Ring_consumption_table),d1
 loc_E158:
 		move.l	D0, (A1)+
 		dbf    D1, loc_E158
@@ -16647,9 +16677,7 @@ ObjectsManager_Init:
 		move.w	#$0101,(a2)+	; the first two bytes are not used as respawn values
 		; Instead, they are used to keep track of the current respawn indexes
 
-		; This clears longwords, but the loop counter is measured in words!
-		; This causes $17C bytes to be cleared instead of $BE.
-		move.w	#bytesToWcnt(Obj_respawn_data_End-Obj_respawn_data),d0 ; set loop counter
+		move.w	#bytesToLcnt(Obj_respawn_data_End-Obj_respawn_data),d0 ; set loop counter
 
 -		clr.l	(a2)+
 		dbf	d0,-
@@ -18874,8 +18902,8 @@ Obj01_Modes:	offsetTable
 ; ===========================================================================
 ; byte_FD66:
 Sonic_MusicList:	zoneOrderedTable 1,1
-	zoneTableEntry.b	MusID_GHZ	; GHZ
-	zoneTableEntry.b	MusID_GHZ	; OWZ
+	zoneTableEntry.b	MusID_EHZ	; EHZ
+	zoneTableEntry.b	MusID_EHZ	; OWZ
 	zoneTableEntry.b	MusID_MTZ	; WZ
 	zoneTableEntry.b	MusID_SSZ	; SSZ
 	zoneTableEntry.b	MusID_MTZ	; MTZ
@@ -18890,8 +18918,7 @@ Sonic_MusicList:	zoneOrderedTable 1,1
 	zoneTableEntry.b	MusID_CPZ	; CPZ
 	zoneTableEntry.b	MusID_CPZ	; GCZ
 	zoneTableEntry.b	MusID_NGHZ	; NGHZ
-	; no *proper* entry for DEZ, so it instead uses the alignment to play sound $08
-	;zoneTableEntry.b	MusID_DEZ	; DEZ
+	zoneTableEntry.b	MusID_DEZ	; DEZ
     zoneTableEnd
 	even
 
@@ -20821,8 +20848,8 @@ Tails_Modes: ; loc_10EFA:
 		dc.w	Tails_MdJump2-Tails_Modes   ; loc_110E2
 ; byte_10F02:
 Tails_MusicList:	zoneOrderedTable 1,1
-	zoneTableEntry.b	MusID_GHZ	; GHZ
-	zoneTableEntry.b	MusID_GHZ	; OWZ
+	zoneTableEntry.b	MusID_EHZ	; EHZ
+	zoneTableEntry.b	MusID_EHZ	; OWZ
 	zoneTableEntry.b	MusID_MTZ	; WZ
 	zoneTableEntry.b	MusID_SSZ	; SSZ
 	zoneTableEntry.b	MusID_MTZ	; MTZ
@@ -20837,8 +20864,7 @@ Tails_MusicList:	zoneOrderedTable 1,1
 	zoneTableEntry.b	MusID_CPZ	; CPZ
 	zoneTableEntry.b	MusID_CPZ	; GCZ
 	zoneTableEntry.b	MusID_NGHZ	; NGHZ
-	; no *proper* entry for DEZ, so it instead uses the alignment to play sound $08
-	;zoneTableEntry.b	MusID_DEZ	; DEZ
+	zoneTableEntry.b	MusID_DEZ	; DEZ
     zoneTableEnd
 	even
 
@@ -24010,90 +24036,6 @@ loc_135CA:
 ; [ End ]
 ;===============================================================================
 
-; ---------------------------------------------------------------------------
-; This subroutine takes 'raw' bitmap-like collision block data as input and
-; converts it into the proper collision arrays (ColArray and ColArray2).
-; Pointers to said raw data are dummied out.
-;
-; Since this would require a special read/write cartridge, it will NOT
-; function normally; the same code exists in Sonic 1 and Sonic CD (with it
-; working in the latter due to the Sega CD storing code in RAM), as well
-; as the Nick Arcade prototype, where it converts GHZ's collision format
-; to S2's standard
-; ---------------------------------------------------------------------------
-
-RawColBlocks		= Colision_Array_1
-ConvRowColBlocks	= Colision_Array_1
-
-; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
-
-; return_135DA: FloorLog_Unk:
-ConvertCollisionArray:
-		rts
-; ---------------------------------------------------------------------------
-; loc_135DC:
-		; The raw format stores the collision data column by column for the normal collision array.
-		; This makes a copy of the data, but stored row by row, for the rotated collision array.
-		lea	(RawColBlocks).l,a1
-		lea	(ConvRowColBlocks).l,a2
-
-		move.w	#$100-1,d3	; number of blocks in collision data
-
-loc_135EC:
-		moveq	#$10, D5
-		move.w	#$000F, D2
-loc_135F2:
-		moveq	#$00, D4
-		move.w	#$000F, D1
-loc_135F8:
-		move.w	(A1)+, D0
-		lsr.l	D5, D0
-		addx.w	D4, D4
-		dbf    D1, loc_135F8
-		move.w	D4, (A2)+
-		suba.w	#$0020, A1
-		subq.w	#$01, D5
-		dbf    D2, loc_135F2
-		adda.w	#$0020, A1
-		dbf    D3, loc_135EC
-		lea	(ConvRowColBlocks).l, A1  ; loc_2D2EA
-		lea	(Colision_Array_2).l, A2  ; loc_2E2EA
-		bsr.s	loc_13630
-		lea	(RawColBlocks).l, A1  ; loc_2D2EA
-		lea	(Colision_Array_1).l, A2  ; loc_2D2EA
-loc_13630:
-		move.w	#$0FFF, D3
-loc_13634:
-		moveq	#$00, D2
-		move.w	#$000F, D1
-		move.w	(A1)+, D0
-		beq.s	loc_13662
-		bmi.s	loc_1364C
-loc_13640:
-		lsr.w	#$01, D0
-		bcc.s	loc_13646
-		addq.b	#$01, D2
-loc_13646:
-		dbf    D1, loc_13640
-		bra.s	loc_13664
-loc_1364C:
-		cmpi.w	#$FFFF, D0
-		beq.s	loc_1365E
-loc_13652:
-		lsl.w	#$01, D0
-		bcc.s	loc_13658
-		subq.b	#$01, D2
-loc_13658:
-		dbf    D1, loc_13652
-		bra.s	loc_13664
-loc_1365E:
-		move.w	#$0010, D0
-loc_13662:
-		move.w	D0, D2
-loc_13664:
-		move.b	D2, (A2)+
-		dbf    D3, loc_13634
-		rts
 ;===============================================================================
 ; Sub Routine Sonic_WalkSpeed
 ; [ Begin ]
@@ -25948,7 +25890,7 @@ Obj04_Display:
 		move.b	(a1,d1.w),$1A(a0)
 		addq.b	#1,$1B(a0)
 		andi.b	#$3F,$1B(a0)
-		bra.w	J_DisplaySprite_00
+		jmp	(DisplaySprite).l
 ; ===========================================================================
 ; water sprite animation 'script' (custom format for this object)
 ; byte_15136:
@@ -25985,7 +25927,7 @@ loc_151A8:
 		andi.b	#1,$1A(a0)
 
 loc_151BE:
-		bra.w	J_DisplaySprite_00
+		jmp	(DisplaySprite).l
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
@@ -26042,7 +25984,7 @@ loc_153B8:
 		bcc.s	loc_153EA
 		move.b	#$01, $001A(A0)
 		add.b	D3, $001A(A0)
-		bra.w	  J_DisplaySprite_00	  ; loc_15720
+		jmp	(DisplaySprite).l	  ; loc_15720
 loc_153EA:
 		move.w	($FFFFB048).w, D0
 		cmp.w	D1, D0
@@ -26052,7 +25994,7 @@ loc_153EA:
 		move.b	#$01, $001A(A0)
 loc_153FC:
 		add.b	D3, $001A(A0)
-		bra.w	  J_DisplaySprite_00	  ; loc_15720
+		jmp	(DisplaySprite).l	  ; loc_15720
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
@@ -26068,10 +26010,10 @@ Obj49_MapUnc_15404:	BINCLUDE	"mappings/sprite/obj49.bin"
 ; [ Begin ]
 ;===============================================================================
 Obj_0x31_Lava_Attributes: ; loc_155A0:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_155AE(PC, D0), D1
-		jmp	loc_155AE(PC, D1)
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	loc_155AE(PC,d0),d1
+		jmp	loc_155AE(PC,d1)
 loc_155AE:
 		dc.w	loc_155B6-loc_155AE
 		dc.w	loc_155EC-loc_155AE
@@ -26079,28 +26021,28 @@ loc_155B2:
 		dc.w	$9694, $9500
 
 loc_155B6:
-		addq.b	#$02, $0024(A0)
-		moveq	#$00, D0
-		move.b	$0028(A0), D0
-		move.b	loc_155B2(PC, D0), $0020(A0)
-		move.l	#Lava_Attributes_Mappings, $0004(A0) ; loc_15612
-		move.w	#$8680, $0002(A0)
-		move.b	#$84, $0001(A0)
-		move.b	#$80, $0019(A0)
-		move.b	#$04, $0018(A0)
-		move.b	$0028(A0), $001A(A0)
+		addq.b	#2,$24(a0)
+		moveq	#0,d0
+		move.b	$28(a0),d0
+		move.b	loc_155B2(PC,d0),$20(a0)
+		move.l	#Lava_Attributes_Mappings,$4(a0) ; loc_15612
+		move.w	#$8680,$2(a0)
+		move.b	#$84,$1(a0)
+		move.b	#$80,$19(a0)
+		move.b	#$4,$18(a0)
+		move.b	$28(a0),$1A(a0)
 loc_155EC:
 		tst.w	(Two_player_mode).w
 		bne.s	loc_15606
-		move.w	$0008(A0), D0
-		andi.w	#$FF80, D0
-		sub.w	(Camera_X_pos_coarse).w, D0
-		cmpi.w	#$0280, D0
-		bhi.w	 J_DeleteObject_09	 ; loc_15726
+		move.w	$8(a0),d0
+		andi.w	#$FF80,d0
+		sub.w	(Camera_X_pos_coarse).w,d0
+		cmpi.w	#$280,d0
+		bhi.w	J_DeleteObject_09	 ; loc_15726
 loc_15606:
 		tst.w	(Debug_placement_mode).w
 		beq.s	loc_15610
-		bsr.w	  J_DisplaySprite_00	  ; loc_15720
+		jmp	(DisplaySprite).l	  ; loc_15720
 loc_15610:
 		rts
 Lava_Attributes_Mappings:
@@ -26119,48 +26061,48 @@ loc_15618:
 ; [ Begin ]
 ;===============================================================================
 Obj_0x74_Invisible_Block: ; loc_1561A:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_15628(PC, D0), D1
-		jmp	loc_15628(PC, D1)
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	loc_15628(PC,d0),d1
+		jmp	loc_15628(PC,d1)
 loc_15628:
 		dc.w	loc_1562C-loc_15628
 		dc.w	loc_15668-loc_15628
 loc_1562C:
-		addq.b	#$02, $0024(A0)
-		move.l	#Obj74_MapUnc_156B2, $0004(A0) ; loc_156B2
-		move.w	#$8680, $0002(A0)
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
-		ori.b	#$04, $0001(A0)
-		move.b	$0028(A0), D0
-		move.b	D0, D1
-		andi.w	#$00F0, D0
-		addi.w	#$0010, D0
-		lsr.w	#$01, D0
-		move.b	D0, $0019(A0)
-		andi.w	#$000F, D1
-		addq.w	#$01, D1
-		lsl.w	#$03, D1
-		move.b	D1, $0016(A0)
+		addq.b	#2,$24(a0)
+		move.l	#Invisible_Block_Mappings,$4(a0) ; loc_156B2
+		move.w	#$8680,$2(a0)
+		bsr.w	Adjust2PArtPointer	 ; loc_DC30
+		ori.b	#4,$1(a0)
+		move.b	$28(a0),d0
+		move.b	d0,d1
+		andi.w	#$F0,d0
+		addi.w	#$10,d0
+		lsr.w	#1,d0
+		move.b	d0,$19(a0)
+		andi.w	#$F,d1
+		addq.w	#1,d1
+		lsl.w	#3,d1
+		move.b	d1,$16(a0)
 loc_15668:
-		bsr.w	  loc_DDD8
+		bsr.w	loc_DDD8
 		bne.s	loc_1568A
-		moveq	#$00, D1
-		move.b	$0019(A0), D1
-		addi.w	#$000B, D1
-		moveq	#$00, D2
-		move.b	$0016(A0), D2
-		move.w	D2, D3
-		addq.w	#$01, D3
-		move.w	$0008(A0), D4
-		bsr.w	  loc_F4FA
+		moveq	#0,d1
+		move.b	$19(a0),d1
+		addi.w	#$B,d1
+		moveq	#0,d2
+		move.b	$16(a0),d2
+		move.w	d2,d3
+		addq.w	#1,d3
+		move.w	$8(a0),d4
+		bsr.w	loc_F4FA
 loc_1568A:
 		tst.w	(Two_player_mode).w
 		bne.s	loc_156A4
-		move.w	$0008(A0), D0
-		andi.w	#$FF80, D0
-		sub.w	(Camera_X_pos_coarse).w, D0
-		cmpi.w	#$0280, D0
+		move.w	$8(a0),d0
+		andi.w	#$FF80,d0
+		sub.w	(Camera_X_pos_coarse).w,d0
+		cmpi.w	#$280,d0
 		bhi.w	 J_DeleteObject_09	 ; loc_15726
 loc_156A4:
 		tst.w	(Debug_placement_mode).w
@@ -26171,12 +26113,9 @@ loc_156B0:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj74_MapUnc_156B2:	BINCLUDE	"mappings/sprite/obj74.bin"
+Invisible_Block_Mappings:	BINCLUDE	"mappings/sprite/obj74.bin"
+		even
 ; ===========================================================================
-		nop
-
-J_DisplaySprite_00: ; loc_15720:
-		jmp	DisplaySprite		; loc_D3C2
 J_DeleteObject_09: ; loc_15726:
 		jmp	DeleteObject		; loc_D3B4
 ; ===========================================================================
@@ -26499,7 +26438,7 @@ loc_15B42:
 		btst	#3,$22(a1)
 		beq.s	return_15AEC
 		move.b	(a2),d0
-		bsr.w	JmpTo2_CalcSine
+		jsr	(CalcSine).l
 		muls.w	#$2800,d1
 		swap	d1
 		move.w	$C(a0),d2
@@ -26519,13 +26458,6 @@ loc_15B42:
 return_15B80:
 		rts
 ; ===========================================================================
-		nop
-; loc_15B84:
-JmpTo2_CalcSine:
-		jmp	(CalcSine).l
-
-		align 4
-
 ;===============================================================================
 ; Object 0x14 - Hill Top See-saw badnick
 ; [ Begin ]
@@ -26856,7 +26788,7 @@ loc_1601A:
 		dc.w	loc_16064-loc_1601A
 loc_1601E:
 		addq.b	#$02, $0024(A0)
-		move.l	#Obj16_MapUnc_1611E, $0004(A0)	; loc_1611E
+		move.l	#Teleferics_Mappings, $0004(A0)	; loc_1611E
 		move.w	#$43E6, $0002(A0)
 		bsr.w	  J_Adjust2PArtPointer_01 ; loc_16210
 		ori.b	#$04, $0001(A0)
@@ -26928,7 +26860,7 @@ loc_16102:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj16_MapUnc_1611E:	BINCLUDE	"mappings/sprite/obj16.bin"
+Teleferics_Mappings:	BINCLUDE	"mappings/sprite/obj16.bin"
 ; ===========================================================================
 		nop			     ;	Filler
 J_DeleteObject_0B: ; loc_16204:
@@ -28825,7 +28757,7 @@ loc_18002:
 		move.l	$003C(A0), A1
 		cmpa.l	A0, A1
 		beq.s	loc_18010
-		jsr	(loc_D3B6)
+		jsr	(DeleteObject2)
 loc_18010:
 		lea	(Object_Respawn_Table).w, A2
 		moveq	#$00, D0
@@ -29763,9 +29695,8 @@ loc_1912E:
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
 Break_Boost_Mappings:	BINCLUDE	"mappings/sprite/obj3D.bin"
+		even
 ; ===========================================================================
-		nop
-
 J_DisplaySprite_03: ; loc_19218:
 		jmp	DisplaySprite		; (loc_D3C2)
 J_DeleteObject_12: ; loc_1921E:
@@ -29797,8 +29728,8 @@ Obj_0x48_Cannon: ; loc_19250:
 		jsr	loc_1926E(PC, D1)
 		move.b	$002C(A0), D0
 		add.b	$0036(A0), D0
-		beq.w	 J_MarkObjGone_09	 ; loc_19652
-		bra.w	  J_DisplaySprite_04	  ; loc_1964C
+		beq.w	J_MarkObjGone_09
+		jmp	(DisplaySprite).l
 loc_1926E:
 		dc.w	loc_19282-loc_1926E
 		dc.w	loc_192D2-loc_1926E
@@ -29810,7 +29741,7 @@ loc_19282:
 		addq.b	#$02, $0024(A0)
 		move.l	#Cannon_Mappings, $0004(A0) ; loc_194CA
 		move.w	#$6368, $0002(A0)
-		bsr.w	J_Adjust2PArtPointer_0B ; loc_19658
+		jsr	(Adjust2PArtPointer).l ; loc_19658
 		move.b	$0028(A0), D0
 		andi.w	#$000F, D0
 		btst	#$00, $0022(A0)
@@ -29981,16 +29912,11 @@ loc_194C8:
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
 Cannon_Mappings:	BINCLUDE	"mappings/sprite/obj48.bin"
+		even
 ; ===========================================================================
-		nop
-
-J_DisplaySprite_04: ; loc_1964C:
-		jmp	DisplaySprite		; (loc_D3C2)
 J_MarkObjGone_09: ; loc_19652:
 		jmp	MarkObjGone		; (loc_D2A0)
-J_Adjust2PArtPointer_0B: ; loc_19658:
-		jmp	Adjust2PArtPointer     ; (loc_DC30)
-		dc.w	$0000		   ; Filler
+		even
 ;===============================================================================
 ; Object 0x22 - Arrow Shooter - Neo Green Hill
 ; [ Begin ]
@@ -30008,9 +29934,9 @@ loc_1966E:
 		dc.w	loc_19780-loc_1966E
 loc_19678:
 		addq.b	#$02, $0024(A0)
-		move.l	#Obj22_MapUnc_197C6, $0004(A0) ; loc_197C6
+		move.l	#Arrow_Shooter_Mappings, $0004(A0) ; loc_197C6
 		move.w	#$0417, $0002(A0)
-		bsr.w	  J_Adjust2PArtPointer_0C ; loc_19844
+		jsr	(Adjust2PArtPointer).l
 		ori.b	#$04, $0001(A0)
 		move.b	#$03, $0018(A0)
 		move.b	#$10, $0019(A0)
@@ -30033,8 +29959,8 @@ loc_196CE:
 		move.b	D2, $001C(A0)
 loc_196D2:
 		lea	(loc_197B0).l, A1
-		bsr.w	  J_AnimateSprite_01	  ; loc_1983E
-		bra.w	  J_MarkObjGone_0A	  ; loc_19838
+		jsr	(AnimateSprite).l
+		jmp	(MarkObjGone).l
 loc_196E0:
 		move.w	$0008(A0), D0
 		sub.w	$0008(A1), D0
@@ -30047,9 +29973,9 @@ loc_196EC:
 loc_196F4:
 		rts
 loc_196F6:
-		bsr.w	  J_SingleObjLoad_02   ; loc_19832
+		jsr	(SingleObjLoad).l
 		bne.s	loc_1972A
-		_move.b  0(A0), 0(A1)
+		_move.b	0(A0), 0(A1)
 		addq.b	#$06, $0024(A1)
 		move.l	$0004(A0), $0004(A1)
 		move.w	$0002(A0), $0002(A1)
@@ -30060,8 +29986,8 @@ loc_196F6:
 loc_1972A:
 		subq.b	#$02, $0024(A0)
 		lea	(loc_197B0).l, A1
-		bsr.w	  J_AnimateSprite_01	  ; loc_1983E
-		bra.w	  J_MarkObjGone_0A	  ; loc_19838
+		jsr	(AnimateSprite).l
+		jmp	(MarkObjGone).l	  ; loc_19838
 loc_1973C:
 		addq.b	#$02, $0024(A0)
 		move.b	#$08, $0016(A0)
@@ -30078,22 +30004,22 @@ loc_19776:
 		move.w	#$00AE, D0
 		jsr	(PlaySound).l		  ; loc_14C6
 loc_19780:
-		bsr.w	  J_SpeedToPos_07	  ; loc_1984A
-		btst	#$00, $0022(A0)
+		jsr	(SpeedToPos).l
+		btst	#0,$22(A0)
 		bne.s	loc_197A0
-		moveq	#-8, D3
-		bsr.w	  ObjHitWallLeft	  ; loc_13B24
-		tst.w	D1
-		bmi.w	 loc_1979C
-		bra.w	  J_MarkObjGone_0A	  ; loc_19838
+		moveq	#-8,D3
+		bsr.w	ObjHitWallLeft	  ; loc_13B24
+		tst.w	d1
+		bmi.w	loc_1979C
+		jmp	(MarkObjGone).l
 loc_1979C:
-		bra.w	  J_DeleteObject_13	  ; loc_1982C
+		jmp	(DeleteObject).l	  ; loc_1982C
 loc_197A0:
 		moveq	#$08, D3
-		bsr.w	  ObjHitWallRight	  ; loc_1399E
-		tst.w	D1
-		bmi.w	 loc_1979C
-		bra.w	  J_MarkObjGone_0A	  ; loc_19838
+		bsr.w	ObjHitWallRight	  ; loc_1399E
+		tst.w	d1
+		bmi.w	loc_1979C
+		jmp	(MarkObjGone).l
 loc_197B0:
 		dc.w	loc_197B6-loc_197B0
 		dc.w	loc_197B9-loc_197B0
@@ -30107,22 +30033,9 @@ loc_197BD:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj22_MapUnc_197C6:	BINCLUDE	"mappings/sprite/obj22.bin"
+Arrow_Shooter_Mappings:	BINCLUDE	"mappings/sprite/obj22.bin"
+		even
 ; ===========================================================================
-		nop
-
-J_DeleteObject_13: ; loc_1982C:
-		jmp	DeleteObject		; (loc_D3B4)
-J_SingleObjLoad_02: ; loc_19832:
-		jmp	SingleObjLoad	     ; (loc_E772)
-J_MarkObjGone_0A: ; loc_19838:
-		jmp	MarkObjGone		; (loc_D2A0)
-J_AnimateSprite_01: ; loc_1983E:
-		jmp	AnimateSprite		; (loc_D412)
-J_Adjust2PArtPointer_0C: ; loc_19844:
-		jmp	Adjust2PArtPointer     ; (loc_DC30)
-J_SpeedToPos_07: ; loc_1984A:
-		jmp	SpeedToPos		; (loc_D27A)
 ;===============================================================================
 ; Object 0x23 - Neo Green Hill - Pillar That Drops Lower Half
 ; [ Begin ]
@@ -30217,11 +30130,11 @@ loc_19960:
 loc_19974:
 		dc.b	$00, $01, $FF, $01, $00, $FF, $00, $01
 loc_1997C:
-		bsr.w	  J_SpeedToPos_08	  ; loc_1A0BC
+		jsr	(SpeedToPos).l
 		addi.w	#$0038, $0012(A0)
-		bsr.w	  ObjHitFloor		  ; loc_13898
+		bsr.w	ObjHitFloor		  ; loc_13898
 		tst.w	D1
-		bpl.w	 loc_199A8
+		bpl.w	loc_199A8
 		add.w	D1, $000C(A0)
 		clr.w	$0012(A0)
 		move.w	$000C(A0), $0032(A0)
@@ -30356,7 +30269,7 @@ loc_19B50:
 		subq.b	#$01, $003F(A0)
 		bra.s	loc_19B66
 loc_19B5C:
-		bsr.w	  J_SpeedToPos_08	  ; loc_1A0BC
+		jsr	(SpeedToPos).l
 		addi.w	#$0018, $0012(A0)
 loc_19B66:
 		tst.b	$0001(A0)
@@ -30532,9 +30445,7 @@ J_Adjust2PArtPointer_0D: ; loc_1A0B0:
 		jmp	Adjust2PArtPointer     ; (loc_DC30)
 J_SolidObject_05: ; loc_1A0B6:
 		jmp	SolidObject		; (loc_F4A0)
-J_SpeedToPos_08: ; loc_1A0BC:
-		jmp	SpeedToPos		; (loc_D27A)
-		dc.w	$0000		   ; Filler
+		even
 ;===============================================================================
 ; Object 0x2C - Neo Green Hill - Leaves
 ; [ Begin ]
@@ -33263,11 +33174,9 @@ loc_1C5E2:
 loc_1C5F0:
 		rts
 loc_1C5F2:
-		jsr	SpeedToPos		; (loc_D27A)
+		jsr	(SpeedToPos).l
 		subq.w	#$01, $0034(A0)
-		bne.s	loc_1C602
-		bsr.w	  loc_1C604
-loc_1C602:
+		beq.s	loc_1C604
 		rts
 loc_1C604:
 		moveq	#$00, D0
@@ -33685,7 +33594,7 @@ J_DisplaySprite_0B: ; loc_1CE28:
 J_SingleObjLoad_06: ; loc_1CE2E:
 		jmp	SingleObjLoad	     ; (loc_E772)
 loc_1CE34:
-		jmp	(loc_D3B6)
+		jmp	(DeleteObject2)
 J_Adjust2PArtPointer_1A: ; loc_1CE3A:
 		jmp	Adjust2PArtPointer     ; (loc_DC30)
 J_SolidObject_0E: ; loc_1CE40:
@@ -33844,7 +33753,7 @@ J_DeleteObject_1F: ; loc_1D04C:
 J_MarkObjGone_11: ; loc_1D052:
 		jmp	MarkObjGone		; (loc_D2A0)
 loc_1D058:
-		jmp	(loc_D3B6)
+		jmp	(DeleteObject2)
 J_SingleObjLoad2_08: ; loc_1D05E:
 		jmp	SingleObjLoad2	    ; (loc_E788)
 J_Adjust2PArtPointer_1B: ; loc_1D064:
@@ -33871,7 +33780,7 @@ loc_1D08A:
 		dc.b	$40, $10, $00, $00
 loc_1D08E:
 		addq.b	#$02, $0024(A0)
-		move.l	#Obj76_MapUnc_1D1BA, $0004(A0) ; loc_1D1BA
+		move.l	#Platform_Spikes_Mappings, $0004(A0) ; loc_1D1BA
 		move.w	#$0000, $0002(A0)
 		bsr.w	  J_Adjust2PArtPointer_1C ; loc_1D1F6
 		ori.b	#$04, $0001(A0)
@@ -33966,7 +33875,7 @@ loc_1D1B8:
 ; ---------------------------------------------------------------------------
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
-Obj76_MapUnc_1D1BA:	BINCLUDE	"mappings/sprite/obj76.bin"
+Platform_Spikes_Mappings:	BINCLUDE	"mappings/sprite/obj76.bin"
 ; ===========================================================================
 		nop
 
@@ -34320,7 +34229,7 @@ loc_1D68C:
 		move.l	$003C(A0), A1
 		cmpa.l	A0, A1
 		beq.s	loc_1D69A
-		jsr	(loc_D3B6)
+		jsr	(DeleteObject2)
 loc_1D69A:
 		lea	(Object_Respawn_Table).w, A2
 		moveq	#$00, D0
@@ -36684,83 +36593,100 @@ J_ObjectFall_06: ; loc_1F990:
 		jmp	ObjectFall		; loc_D24E
 J_SpeedToPos_12: ; loc_1F996:
 		jmp	SpeedToPos		; loc_D27A
-;===============================================================================
-; Object 0x57 -
-; [ Begin ]
-;===============================================================================
+;----------------------------------------------------
+; Object 57 - sub object of the	EHZ boss
+;----------------------------------------------------
 Obj_0x57: ; loc_1F99C:
-		moveq	#$00, D0
-		move.b	$0025(A0), D0
-		move.w	loc_1F9AA(PC, D0), D1
-		jmp	loc_1F9AA(PC, D1)
-loc_1F9AA:
-		dc.w	loc_1F9B6-loc_1F9AA
+		moveq	#0,d0
+		move.b	$25(a0),d0
+		move.w	loc_1F9AA(pc,d0.w),d1
+		jmp	loc_1F9AA(pc,d1.w)
+; ===========================================================================
+loc_1F9AA:	dc.w	loc_1F9B6-loc_1F9AA
 		dc.w	loc_1F9DC-loc_1F9AA
 		dc.w	loc_1FA38-loc_1F9AA
 		dc.w	loc_1FA6A-loc_1F9AA
 		dc.w	loc_1FA94-loc_1F9AA
 		dc.w	loc_1FAAE-loc_1F9AA
+; ===========================================================================
+
 loc_1F9B6:
-		move.b	#$00, $0020(A0)
-		cmpi.w	#$29D0, $0008(A0)
+		move.b	#0,$20(a0)
+		cmpi.w	#$29D0,8(a0)
 		ble.s	loc_1F9CE
-		subi.w	#$0001, $0008(A0)
-		bra.w	  J_DisplaySprite_11	  ; loc_202DC
+		subi.w	#1,8(a0)
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
 loc_1F9CE:
-		move.w	#$29D0, $0008(A0)
-		addq.b	#$02, $0025(A0)
-		bra.w	  J_DisplaySprite_11	  ; loc_202DC
+		move.w	#$29D0,8(a0)
+		addq.b	#2,$25(a0)
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
 loc_1F9DC:
-		moveq	#$00, D0
-		move.b	$002C(A0), D0
-		move.w	loc_1F9EA(PC, D0), D1
-		jmp	loc_1F9EA(PC, D1)
-loc_1F9EA:
-		dc.w	loc_1F9EE-loc_1F9EA
+		moveq	#0,d0
+		move.b	$2C(a0),d0
+		move.w	loc_1F9EA(pc,d0.w),d1
+		jmp	loc_1F9EA(pc,d1.w)
+; ===========================================================================
+loc_1F9EA:	dc.w	loc_1F9EE-loc_1F9EA
 		dc.w	loc_1FA14-loc_1F9EA
+; ===========================================================================
+
 loc_1F9EE:
-		cmpi.w	#$041E, $000C(A0)
+		cmpi.w	#$41E,$C(a0)
 		bge.s	loc_1FA00
-		addi.w	#$0001, $000C(A0)
-		bra.w	  J_DisplaySprite_11	  ; loc_202DC
+		addi.w	#1,$C(a0)
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
 loc_1FA00:
-		addq.b	#$02, $002C(A0)
-		bset	#$00, $002D(A0)
-		move.w	#$003C, $002A(A0)
-		bra.w	  J_DisplaySprite_11	  ; loc_202DC
+		addq.b	#2,$2C(a0)
+		bset	#0,$2D(a0)
+		move.w	#$3C,$2A(a0)
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
 loc_1FA14:
-		subi.w	#$0001, $002A(A0)
-		bpl.w	 J_DisplaySprite_11	 ; loc_202DC
-		move.w	#$FE00, $0010(A0)
-		addq.b	#$02, $0025(A0)
-		move.b	#$0F, $0020(A0)
-		bset	#$01, $002D(A0)
-		bra.w	  J_DisplaySprite_11	  ; loc_202DC
+		subi.w	#1,$2A(a0)
+		bpl.w	J_DisplaySprite_11
+		move.w	#$FE00,$10(a0)
+		addq.b	#2,$0025(a0)
+		move.b	#$F,$0020(a0)
+		bset	#1,$002D(a0)
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
 loc_1FA38:
-		bsr.w	  loc_1FBA8
-		bsr.w	  loc_1FB86
-		move.w	$002E(A0), D0
-		lsr.w	#$01, D0
-		subi.w	#$0014, D0
-		move.w	D0, $000C(A0)
-		move.w	#$0000, $002E(A0)
-		move.l	$0008(A0), D2
-		move.w	$0010(A0), D0
-		ext.l	D0
-		asl.l	#$08, D0
-		add.l	D0, D2
-		move.l	D2, $0008(A0)
-		bra.w	  J_DisplaySprite_11	  ; loc_202DC
+		bsr.w	loc_1FBA8
+		bsr.w	loc_1FB86
+		move.w	$2E(a0),d0
+		lsr.w	#1,d0
+		subi.w	#$14,d0
+		move.w	d0,$C(a0)
+		move.w	#0,$2E(a0)
+		move.l	8(a0),d2
+		move.w	$10(a0),d0
+		ext.l	d0
+		asl.l	#8,d0
+		add.l	d0,d2
+		move.l	d2,8(a0)
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
 loc_1FA6A:
-		subq.w	#$01, $003C(A0)
-		dc.w	$6A00, $0000
-		bset	#$00, $0022(A0)
-		bclr	#$07, $0022(A0)
-		clr.w	$0010(A0)
-		addq.b	#$02, $0025(A0)
-		move.w	#$FFDA, $003C(A0)
-		move.w	#$000C, $002A(A0)
+		subq.w	#1,$3C(a0)
+		jsr	(BossDefeated).l
+		bset	#0,$22(a0)
+		bclr	#7,$0022(a0)
+		clr.w	$0010(a0)
+		addq.b	#2,$25(a0)
+		move.w	#$FFDA,$3C(a0)
+		move.w	#$C,$2A(a0)
 		rts
+; ===========================================================================
+
 loc_1FA94:
 		addq.w	#$01, $000C(A0)
 		subq.w	#$01, $002A(A0)
@@ -36773,99 +36699,98 @@ loc_1FAAE:
 		move.b	$002C(A0), D0
 		move.w	loc_1FAC0(PC, D0), D1
 		jsr	loc_1FAC0(PC, D1)
-		bra.w	  J_DisplaySprite_11	  ; loc_202DC
+		bra.w	  J_DisplaySprite_11
 loc_1FAC0:
 		dc.w	loc_1FAC6-loc_1FAC0
 		dc.w	loc_1FB3E-loc_1FAC0
 		dc.w	loc_1FB58-loc_1FAC0
 loc_1FAC6:
-		bclr	#$00, $002D(A0)
-		bsr.w	  J_SingleObjLoad2_0D ; loc_202EE
-		bne.w	 J_DisplaySprite_11	 ; loc_202DC
-		_move.b  #$58, 0(A1)
-		move.l	A0, $0034(A1)
-		move.l	#Obj_0x57_Mappings, $0004(A1) ; loc_20168
-		move.w	#$2540, $0002(A1)
-		bsr.w	  J_Adjust2PArtPointer2_05 ; loc_202FA
-		move.b	#$04, $0001(A1)
-		move.b	#$20, $0019(A1)
-		move.b	#$04, $0018(A1)
-		move.l	$0008(A0), $0008(A1)
-		move.l	$000C(A0), $000C(A1)
-		addi.w	#$000C, $000C(A1)
-		move.b	$0022(A0), $0022(A1)
-		move.b	$0001(A0), $0001(A1)
-		move.b	#$08, $0024(A1)
-		move.b	#$02, $001C(A1)
-		move.w	#$0010, $002A(A1)
-		move.w	#$0032, $002A(A0)
-		addq.b	#$02, $002C(A0)
+		bclr	#0,$2D(a0)
+		jsr	(SingleObjLoad2).l
+		bne.w	J_DisplaySprite_11
+		_move.b	#$58,0(a1)
+		move.l	a0,$34(a1)
+		move.l	#Obj_0x57_Mappings,$4(a1)
+		move.w	#$2540,$2(a1)
+		move.b	#4,$1(a1)
+		move.b	#$20,$19(a1)
+		move.b	#$04,$18(a1)
+		move.l	$8(a0),$8(a1)
+		move.l	$C(a0),$C(a1)
+		addi.w	#$C,$C(a1)
+		move.b	$22(a0),$22(a1)
+		move.b	$1(a0),$1(a1)
+		move.b	#8,$24(a1)
+		move.b	#2,$1C(a1)
+		move.w	#$10,$2A(a1)
+		move.w	#$32,$2A(a0)
+		addq.b	#2,$2C(a0)
 		rts
 loc_1FB3E:
-		subi.w	#$0001, $002A(A0)
+		subi.w	#1,$2A(a0)
 		bpl.s	loc_1FB56
-		bset	#$02, $002D(A0)
-		move.w	#$0060, $002A(A0)
-		addq.b	#$02, $002C(A0)
+		bset	#2,$2D(a0)
+		move.w	#$60,$2A(a0)
+		addq.b	#2,$2C(a0)
 loc_1FB56:
 		rts
 loc_1FB58:
-		subq.w	#$01, $000C(A0)
-		subi.w	#$0001, $002A(A0)
+		subq.w	#1,$C(a0)
+		subi.w	#1,$2A(a0)
 		bpl.s	loc_1FB84
-		addq.w	#$01, $000C(A0)
-		addq.w	#$02, $0008(A0)
-		cmpi.w	#$2B08, $0008(A0)
+		addq.w	#1,$C(a0)
+		addq.w	#2,$8(a0)
+		cmpi.w	#$2B08,$8(a0)
 		bcs.s	loc_1FB84
 		tst.b	(Boss_defeated_flag).w
 		bne.s	loc_1FB84
-		move.b	#$01, (Boss_defeated_flag).w
-		bra.w	  J_DeleteObject_27	  ; loc_202E2
+		move.b	#1,(Boss_defeated_flag).w
+		jmp	(DeleteObject).l
 loc_1FB84:
 		rts
 loc_1FB86:
-		move.w	$0008(A0), D0
-		cmpi.w	#$2720, D0
+		move.w	$8(a0),d0
+		cmpi.w	#$2720,d0
 		ble.s	loc_1FB96
-		cmpi.w	#$2B08, D0
+		cmpi.w	#$2B08,d0
 		blt.s	loc_1FBA6
 loc_1FB96:
-		bchg	#0, $0022(A0)
-		bchg	#0, $0001(A0)
-		neg.w	$0010(A0)
+		bchg	#0,$22(a0)
+		bchg	#0,$1(a0)
+		neg.w	$10(a0)
 loc_1FBA6:
 		rts
 loc_1FBA8:
-		cmpi.b	#$06, $0025(A0)
+		cmpi.b	#6,$25(a0)
 		bcc.s	loc_1FBEE
-		tst.b	$0022(A0)
+		tst.b	$22(a0)
 		bmi.s	loc_1FBF0
-		tst.b	$0020(A0)
+		tst.b	$20(a0)
 		bne.s	loc_1FBEE
-		tst.b	$003E(A0)
+		tst.b	$3E(a0)
 		bne.s	loc_1FBD2
-		move.b	#$20, $003E(A0)
-		move.w	#$00AC, D0
-		jsr	(PlaySound).l		  ; loc_14C6
+		move.b	#$20,$3E(a0)
+		move.w	#$AC,d0
+		jsr	(PlaySound).l
 loc_1FBD2:
-		lea	(Normal_palette_line2+2).w, A1
-		moveq	#$00, D0
-		tst.w	(A1)
+		lea	(Normal_palette_line2+2).w,a1
+		moveq	#0,d0
+		tst.w	(a1)
 		bne.s	loc_1FBE0
-		move.w	#$0EEE, D0
+		move.w	#$EEE,d0
 loc_1FBE0:
-		move.w	D0, (A1)
-		subq.b	#$01, $003E(A0)
+		move.w	d0,(a1)
+		subq.b	#1,$003E(a0)
 		bne.s	loc_1FBEE
-		move.b	#$0F, $0020(A0)
+		move.b	#$F,$20(a0)
 loc_1FBEE:
 		rts
 loc_1FBF0:
-		moveq	#$64, D0
-		bsr.w	  AddPoints		  ; loc_22FD0
-		move.b	#$06, $0025(A0)
-		move.w	#$00B3, $003C(A0)
-		bset	#$03, $002D(A0)
+		moveq	#$64,d0
+		bsr.w	AddPoints		  ; loc_22FD0
+		move.b	#6,$25(a0)
+		move.w	#$B3,$3C(a0)
+		bset	#3,$2D(a0)
 		rts
 ;===============================================================================
 ; Object 0x57 -
@@ -37092,8 +37017,8 @@ loc_1FEB6:
 loc_1FF2E:
 		jsr	SingleObjLoad2	    ; (loc_E788)
 		bne.s	loc_1FFA6
-		_move.b  #$58, 0(A1)
-		move.l	A0, $0034(A1)
+		_move.b	#$58, 0(A1)
+		move.l	A0,$0034(A1)
 		move.l	#loc_20250, $0004(A1)
 		move.w	#$24C0, $0002(A1)
 		bsr.w	  J_Adjust2PArtPointer2_05 ; loc_202FA
@@ -37157,10 +37082,10 @@ loc_20080:
 		jsr	SingleObjLoad2	    ; (loc_E788)
 		bne.s	loc_200C8
 		_move.b  #$58, 0(A1)
-		move.l	A0, $0034(A1)
+		move.l	A0,$0034(A1)
 		move.l	#loc_20250, $0004(A1)
 		move.w	#$04C0, $0002(A1)
-		bsr.w	  J_Adjust2PArtPointer2_05 ; loc_202FA
+		bsr.w	J_Adjust2PArtPointer2_05 ; loc_202FA
 		move.b	#$04, $0001(A1)
 		move.b	#$20, $0019(A1)
 		move.b	#$02, $0018(A1)
@@ -37308,172 +37233,189 @@ J_ObjHitFloor_01: ; loc_20300:
 		jmp	ObjHitFloor		; (loc_13898)
 J_ObjectFall_07: ; loc_20306:
 		jmp	ObjectFall		; (loc_D24E)
-;===============================================================================
-; Object 0x55 - Ghz Boss
-; [ Begin ]
-;===============================================================================
-Obj_0x55_Ghz_Boss: ; loc_2030C:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_2031A(PC, D0), D1
-		jmp	loc_2031A(PC, D1)
-loc_2031A:
-		dc.w	loc_20324-loc_2031A
+; ===========================================================================
+; ---------------------------------------------------------------------------
+; Object 55 - EHZ boss
+; ---------------------------------------------------------------------------
+
+Obj_0x55_Ghz_Boss:
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	loc_2031A(pc,d0),d1
+		jmp	loc_2031A(pc,d1)
+; ===========================================================================
+loc_2031A:	dc.w	loc_20324-loc_2031A
 		dc.w	loc_2044E-loc_2031A
 		dc.w	loc_2048C-loc_2031A
 		dc.w	loc_204BE-loc_2031A
 		dc.w	loc_20560-loc_2031A
+; ===========================================================================
+
 loc_20324:
-		move.l	#Ghz_Boss_Mappings, $0004(A0) ; loc_206BA
-		move.w	#$2400, $0002(A0)
-		ori.b	#$04, $0001(A0)
-		move.b	#$20, $0019(A0)
-		move.b	#$03, $0018(A0)
-		move.b	#$0F, $0020(A0)
-		move.b	#$08, $0021(A0)
-		addq.b	#$02, $0024(A0)
-		move.w	$0008(A0), $0030(A0)
-		move.w	$000C(A0), $0038(A0)
-		move.b	$0028(A0), D0
-		cmpi.b	#$81, D0
+		move.l	#Ghz_Boss_Mappings,4(a0)
+		move.w	#$2400,2(a0)
+		ori.b	#4,1(a0)
+		move.b	#$20,$19(a0)
+		move.b	#3,$18(a0)
+		move.b	#$F,$20(a0)
+		move.b	#8,$21(a0)
+		addq.b	#2,$24(a0)
+		move.w	8(a0),$30(a0)
+		move.w	$C(a0),$38(a0)
+		move.b	$28(a0),d0
+		cmpi.b	#$81,d0
 		bne.s	loc_20370
-		addi.w	#$0060, $0002(A0)
+		addi.w	#$60,$2(a0)
+
 loc_20370:
-		bsr.w	  J_Adjust2PArtPointer_23 ; loc_2073A
-		jsr	SingleObjLoad2	    ; (loc_E788)
-		bne.w	 loc_20434
-		_move.b  #$55, 0(A1)
-		move.l	A0, $0034(A1)
-		move.l	A1, $0034(A0)
-		move.l	#Ghz_Boss_Mappings, $0004(A1) ; loc_206BA
-		move.w	#$0400, $0002(A1)
-		move.b	#$04, $0001(A1)
-		move.b	#$20, $0019(A1)
-		move.b	#$03, $0018(A1)
-		move.l	$0008(A0), $0008(A1)
-		move.l	$000C(A0), $000C(A1)
-		addq.b	#$04, $0024(A1)
-		move.b	#$01, $001C(A1)
-		move.b	$0001(A0), $0001(A1)
-		move.b	$0028(A0), D0
-		cmpi.b	#$81, D0
+		jsr	SingleObjLoad2
+		bne.w	loc_20434
+		_move.b	#$55,0(a1)
+		move.l	a0,$34(a1)
+		move.l	a1,$34(a0)
+		move.l	#Ghz_Boss_Mappings,$4(a1)
+		move.w	#400,$2(a1)
+		move.b	#4,$1(a1)
+		move.b	#$20,$19(a1)
+		move.b	#3,$18(a1)
+		move.l	$8(a0),$8(a1)
+		move.l	$C(a0),$C(a1)
+		addq.b	#4,$24(a1)
+		move.b	#1,$1C(a1)
+		move.b	$1(a0),$1(a1)
+		move.b	$28(a0),d0
+		cmpi.b	#$81,d0
 		bne.s	loc_203D8
-		addi.w	#$0060, $0002(A1)
+		addi.w	#$60,$2(a1)
+
 loc_203D8:
-		bsr.w	  J_Adjust2PArtPointer2_06 ; loc_20734
-		tst.b	$0028(A0)
+		tst.b	$28(a0)
 		bmi.s	loc_20434
-		jsr	SingleObjLoad2	    ; (loc_E788)
+		jsr	SingleObjLoad2
 		bne.s	loc_20434
-		_move.b  #$55, 0(A1)
-		move.l	A0, $0034(A1)
-		move.l	#Ghz_Boss_Mappings_1, $0004(A1) ; loc_20612
-		move.w	#$04D0, $0002(A1)
-		bsr.w	  J_Adjust2PArtPointer2_06 ; loc_20734
-		move.b	#$01, $001E(A0)
-		move.b	#$04, $0001(A1)
-		move.b	#$20, $0019(A1)
-		move.b	#$03, $0018(A1)
-		move.l	$0008(A0), $0008(A1)
-		move.l	$000C(A0), $000C(A1)
-		addq.b	#$06, $0024(A1)
-		move.b	$0001(A0), $0001(A1)
+		_move.b	#$55,0(a1)
+		move.l	a0,$34(a1)
+		move.l	#Ghz_Boss_Mappings_1,4(a1)
+		move.w	#$4D0,2(a1)
+		move.b	#1,$1E(a0)
+		move.b	#4,1(a1)
+		move.b	#$20,$19(a1)
+		move.b	#3,$18(a1)
+		move.l	8(a0),8(a1)
+		move.l	$C(a0),$C(a1)
+		addq.b	#6,$24(a1)
+		move.b	1(a0),1(a1)
+
 loc_20434:
-		move.b	$0028(A0), D0
-		andi.w	#$007F, D0
-		add.w	D0, D0
-		add.w	D0, D0
-		move.l	loc_20446(PC, D0), A1
-		jmp	(A1)
-loc_20446:
-		dc.l	$00000000
+		move.b	$28(a0),d0
+		andi.w	#$7F,d0
+		add.w	d0,d0
+		add.w	d0,d0
+		move.l	loc_20446(PC,d0),a1
+		jmp	(a1)
+; ===========================================================================
+loc_20446:	dc.l	$00000000
 		dc.l	loc_20080
+; ===========================================================================
+
 loc_2044E:
-		move.b	$0028(A0), D0
-		andi.w	#$007F, D0
-		add.w	D0, D0
-		add.w	D0, D0
-		move.l	loc_20484(PC, D0), A1
-		jsr	(A1)
-		lea	(loc_206AE).l, A1
-		jsr	AnimateSprite		; (loc_D412)
-		move.b	$0022(A0), D0
-		andi.b	#$03, D0
-		andi.b	#$FC, $0001(A0)
-		or.b	D0, $0001(A0)
-		jmp	DisplaySprite		; (loc_D3C2)
-loc_20484:
-		dc.l	$00000000
-		dc.l	Obj_0x57  ; loc_1F99C
+		move.b	$0028(a0),d0
+		andi.w	#$7F,d0
+		add.w	d0,d0
+		add.w	d0,d0
+		move.l	loc_20484(PC,d0),a1
+		jsr	(a1)
+		lea	(loc_206AE).l,a1
+		jsr	AnimateSprite
+		move.b	$22(a0),d0
+		andi.b	#3,d0
+		andi.b	#$FC,1(a0)
+		or.b	d0,1(a0)
+		jmp	DisplaySprite
+; ===========================================================================
+loc_20484:	dc.l	$00000000
+		dc.l	Obj_0x57
+; ===========================================================================
+
 loc_2048C:
-		move.l	$0034(A0), A1
-		move.l	$0008(A1), $0008(A0)
-		move.l	$000C(A1), $000C(A0)
-		move.b	$0022(A1), $0022(A0)
-		move.b	$0001(A1), $0001(A0)
-		move.l	#loc_206AE, A1
-		jsr	AnimateSprite		; (loc_D412)
-		jmp	DisplaySprite		; (loc_D3C2)
-loc_204BA:
-		dc.b	$00, $FF, $01, $00
+		movea.l	$34(a0),a1
+		move.l	8(a1),8(a0)
+		move.l	$C(a1),$C(a0)
+		move.b	$22(a1),$22(a0)
+		move.b	1(a1),1(a0)
+		movea.l	#loc_206AE,a1
+		jsr	(AnimateSprite).l
+		jmp	(DisplaySprite).l
+; ===========================================================================
+loc_204BA:	dc.b	0, $FF, 1, 0
+; ===========================================================================
+
 loc_204BE:
-		btst	#$07, $0022(A0)
+		btst	#7,$22(a0)
 		bne.s	loc_20512
-		move.l	$0034(A0), A1
-		move.l	$0008(A1), $0008(A0)
-		move.l	$000C(A1), $000C(A0)
-		move.b	$0022(A1), $0022(A0)
-		move.b	$0001(A1), $0001(A0)
-		subq.b	#$01, $001E(A0)
+		movea.l	$34(a0),a1
+		move.l	8(a1),8(a0)
+		move.l	$C(a1),$C(a0)
+		move.b	$22(a1),$22(a0)
+		move.b	1(a1),1(a0)
+		subq.b	#1,$1E(a0)
 		bpl.s	loc_20506
-		move.b	#$01, $001E(A0)
-		move.b	$002A(A0), D0
-		addq.b	#$01, D0
-		cmpi.b	#$02, D0
+		move.b	#1,$1E(a0)
+		move.b	$2A(a0),d0
+		addq.b	#1,d0
+		cmpi.b	#2,d0
 		ble.s	loc_204FC
-		moveq	#$00, D0
+		moveq	#0,d0
+
 loc_204FC:
-		move.b	loc_204BA(PC, D0), $001A(A0)
-		move.b	D0, $002A(A0)
+		move.b	loc_204BA(pc,d0),$1A(a0)
+		move.b	d0,$2A(a0)
+
 loc_20506:
-		cmpi.b	#$FF, $001A(A0)
-		bne.w	 J_DisplaySprite_12	 ; loc_20728
+		cmpi.b	#$FF,$1A(a0)
+		bne.w	J_DisplaySprite_12
 		rts
+; ===========================================================================
+
 loc_20512:
-		move.l	$0034(A0), A1
-		btst	#$06, $002E(A1)
+		movea.l	$34(a0),a1
+		btst	#6,$2E(a1)
 		bne.s	loc_20520
 		rts
+; ===========================================================================
+
 loc_20520:
-		addq.b	#$02, $0024(A0)
-		move.l	#Ghz_Boss_Mappings_2, $0004(A0) ; loc_2062A
-		move.w	#$04D8, $0002(A0)
-		bsr.w	  J_Adjust2PArtPointer_23 ; loc_2073A
-		move.b	#$00, $001A(A0)
-		move.b	#$05, $001E(A0)
-		move.l	$0034(A0), A1
-		move.w	$0008(A1), $0008(A0)
-		move.w	$000C(A1), $000C(A0)
-		addi.w	#$0004, $000C(A0)
-		subi.w	#$0028, $0008(A0)
+		addq.b	#2,$24(a0)
+		move.l	#Ghz_Boss_Mappings_2,4(a0)
+		move.w	#$4D8,2(a0)
+		move.b	#0,$1A(a0)
+		move.b	#5,$1E(a0)
+		movea.l	$34(a0),a1
+		move.w	8(a1),8(a0)
+		move.w	$C(a1),$C(a0)
+		addi.w	#4,$C(a0)
+		subi.w	#$28,8(a0)
 		rts
+; ===========================================================================
+
 loc_20560:
-		subq.b	#$01, $001E(A0)
+		subq.b	#1,$1E(a0)
 		bpl.s	loc_205A2
-		move.b	#$05, $001E(A0)
-		addq.b	#$01, $001A(A0)
-		cmpi.b	#$04, $001A(A0)
-		bne.w	 loc_205A2
-		move.b	#$00, $001A(A0)
-		move.l	$0034(A0), A1
-		move.b	(A1), D0
-		beq.w	 J_DeleteObject_28	 ; loc_2072E
-		move.w	$0008(A1), $0008(A0)
-		move.w	$000C(A1), $000C(A0)
-		addi.w	#$0004, $000C(A0)
-		subi.w	#$0028, $0008(A0)
+		move.b	#5,$1E(a0)
+		addq.b	#1,$1A(a0)
+		cmpi.b	#4,$1A(a0)
+		bne.w	loc_205A2
+		move.b	#0,$1A(a0)
+		movea.l	$34(a0),a1
+		move.b	(a1),d0
+		beq.w	J_DeleteObject_28	; loc_2072E
+		move.w	8(a1),8(a0)
+		move.w	$C(a1),$C(a0)
+		addi.w	#4,$C(a0)
+		subi.w	#$28,8(a0)
+
 loc_205A2:
-		bra.w	  J_DisplaySprite_12	  ; loc_20728
+		jmp	(DisplaySprite).l	; loc_20728
 ;===============================================================================
 ; Object 0x55 - Ghz Boss
 ; [ End ]
@@ -37483,34 +37425,37 @@ loc_205A2:
 ; [ Begin ]
 ;===============================================================================
 Obj_0x56: ; loc_205A6:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_205B4(PC, D0), D1
-		jmp	loc_205B4(PC, D1)
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	loc_205B4(pc,d0),d1
+		jmp	loc_205B4(pc,d1)
 loc_205B4:
 		dc.w	loc_205B8-loc_205B4
 		dc.w	loc_205F4-loc_205B4
 loc_205B8:
-		addq.b	#$02, $0024(A0)
-		move.l	#Obj_0x56_Mappings, $0004(A0) ; loc_2065A
-		move.w	#$05A0, $0002(A0)
-		bsr.w	  J_Adjust2PArtPointer_23 ; loc_2073A
-		move.b	#$04, $0001(A0)
-		move.b	#$01, $0018(A0)
-		move.b	#$00, $0020(A0)
-		move.b	#$0C, $0019(A0)
-		move.b	#$07, $001E(A0)
-		move.b	#$00, $001A(A0)
+		addq.b	#2,$24(a0)
+		move.l	#Obj_0x56_Mappings,4(a0) ; loc_2065A
+		move.w	#$5A0,2(a0)
+		move.b	#4,1(a0)
+		move.b	#1,$18(a0)
+		move.b	#0,$20(a0)
+		move.b	#$C,$19(a0)
+		move.b	#7,$1E(a0)
+		move.b	#0,$1A(a0)
 		rts
+; ===========================================================================
+
 loc_205F4:
-		subq.b	#$01, $001E(A0)
+		subq.b	#1,$1E(a0)
 		bpl.s	loc_2060E
-		move.b	#$07, $001E(A0)
-		addq.b	#$01, $001A(A0)
-		cmpi.b	#$07, $001A(A0)
-		beq.w	 J_DeleteObject_28	 ; loc_2072E
+		move.b	#7,$1E(a0)
+		addq.b	#1,$1A(a0)
+		cmpi.b	#7,$1A(a0)
+		beq.w	J_DeleteObject_28	; loc_2072E
+
 loc_2060E:
-		bra.w	  J_DisplaySprite_12	  ; loc_20728
+		jmp	(DisplaySprite).l	; loc_20728
+; ===========================================================================
 Ghz_Boss_Mappings_1:
 loc_20612:
 		dc.w	loc_20616-loc_20612
@@ -37593,11 +37538,11 @@ loc_20704:
 		dc.w	$0004
 		dc.l	$E8050028, $0014FFE0, $E80D0038, $001CFFF0
 		dc.l	$E8050024, $00120010, $D8050020, $00100002
+		even
 ;===============================================================================
 ; Object 0x56 - Ghz Boss
 ; [ End ]
 ;===============================================================================
-		nop			     ; Filler
 J_DisplaySprite_12: ; loc_20728:
 		jmp	DisplaySprite		; (loc_D3C2)
 J_DeleteObject_28: ; loc_2072E:
@@ -37606,6 +37551,719 @@ J_Adjust2PArtPointer2_06: ; loc_20734:
 		jmp	Adjust2PArtPointer2   ; (loc_DC4C)
 J_Adjust2PArtPointer_23: ; loc_2073A:
 		jmp	Adjust2PArtPointer     ; (loc_DC30)
+; ---------------------------------------------------------------------------
+; Object 3D - GHZ Boss
+; ---------------------------------------------------------------------------
+
+Obj3D:					; DATA XREF: ROM:Obj_Indexo
+		moveq	#0,d0
+		move.b	routine(a0),d0
+		move.w	Obj3D_Index(pc,d0.w),d1
+		jmp	Obj3D_Index(pc,d1.w)
+; ===========================================================================
+Obj3D_Index:	dc.w Obj3D_Main-Obj3D_Index ; DATA XREF: ROM:Obj3D_Indexo
+		dc.w Obj3D_ShipMain-Obj3D_Index
+		dc.w Obj3D_FaceMain-Obj3D_Index
+		dc.w Obj3D_FlameMain-Obj3D_Index
+Obj3D_ObjData:	dc.b   2,  0		; 0 ; DATA XREF: ROM:Obj3D_Maint
+		dc.b   4,  1		; 2
+		dc.b   6,  7		; 4
+; ===========================================================================
+
+Obj3D_Main:				; DATA XREF: ROM:Obj3D_Indexo
+		lea	Obj3D_ObjData(pc),a2
+		movea.l	a0,a1
+		moveq	#2,d1
+		bra.s	loc_18D2A
+; ===========================================================================
+
+loc_18D22:				; CODE XREF: ROM:00018D6Cj
+		jsr	SingleObjLoad2
+		bne.s	loc_18D70
+
+loc_18D2A:				; CODE XREF: ROM:00018D20j
+		move.b	(a2)+,routine(a1)
+		move.b	#$3D,0(a1) ; '='
+		move.w	8(a0),8(a1)
+		move.w	$C(a0),$C(a1)
+		move.l	#Map_Eggman,4(a1)
+		move.w	#$400,2(a1)
+		move.b	#4,1(a1)
+		move.b	#$20,$19(a1) ; ' '
+		move.b	#3,$18(a1)
+		move.b	(a2)+,$1C(a1)
+		move.l	a0,$34(a1)
+		dbf	d1,loc_18D22
+
+loc_18D70:				; CODE XREF: ROM:00018D28j
+		move.w	8(a0),$30(a0)
+		move.w	$C(a0),$38(a0)
+		move.b	#$F,$20(a0)
+		move.b	#8,$21(a0)
+
+Obj3D_ShipMain:				; DATA XREF: ROM:00018D0Co
+		moveq	#0,d0
+		move.b	$25(a0),d0
+		move.w	Obj3D_ShipIndex(pc,d0.w),d1
+		jsr	Obj3D_ShipIndex(pc,d1.w)
+		lea	(Ani_Eggman).l,a1
+		jsr	AnimateSprite
+		move.b	$22(a0),d0
+		andi.b	#3,d0
+		andi.b	#$FC,1(a0)
+		or.b	d0,1(a0)
+		jmp	DisplaySprite
+; ===========================================================================
+Obj3D_ShipIndex:dc.w loc_18DC8-Obj3D_ShipIndex ; DATA XREF: ROM:Obj3D_ShipIndexo
+		dc.w loc_18EC8-Obj3D_ShipIndex
+		dc.w loc_18F18-Obj3D_ShipIndex
+		dc.w loc_18F52-Obj3D_ShipIndex
+		dc.w loc_18F782-Obj3D_ShipIndex
+		dc.w loc_18FAA-Obj3D_ShipIndex
+		dc.w loc_18FF6-Obj3D_ShipIndex
+; ===========================================================================
+
+loc_18DC8:
+		move.w	#$100,$12(a0)
+		bsr.w	BossMove
+		cmpi.w	#$338,$38(a0)
+		bne.s	loc_18DE4
+		move.w	#0,$12(a0)
+		addq.b	#2,$25(a0)
+
+loc_18DE4:
+		move.b	$3F(a0),d0
+		jsr	(CalcSine).l
+		asr.w	#6,d0
+		add.w	$38(a0),d0
+		move.w	d0,$C(a0)
+		move.w	$30(a0),8(a0)
+		addq.b	#2,$3F(a0)
+		cmpi.b	#8,$25(a0)
+		bcc.s	locret_18E48
+		tst.b	$22(a0)
+		bmi.s	loc_18E4A
+		tst.b	$20(a0)
+		bne.s	locret_18E48
+		tst.b	$3E(a0)
+		bne.s	loc_18E2C
+		move.b	#$20,$3E(a0)
+		move.w	#$AC,d0
+		jsr	(PlaySound).l
+
+loc_18E2C:
+		lea	(Normal_palette+$22).w,a1 ; load 2nd palette, 2nd entry
+		moveq	#0,d0
+		tst.w	(a1)
+		bne.s	loc_18E3A2
+		move.w	#$EEE,d0
+
+loc_18E3A2:
+		move.w	d0,(a1)
+		subq.b	#1,$3E(a0)
+		bne.s	locret_18E48
+		move.b	#$F,$20(a0)
+
+locret_18E48:
+		rts
+; ===========================================================================
+
+loc_18E4A:
+		moveq	#$64,d0	; 'd'
+		jsr	(AddPoints).l
+		move.b	#8,$25(a0)
+		move.w	#$B3,$3C(a0)
+		rts
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+BossDefeated:	move.b	(Vint_runcount+3).w,d0
+		andi.b	#7,d0
+		bne.s	locret_18EA0
+		jsr	SingleObjLoad
+		bne.s	locret_18EA0
+		_move.b	#$3F,0(a1)
+		move.w	x_pos(a0),x_pos(a1)
+		move.w	y_pos(a0),y_pos(a1)
+		jsr	(PseudoRandomNumber).l
+		move.w	d0,d1
+		moveq	#0,d1
+		move.b	d0,d1
+		lsr.b	#2,d1
+		subi.w	#$20,d1
+		add.w	d1,x_pos(a1)
+		lsr.w	#8,d0
+		lsr.b	#3,d0
+		add.w	d0,y_pos(a1)
+
+locret_18EA0:
+		rts
+; End of function BossDefeated
+
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+BossMove:
+		move.l	$30(a0),d2
+		move.l	$38(a0),d3
+		move.w	$10(a0),d0
+		ext.l	d0
+		asl.l	#8,d0
+		add.l	d0,d2
+		move.w	$12(a0),d0
+		ext.l	d0
+		asl.l	#8,d0
+		add.l	d0,d3
+		move.l	d2,$30(a0)
+		move.l	d3,$38(a0)
+		rts
+; End of function BossMove
+
+; ===========================================================================
+
+loc_18EC8:
+		move.w	#$FF00,x_vel(a0)
+		move.w	#$FFC0,y_vel(a0)
+		bsr.w	BossMove
+		cmpi.w	#$2A00,$30(a0)
+		bne.s	loc_18F14
+		move.w	#0,x_vel(a0)
+		move.w	#0,y_vel(a0)
+		addq.b	#2,routine_secondary(a0)
+		jsr	SingleObjLoad2
+		bne.s	loc_18F0E
+		_move.b	#$48,0(a1)
+		move.w	$30(a0),x_pos(a1)
+		move.w	$38(a0),y_pos(a1)
+		move.l	a0,$34(a1)
+
+loc_18F0E:
+		move.w	#$77,$3C(a0)
+
+loc_18F14:
+		bra.w	loc_18DE4
+; ===========================================================================
+
+loc_18F18:
+		subq.w	#1,$3C(a0)
+		bpl.s	loc_18F422
+		addq.b	#2,routine_secondary(a0)
+		move.w	#$3F,$3C(a0)
+		move.w	#$100,x_vel(a0)
+		cmpi.w	#$2A00,$30(a0)
+		bne.s	loc_18F422
+		move.w	#$7F,$3C(a0)
+		move.w	#$40,x_vel(a0)
+
+loc_18F422:
+		btst	#0,status(a0)
+		bne.s	loc_18F4E
+		neg.w	x_vel(a0)
+
+loc_18F4E:
+		bra.w	loc_18DE4
+; ===========================================================================
+
+loc_18F52:				; DATA XREF: ROM:00018DC0o
+		subq.w	#1,$3C(a0)
+		bmi.s	loc_18F5E
+		bsr.w	BossMove
+		bra.s	loc_18F74
+; ===========================================================================
+
+loc_18F5E:
+		bchg	#0,status(a0)
+		move.w	#$3F,$3C(a0)
+		subq.b	#2,routine_secondary(a0)
+		move.w	#0,x_vel(a0)
+
+loc_18F74:				; CODE XREF: ROM:00018F5Cj
+		bra.w	loc_18DE4
+; ===========================================================================
+
+loc_18F782:				; DATA XREF: ROM:00018DC2o
+		subq.w	#1,$3C(a0)
+		bmi.s	loc_18F82
+		bra.w	BossDefeated
+; ===========================================================================
+
+loc_18F82:				; CODE XREF: ROM:00018F7Cj
+		bset	#0,status(a0)
+		bclr	#7,status(a0)
+		clr.w	x_vel(a0)
+		addq.b	#2,routine_secondary(a0)
+		move.w	#-$26,$3C(a0)
+		tst.b	(Boss_defeated_flag).w
+		bne.s	locret_18FA8
+		move.b	#1,(Boss_defeated_flag).w
+
+locret_18FA8:				; CODE XREF: ROM:00018FA0j
+		rts
+; ===========================================================================
+
+loc_18FAA:				; DATA XREF: ROM:00018DC4o
+		addq.w	#1,$3C(a0)
+		beq.s	loc_18FBA
+		bpl.s	loc_18FC0
+		addi.w	#$18,$12(a0)
+		bra.s	loc_18FEE
+; ===========================================================================
+
+loc_18FBA:				; CODE XREF: ROM:00018FAEj
+		clr.w	$12(a0)
+		bra.s	loc_18FEE
+; ===========================================================================
+
+loc_18FC0:				; CODE XREF: ROM:00018FB0j
+		cmpi.w	#$30,$3C(a0) ; '0'
+		bcs.s	loc_18FD8
+		beq.s	loc_18FE0
+		cmpi.w	#$38,$3C(a0)
+		bcs.s	loc_18FEE
+		addq.b	#2,routine_secondary(a0)
+		bra.s	loc_18FEE
+; ===========================================================================
+
+loc_18FD8:				; CODE XREF: ROM:00018FC6j
+		subi.w	#8,y_vel(a0)
+		bra.s	loc_18FEE
+; ===========================================================================
+
+loc_18FE0:
+		clr.w	y_vel(a0)
+		move.w	#MusID_MTZ,d0
+		jsr	(PlayMusic).l
+
+loc_18FEE:
+		bsr.w	BossMove
+		bra.w	loc_18DE4
+; ===========================================================================
+
+loc_18FF6:
+		move.w	#$400,x_vel(a0)
+		move.w	#$FFC0,y_vel(a0)
+		cmpi.w	#$2AC0,(Camera_Max_X_pos).w
+		beq.s	loc_190102
+		addq.w	#2,(Camera_Max_X_pos).w
+		bra.s	loc_19016
+; ===========================================================================
+
+loc_190102:
+		tst.b	1(a0)
+		bpl.s	loc_1901E
+
+loc_19016:				; CODE XREF: ROM:0001900Ej
+		bsr.w	BossMove
+		bra.w	loc_18DE4
+; ===========================================================================
+
+loc_1901E:				; CODE XREF: ROM:00019014j
+		addq.l	#4,sp
+		jmp	DeleteObject
+; ===========================================================================
+
+Obj3D_FaceMain:				; DATA XREF: ROM:00018D0Eo
+		moveq	#0,d0
+		moveq	#1,d1
+		movea.l	$34(a0),a1
+		move.b	$25(a1),d0
+		subq.b	#4,d0
+		bne.s	loc_19040
+		cmpi.w	#$2A00,$30(a1)
+		bne.s	loc_19048
+		moveq	#4,d1
+
+loc_19040:				; CODE XREF: ROM:00019034j
+		subq.b	#6,d0
+		bmi.s	loc_19048
+		moveq	#$A,d1
+		bra.s	loc_1905C
+; ===========================================================================
+
+loc_19048:
+		tst.b	$20(a1)
+		bne.s	loc_19052
+		moveq	#5,d1
+		bra.s	loc_1905C
+; ===========================================================================
+
+loc_19052:
+		cmpi.b	#4,(Object_RAM+routine).w
+		bcs.s	loc_1905C
+		moveq	#4,d1
+
+loc_1905C:
+		move.b	d1,anim(a0)
+		subq.b	#2,d0
+		bne.s	loc_19070
+		move.b	#6,anim(a0)
+		tst.b	render_flags(a0)
+		bpl.s	loc_19072
+
+loc_19070:
+		bra.s	Obj3D_Display
+; ===========================================================================
+
+loc_19072:
+		jmp	(DeleteObject).l
+; ===========================================================================
+
+Obj3D_FlameMain:
+		move.b	#7,anim(a0)
+		movea.l	$34(a0),a1
+		cmpi.b	#$C,$25(a1)
+		bne.s	loc_19098
+		move.b	#$B,anim(a0)
+		tst.b	render_flags(a0)
+		bpl.s	loc_190A6
+		bra.s	loc_190A4
+; ===========================================================================
+
+loc_19098:
+		move.w	x_vel(a1),d0
+		beq.s	loc_190A4
+		move.b	#8,anim(a0)
+
+loc_190A4:
+		bra.s	Obj3D_Display
+; ===========================================================================
+
+loc_190A6:
+		jmp	(DeleteObject).l
+; ===========================================================================
+
+Obj3D_Display:
+		movea.l	$34(a0),a1
+		move.w	x_pos(a1),x_pos(a0)
+		move.w	y_pos(a1),y_pos(a0)
+		move.b	status(a1),status(a0)
+		lea	(Ani_Eggman).l,a1
+		jsr	AnimateSprite
+		move.b	status(a0),d0
+		andi.b	#3,d0
+		andi.b	#$FC,render_flags(a0)
+		or.b	d0,render_flags(a0)
+		jmp	DisplaySprite
+; ===========================================================================
+;----------------------------------------------------
+; Object 48 - the ball that swings on the GHZ boss
+;----------------------------------------------------
+
+Obj48:
+		moveq	#0,d0
+		move.b	routine(a0),d0
+		move.w	Obj48_Index(pc,d0.w),d1
+		jmp	Obj48_Index(pc,d1.w)
+; ===========================================================================
+Obj48_Index:	dc.w Obj48_Init-Obj48_Index
+		dc.w Obj48_Main-Obj48_Index
+		dc.w loc_19226-Obj48_Index
+		dc.w loc_19274-Obj48_Index
+		dc.w loc_19290-Obj48_Index
+; ===========================================================================
+
+Obj48_Init:
+		addq.b	#2,routine(a0)
+		move.w	#$4080,$26(a0)
+		move.w	#$FE00,$3E(a0)
+		move.l	#Map_BossItems,4(a0)
+		move.w	#$46C,2(a0)
+		lea	$28(a0),a2
+		move.b	#0,(a2)+
+		moveq	#5,d1
+		movea.l	a0,a1
+		bra.s	loc_1916A
+; ===========================================================================
+
+loc_1912E2:
+		jsr	(SingleObjLoad2).l
+		bne.s	loc_19194
+		move.w	8(a0),8(a1)
+		move.w	$C(a0),$C(a1)
+		move.b	#$48,0(a1)
+		move.b	#6,routine(a1)
+		move.l	#Map_Obj15,4(a1)
+		move.w	#$380,2(a1)
+		move.b	#1,$1A(a1)
+		addq.b	#1,$28(a0)
+
+loc_1916A:
+		move.w	a1,d5
+		subi.w	#Object_RAM&$FFFF,d5
+		lsr.w	#6,d5
+		andi.w	#$7F,d5
+		move.b	d5,(a2)+
+		move.b	#4,1(a1)
+		move.b	#8,$19(a1)
+		move.b	#6,$18(a1)
+		move.l	$34(a0),$34(a1)
+		dbf	d1,loc_1912E2
+
+loc_19194:
+		move.b	#8,routine(a1)
+		move.l	#Map_Obj48,mappings(a1)
+		move.w	#$43AA,art_tile(a1)
+		move.b	#1,$1A(a1)
+		move.b	#5,$18(a1)
+		move.b	#$81,$20(a1)
+		rts
+; ===========================================================================
+Obj48_PosData:	dc.b   0,$10,$20,$30,$40,$60
+; ===========================================================================
+
+Obj48_Main:
+		lea	Obj48_PosData(pc),a3
+		lea	$28(a0),a2
+		moveq	#0,d6
+		move.b	(a2)+,d6
+
+loc_191D2:
+		moveq	#0,d4
+		move.b	(a2)+,d4
+		lsl.w	#6,d4
+		addi.l	#Object_RAM&$FFFFFF,d4
+		movea.l	d4,a1
+		move.b	(a3)+,d0
+		cmp.b	$3C(a1),d0
+		beq.s	loc_191EC
+		addq.b	#1,$3C(a1)
+
+loc_191EC:
+		dbf	d6,loc_191D2
+		cmp.b	$3C(a1),d0
+		bne.s	loc_19206
+		movea.l	$34(a0),a1
+		cmpi.b	#6,$25(a1)
+		bne.s	loc_19206
+		addq.b	#2,routine(a0)
+
+loc_19206:
+		cmpi.w	#$20,$32(a0)
+		beq.s	loc_19212
+		addq.w	#1,$32(a0)
+
+loc_19212:
+		bsr.w	sub_19236
+		move.b	angle(a0),d0
+		jsr	(loc_842E).l
+		jmp	DisplaySprite
+; ===========================================================================
+
+loc_19226:
+		bsr.s	sub_19236
+		jsr	(loc_83EA).l
+		jmp	DisplaySprite
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+sub_19236:
+		movea.l	$34(a0),a1
+		addi.b	#$20,$1B(a0)
+		bcc.s	loc_19248
+		bchg	#0,$1A(a0)
+
+loc_19248:
+		move.w	x_pos(a1),$3A(a0)
+		move.w	y_pos(a1),d0
+		add.w	$32(a0),d0
+		move.w	d0,$38(a0)
+		move.b	status(a1),status(a0)
+		tst.b	status(a1)
+		bpl.s	locret_19272
+		move.b	#$3F,0(a0)
+		move.b	#0,routine(a0)
+
+locret_19272:
+		rts
+; End of function sub_19236
+
+; ===========================================================================
+
+loc_19274:
+		movea.l	$34(a0),a1
+		tst.b	$22(a1)
+		bpl.s	loc_1928A
+		move.b	#$3F,0(a0)
+		move.b	#0,routine(a0)
+
+loc_1928A:
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
+loc_19290:
+		moveq	#0,d0
+		tst.b	$1A(a0)
+		bne.s	loc_1929A
+		addq.b	#1,d0
+
+loc_1929A:
+		move.b	d0,$1A(a0)
+		movea.l	$34(a0),a1
+		tst.b	$22(a1)
+		bpl.s	loc_1928A
+		move.b	#0,$20(a0)
+		bsr.w	BossDefeated
+		subq.b	#1,$3C(a0)
+		bpl.s	loc_1928A
+		move.b	#$3F,(a0)
+		move.b	#0,routine(a0)
+		jmp	(DisplaySprite).l
+; ===========================================================================
+Ani_Eggman:	dc.w byte_192E0-Ani_Eggman
+		dc.w byte_192E3-Ani_Eggman
+		dc.w byte_192E7-Ani_Eggman
+		dc.w byte_192EB-Ani_Eggman
+		dc.w byte_192EF-Ani_Eggman
+		dc.w byte_192F3-Ani_Eggman
+		dc.w byte_192F7-Ani_Eggman
+		dc.w byte_192FB-Ani_Eggman
+		dc.w byte_192FE-Ani_Eggman
+		dc.w byte_19302-Ani_Eggman
+		dc.w byte_19306-Ani_Eggman
+		dc.w byte_19309-Ani_Eggman
+byte_192E0:	dc.b  $F,  0,$FF	; 0
+byte_192E3:	dc.b   5,  1,  2,$FF	; 0
+byte_192E7:	dc.b   3,  1,  2,$FF	; 0
+byte_192EB:	dc.b   1,  1,  2,$FF	; 0
+byte_192EF:	dc.b   4,  3,  4,$FF	; 0
+byte_192F3:	dc.b $1F,  5,  1,$FF	; 0
+byte_192F7:	dc.b   3,  6,  1,$FF	; 0
+byte_192FB:	dc.b  $F, $A,$FF	; 0
+byte_192FE:	dc.b   3,  8,  9,$FF	; 0
+byte_19302:	dc.b   1,  8,  9,$FF	; 0
+byte_19306:	dc.b  $F,  7,$FF	; 0
+byte_19309:	dc.b   2,  9,  8, $B, $C, $B, $C,  9,  8,$FE,  2; 0
+
+Map_Eggman:	dc.w word_1932E-Map_Eggman
+		dc.w word_19360-Map_Eggman
+		dc.w word_19372-Map_Eggman
+		dc.w word_19384-Map_Eggman
+		dc.w word_1939E-Map_Eggman
+		dc.w word_193B8-Map_Eggman
+		dc.w word_193D2-Map_Eggman
+		dc.w word_193EC-Map_Eggman
+		dc.w word_1940E-Map_Eggman
+		dc.w word_19418-Map_Eggman
+		dc.w word_19422-Map_Eggman
+		dc.w word_19424-Map_Eggman
+		dc.w word_19436-Map_Eggman
+word_1932E:	dc.w 6
+		dc.w $EC01,   $A,    5,$FFE4; 0
+		dc.w $EC05,   $C,    6,	  $C; 4
+		dc.w $FC0E,$2010,$2008,$FFE4; 8
+		dc.w $FC0E,$201C,$200E,	   4; 12
+		dc.w $140C,$2028,$2014,$FFEC; 16
+		dc.w $1400,$202C,$2016,	  $C; 20
+word_19360:	dc.w 2
+		dc.w $E404,    0,    0,$FFF4; 0
+		dc.w $EC0D,    2,    1,$FFEC; 4
+word_19372:	dc.w 2
+		dc.w $E404,    0,    0,$FFF4; 0
+		dc.w $EC0D,  $35,  $1A,$FFEC; 4
+word_19384:	dc.w 3
+		dc.w $E408,  $3D,  $1E,$FFF4; 0
+		dc.w $EC09,  $40,  $20,$FFEC; 4
+		dc.w $EC05,  $46,  $23,	   4; 8
+word_1939E:	dc.w 3
+		dc.w $E408,  $4A,  $25,$FFF4; 0
+		dc.w $EC09,  $4D,  $26,$FFEC; 4
+		dc.w $EC05,  $53,  $29,	   4; 8
+word_193B8:	dc.w 3
+		dc.w $E408,  $57,  $2B,$FFF4; 0
+		dc.w $EC09,  $5A,  $2D,$FFEC; 4
+		dc.w $EC05,  $60,  $30,	   4; 8
+word_193D2:	dc.w 3
+		dc.w $E404,  $64,  $32,	   4; 0
+		dc.w $E404,    0,    0,$FFF4; 4
+		dc.w $EC0D,  $35,  $1A,$FFEC; 8
+word_193EC:	dc.w 4
+		dc.w $E409,  $66,  $33,$FFF4; 0
+		dc.w $E408,  $57,  $2B,$FFF4; 4
+		dc.w $EC09,  $5A,  $2D,$FFEC; 8
+		dc.w $EC05,  $60,  $30,	   4; 12
+word_1940E:	dc.w 1
+		dc.w  $405,  $2D,  $16,	 $22; 0
+word_19418:	dc.w 1
+		dc.w  $405,  $31,  $18,	 $22; 0
+word_19422:	dc.w 0
+word_19424:	dc.w 2
+		dc.w	 8, $12A, $195,	 $22; 0
+		dc.w  $808,$112A,$1995,	 $22; 4
+word_19436:	dc.w 2
+		dc.w $F80B, $12D, $199,	 $22; 0
+		dc.w	 1, $139, $1AB,	 $3A; 4
+Map_BossItems:	dc.w word_19458-Map_BossItems
+		dc.w word_19462-Map_BossItems
+		dc.w word_19474-Map_BossItems
+		dc.w word_1947E-Map_BossItems
+		dc.w word_19488-Map_BossItems
+		dc.w word_19492-Map_BossItems
+		dc.w word_194B4-Map_BossItems
+		dc.w word_194C6-Map_BossItems
+word_19458:	dc.w 1
+		dc.w $F805,    0,    0,$FFF8; 0
+word_19462:	dc.w 2
+		dc.w $FC04,    4,    2,$FFF8; 0
+		dc.w $F805,    0,    0,$FFF8; 4
+word_19474:	dc.w 1
+		dc.w $FC00,    6,    3,$FFFC; 0
+word_1947E:	dc.w 1
+		dc.w $1409,    7,    3,$FFF4; 0
+word_19488:	dc.w 1
+		dc.w $1405,   $D,    6,$FFF8; 0
+word_19492:	dc.w 4
+		dc.w $F004,  $11,    8,$FFF8; 0
+		dc.w $F801,  $13,    9,$FFF8; 4
+		dc.w $F801, $813, $809,	   0; 8
+		dc.w  $804,  $15,   $A,$FFF8; 12
+word_194B4:	dc.w 2
+		dc.w	 5,  $17,   $B,	   0; 0
+		dc.w	 0,  $1B,   $D,	 $10; 4
+word_194C6:	dc.w 2
+		dc.w $1804,  $1C,   $E,	   0; 0
+		dc.w	$B,  $1E,   $F,	 $10; 4
+		even
+Map_Obj15:	dc.w word_8534-Map_Obj15
+		dc.w word_8546-Map_Obj15
+		dc.w word_8550-Map_Obj15
+word_8534:	dc.w 2
+		dc.w $F809,    4,    2,$FFE8; 0
+		dc.w $F809,    4,    2,	   0; 4
+word_8546:	dc.w 1
+		dc.w $F805,    0,    0,$FFF8; 0
+word_8550:	dc.w 1
+		dc.w $F805,   $A,    5,$FFF8; 0
+		even
+Map_Obj48:	dc.w word_85D2-Map_Obj48
+		dc.w word_8604-Map_Obj48
+		dc.w word_8626-Map_Obj48
+		dc.w word_8648-Map_Obj48
+word_85D2:	dc.w 6
+		dc.w $F004,  $24,  $12,$FFF0; 0
+		dc.w $F804,$1024,$1012,$FFF0; 4
+		dc.w $E80A,    0,    0,$FFE8; 8
+		dc.w $E80A, $800, $800,	   0; 12
+		dc.w	$A,$1000,$1000,$FFE8; 16
+		dc.w	$A,$1800,$1800,	   0; 20
+word_8604:	dc.w 4
+		dc.w $E80A,    9,    4,$FFE8; 0
+		dc.w $E80A, $809, $804,	   0; 4
+		dc.w	$A,$1009,$1004,$FFE8; 8
+		dc.w	$A,$1809,$1804,	   0; 12
+word_8626:	dc.w 4
+		dc.w $E80A,  $12,    9,$FFE8; 0
+		dc.w $E80A,  $1B,   $D,	   0; 4
+		dc.w	$A,$181B,$180D,$FFE8; 8
+		dc.w	$A,$1812,$1809,	   0; 12
+word_8648:	dc.w 4
+		dc.w $E80A, $81B, $80D,$FFE8; 0
+		dc.w $E80A, $812, $809,	   0; 4
+		dc.w	$A,$1012,$1009,$FFE8; 8
+		dc.w	$A,$101B,$100D,	   0; 12
+		even
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Object 8A - "SONIC TEAM PRESENTS"/Credits (leftover from S1)
@@ -37629,7 +38287,6 @@ Obj8A_Init:
 		move.w	#$F0,$A(a0)
 		move.l	#Obj8A_MapUnc_207C6,4(a0)
 		move.w	#$5A0,2(a0)
-		bsr.w	J_Adjust2PArtPointer_24
 		move.w	(Ending_demo_number).w,d0
 		move.b	d0,$1A(a0)
 		move.b	#0,1(a0)
@@ -37637,7 +38294,6 @@ Obj8A_Init:
 		cmpi.b	#GameModeID_TitleScreen,(Game_Mode).w
 		bne.s	Obj8A_Display
 		move.w	#$300,2(a0)
-		bsr.w	J_Adjust2PArtPointer_24
 		move.b	#$A,$1A(a0)
 		tst.b	(Hidden_credits_flag).w
 		beq.s	Obj8A_Display
@@ -37655,14 +38311,8 @@ Obj8A_Display:
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
 Obj8A_MapUnc_207C6:	BINCLUDE	"mappings/sprite/obj8A.bin"
+		even
 ; ===========================================================================
-		nop
-; loc_20E54:
-J_Adjust2PArtPointer_24:
-		jmp	(Adjust2PArtPointer).l
-
-		align 4
-
 ;===============================================================================
 ; Object 0x3E - Egg Prison / Animals Container
 ; [ Begin ]
@@ -38205,219 +38855,247 @@ loc_21502:
 ; Special Stage - Sub-routine
 ; [ Begin ]
 ;===============================================================================
-S1_SS_Show_Layout: ; loc_21508:
-		bsr.w	  loc_2164A
-		bsr.w	  loc_2188A
-		move.w	D5, -(A7)
-		lea	(Level_Layout).w, A1
-		move.b	(SpecialStage_angle).w, D0
-		andi.b	#$FC, D0
-		jsr    ( CalcSine).l		; loc_320A
-		move.w	D0, D4
-		move.w	D1, D5
-		muls.w	#$0018, D4
-		muls.w	#$0018, D5
-		moveq	#$00, D2
-		move.w	(Camera_X_pos).w, D2
-		divu.w	#$0018, D2
-		swap  D2
-		neg.w	D2
-		addi.w	#$FF4C, D2
-		moveq	#$00, D3
-		move.w	(Camera_Y_pos).w, D3
-		divu.w	#$0018, D3
-		swap  D3
-		neg.w	D3
-		addi.w	#$FF4C, D3
-		move.w	#$000F, D7
+S1_SS_Show_Layout:
+		bsr.w	S1_SS_AniWallsRings
+		bsr.w	S1_SS_AniItems
+		move.w	d5,-(sp)
+		lea	(Level_Layout).w,a1
+		move.b	(SpecialStage_angle).w,d0
+		andi.b	#$FC,d0
+		jsr	(CalcSine).l
+		move.w	d0,d4
+		move.w	d1,d5
+		muls.w	#$18,d4
+		muls.w	#$18,d5
+		moveq	#0,d2
+		move.w	(Camera_X_pos).w,d2
+		divu.w	#$18,d2
+		swap	d2
+		neg.w	d2
+		addi.w	#-$B4,d2
+		moveq	#0,d3
+		move.w	(Camera_Y_pos).w,d3
+		divu.w	#$18,d3
+		swap	d3
+		neg.w	d3
+		addi.w	#-$B4,d3
+		move.w	#$F,d7
+
 loc_21558:
-		movem.w D0-D2, -(A7)
-		movem.w D0/D1, -(A7)
-		neg.w	D0
-		muls.w	D2, D1
-		muls.w	D3, D0
-		move.l	D0, D6
-		add.l	D1, D6
-		movem.w (A7)+, D0/D1
-		muls.w	D2, D0
-		muls.w	D3, D1
-		add.l	D0, D1
-		move.l	D6, D2
-		move.w	#$000F, D6
+		movem.w	d0-d2,-(sp)
+		movem.w	d0-d1,-(sp)
+		neg.w	d0
+		muls.w	d2,d1
+		muls.w	d3,d0
+		move.l	d0,d6
+		add.l	d1,d6
+		movem.w	(sp)+,d0-d1
+		muls.w	d2,d0
+		muls.w	d3,d1
+		add.l	d0,d1
+		move.l	d6,d2
+		move.w	#$F,d6
+
 loc_2157A:
-		move.l	D2, D0
-		asr.l	#$08, D0
-		move.w	D0, (A1)+
-		move.l	D1, D0
-		asr.l	#$08, D0
-		move.w	D0, (A1)+
-		add.l	D5, D2
-		add.l	D4, D1
-		dbf    D6, loc_2157A
-		movem.w (A7)+, D0-D2
-		addi.w	#$0018, D3
-		dbf    D7, loc_21558
-		move.w	(A7)+, D5
-		lea	(Chunk_Table), A0
-		moveq	#$00, D0
-		move.w	(Camera_Y_pos).w, D0
-		divu.w	#$0018, D0
-		mulu.w	#$0080, D0
-		adda.l	D0, A0
-		moveq	#$00, D0
-		move.w	(Camera_X_pos).w, D0
-		divu.w	#$0018, D0
-		adda.w	D0, A0
-		lea	(Level_Layout).w, A4
-		move.w	#$000F, D7
+		move.l	d2,d0
+		asr.l	#8,d0
+		move.w	d0,(a1)+
+		move.l	d1,d0
+		asr.l	#8,d0
+		move.w	d0,(a1)+
+		add.l	d5,d2
+		add.l	d4,d1
+		dbf	d6,loc_2157A
+
+		movem.w (sp)+,d0-d2
+		addi.w	#$18,d3
+		dbf	d7,loc_21558
+
+		move.w	(sp)+,d5
+		lea	(Chunk_Table).l,a0
+		moveq	#0,d0
+		move.w	(Camera_Y_pos).w,d0
+		divu.w	#$18,d0
+		mulu.w	#$80,d0
+		adda.l	d0,a0
+		moveq	#0,d0
+		move.w	(Camera_X_pos).w,d0
+		divu.w	#$18,d0
+		adda.w	d0,a0
+		lea	(Level_Layout).w,a4
+		move.w	#$F,d7
+
 loc_215C6:
-		move.w	#$000F, D6
+		move.w	#$F,d6
+
 loc_215CA:
-		moveq	#$00, D0
-		move.b	(A0)+, D0
+		moveq	#0,d0
+		move.b	(a0)+,d0
 		beq.s	loc_21622
-		cmpi.b	#$4E, D0
+		cmpi.b	#$4E,d0
 		bhi.s	loc_21622
-		move.w	(A4), D3
-		addi.w	#$0120, D3
-		cmpi.w	#$0070, D3
+		move.w	(a4),d3
+		addi.w	#$120,d3
+		cmpi.w	#$70,d3
 		bcs.s	loc_21622
-		cmpi.w	#$01D0, D3
+		cmpi.w	#$1D0,d3
 		bcc.s	loc_21622
-		move.w	$0002(A4), D2
-		addi.w	#$00F0, D2
-		cmpi.w	#$0070, D2
+		move.w	2(a4),d2
+		addi.w	#$F0,d2
+		cmpi.w	#$70,d2
 		bcs.s	loc_21622
-		cmpi.w	#$0170, D2
+		cmpi.w	#$170,d2
 		bcc.s	loc_21622
-		lea	(Chunk_Table+$4000), A5
-		lsl.w	#$03, D0
-		lea	$00(A5, D0), A5
-		move.l	(A5)+, A1
-		move.w	(A5)+, D1
-		add.w	D1, D1
-		adda.w	$00(A1, D1), A1
-		move.w	(A5)+, A3
-		moveq	#$00, D1
-		move.b	(A1)+, D1
-		subq.b	#$01, D1
+		lea	(Chunk_Table+$4000).l,a5
+		lsl.w	#3,d0
+		lea	(a5,d0.w),a5
+		movea.l	(a5)+,a1
+		move.w	(a5)+,d1
+		add.w	d1,d1
+		adda.w	(a1,d1.w),a1
+		movea.w	(a5)+,a3
+		moveq	#0,d1
+		move.b	(a1)+,d1
+		subq.b	#1,d1
 		bmi.s	loc_21622
 		jsr	(DrawSprite_Loop)
+
 loc_21622:
-		addq.w	#$04, A4
-		dbf    D6, loc_215CA
-		lea	$0070(A0), A0
-		dbf    D7, loc_215C6
-		move.b	D5, (Sprite_count).w
-		cmpi.b	#$50, D5
+		addq.w	#4,a4
+		dbf	d6,loc_215CA
+
+		lea	$70(a0),a0
+		dbf	d7,loc_215C6
+
+		move.b	d5,(Sprite_count).w
+		cmpi.b	#$50,d5
 		beq.s	loc_21642
-		move.l	#$00000000, (A2)
+		move.l	#0,(a2)
 		rts
+; ===========================================================================
+
 loc_21642:
-		move.b	#$00, -5(A2)
+		move.b	#0,-5(a2)
 		rts
-loc_2164A:
-		lea	(Chunk_Table+$400C), A1
-		moveq	#$00, D0
-		move.b	(SpecialStage_angle).w, D0
-		lsr.b	#$02, D0
-		andi.w	#$000F, D0
-		moveq	#$23, D1
+; End of function SS_ShowLayout
+
+; ---------------------------------------------------------------------------
+; Subroutine to	animate	walls and rings	in the special stage
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+S1_SS_AniWallsRings:
+		lea	(Chunk_Table+$400C).l,a1
+		moveq	#0,d0
+		move.b	(SpecialStage_angle).w,d0
+		lsr.b	#2,d0
+		andi.w	#$F,d0
+		moveq	#$23,d1
+
 loc_2165E:
-		move.w	D0, (A1)
-		addq.w	#$08, A1
-		dbf    D1, loc_2165E
-		lea	(Chunk_Table+$4005), A1
-		subq.b	#$01, (SpecialStage2_anim_counter).w
+		move.w	d0,(a1)
+		addq.w	#8,a1
+		dbf	d1,loc_2165E
+
+		lea	(Chunk_Table+$4005).l,a1
+		subq.b	#1,(SpecialStage2_anim_counter).w
 		bpl.s	loc_21682
-		move.b	#$07, (SpecialStage2_anim_counter).w
-		addq.b	#$01, (SpecialStage2_anim_frame).w
-		andi.b	#$03, (SpecialStage2_anim_frame).w
+		move.b	#7,(SpecialStage2_anim_counter).w
+		addq.b	#1,(SpecialStage2_anim_frame).w
+		andi.b	#3,(SpecialStage2_anim_frame).w
+
 loc_21682:
-		move.b	(SpecialStage2_anim_frame).w, $01D0(A1)
-		subq.b	#$01, (SpecialStage3_anim_counter).w
+		move.b	(SpecialStage2_anim_frame).w,$1D0(a1)
+		subq.b	#1,(SpecialStage3_anim_counter).w
 		bpl.s	loc_2169E
-		move.b	#$07, (SpecialStage3_anim_counter).w
-		addq.b	#$01, (SpecialStage3_anim_frame).w
-		andi.b	#$01, (SpecialStage3_anim_frame).w
+		move.b	#7,(SpecialStage3_anim_counter).w
+		addq.b	#1,(SpecialStage3_anim_frame).w
+		andi.b	#1,(SpecialStage3_anim_frame).w
+
 loc_2169E:
-		move.b	(SpecialStage3_anim_frame).w, D0
-		move.b	D0, $0138(A1)
-		move.b	D0, $0160(A1)
-		move.b	D0, $0148(A1)
-		move.b	D0, $0150(A1)
-		move.b	D0, $01D8(A1)
-		move.b	D0, $01E0(A1)
-		move.b	D0, $01E8(A1)
-		move.b	D0, $01F0(A1)
-		move.b	D0, $01F8(A1)
-		move.b	D0, $0200(A1)
-		subq.b	#$01, (SpecialStage4_anim_counter).w
+		move.b	(SpecialStage3_anim_frame).w,d0
+		move.b	d0,$138(a1)
+		move.b	d0,$160(a1)
+		move.b	d0,$148(a1)
+		move.b	d0,$150(a1)
+		move.b	d0,$1D8(a1)
+		move.b	d0,$1E0(a1)
+		move.b	d0,$1E8(a1)
+		move.b	d0,$1F0(a1)
+		move.b	d0,$1F8(a1)
+		move.b	d0,$200(a1)
+		subq.b	#1,(SpecialStage4_anim_counter).w
 		bpl.s	loc_216E0
-		move.b	#$04, (SpecialStage4_anim_counter).w
-		addq.b	#$01, (SpecialStage4_anim_frame).w
-		andi.b	#$03, (SpecialStage4_anim_frame).w
+		move.b	#4,(SpecialStage4_anim_counter).w
+		addq.b	#1,(SpecialStage4_anim_frame).w
+		andi.b	#3,(SpecialStage4_anim_frame).w
+
 loc_216E0:
-		move.b	(SpecialStage4_anim_frame).w, D0
-		move.b	D0, $0168(A1)
-		move.b	D0, $0170(A1)
-		move.b	D0, $0178(A1)
-		move.b	D0, $0180(A1)
-		subq.b	#$01, (SpecialStage_anim_counter).w
+		move.b	(SpecialStage4_anim_frame).w,d0
+		move.b	d0,$168(a1)
+		move.b	d0,$170(a1)
+		move.b	d0,$178(a1)
+		move.b	d0,$180(a1)
+		subq.b	#1,(SpecialStage_anim_counter).w
 		bpl.s	loc_2170A
-		move.b	#$07, (SpecialStage_anim_counter).w
-		subq.b	#$01, (SpecialStage_anim_frame).w
-		andi.b	#$07, (SpecialStage_anim_frame).w
+		move.b	#7,(SpecialStage_anim_counter).w
+		subq.b	#1,(SpecialStage_anim_frame).w
+		andi.b	#7,(SpecialStage_anim_frame).w
+
 loc_2170A:
-		lea	(Chunk_Table+$4016), A1
-		lea	(S1SS_WaRiVramSet).l, A0  ; loc_217F4
-		moveq	#$00, D0
-		move.b	(SpecialStage_anim_frame).w, D0
-		add.w	D0, D0
-		lea	$00(A0, D0), A0
-		move.w	(A0), (A1)
-		move.w	$0002(A0), $0008(A1)
-		move.w	$0004(A0), $0010(A1)
-		move.w	$0006(A0), $0018(A1)
-		move.w	$0008(A0), $0020(A1)
-		move.w	$000A(A0), $0028(A1)
-		move.w	$000C(A0), $0030(A1)
-		move.w	$000E(A0), $0038(A1)
-		adda.w	#$0020, A0
-		adda.w	#$0048, A1
-		move.w	(A0), (A1)
-		move.w	$0002(A0), $0008(A1)
-		move.w	$0004(A0), $0010(A1)
-		move.w	$0006(A0), $0018(A1)
-		move.w	$0008(A0), $0020(A1)
-		move.w	$000A(A0), $0028(A1)
-		move.w	$000C(A0), $0030(A1)
-		move.w	$000E(A0), $0038(A1)
-		adda.w	#$0020, A0
-		adda.w	#$0048, A1
-		move.w	(A0), (A1)
-		move.w	$0002(A0), $0008(A1)
-		move.w	$0004(A0), $0010(A1)
-		move.w	$0006(A0), $0018(A1)
-		move.w	$0008(A0), $0020(A1)
-		move.w	$000A(A0), $0028(A1)
-		move.w	$000C(A0), $0030(A1)
-		move.w	$000E(A0), $0038(A1)
-		adda.w	#$0020, A0
-		adda.w	#$0048, A1
-		move.w	(A0), (A1)
-		move.w	$0002(A0), $0008(A1)
-		move.w	$0004(A0), $0010(A1)
-		move.w	$0006(A0), $0018(A1)
-		move.w	$0008(A0), $0020(A1)
-		move.w	$000A(A0), $0028(A1)
-		move.w	$000C(A0), $0030(A1)
-		move.w	$000E(A0), $0038(A1)
-		adda.w	#$0020, A0
-		adda.w	#$0048, A1
-		rts
-S1SS_WaRiVramSet: ; loc_217F4:
-		dc.w	$0142, $6142, $0142, $0142, $0142, $0142, $0142, $6142
+		lea	(Chunk_Table+$4016).l,a1
+		lea	(S1SS_WaRiVramSet).l,a0
+		moveq	#0,d0
+		move.b	(SpecialStage_anim_frame).w,d0
+		add.w	d0,d0
+		lea	(a0,d0.w),a0
+		move.w	(a0),(a1)
+		move.w	2(a0),8(a1)
+		move.w	4(a0),$10(a1)
+		move.w	6(a0),$18(a1)
+		move.w	8(a0),$20(a1)
+		move.w	$A(a0),$28(a1)
+		move.w	$C(a0),$30(a1)
+		move.w	$E(a0),$38(a1)
+		adda.w	#$20,a0
+		adda.w	#$48,a1
+		move.w	(a0),(a1)
+		move.w	2(a0),8(a1)
+		move.w	4(a0),$10(a1)
+		move.w	6(a0),$18(a1)
+		move.w	8(a0),$20(a1)
+		move.w	$A(a0),$28(a1)
+		move.w	$C(a0),$30(a1)
+		move.w	$E(a0),$38(a1)
+		adda.w	#$20,a0
+		adda.w	#$48,a1
+		move.w	(a0),(a1)
+		move.w	2(a0),8(a1)
+		move.w	4(a0),$10(a1)
+		move.w	6(a0),$18(a1)
+		move.w	8(a0),$20(a1)
+		move.w	$A(a0),$28(a1)
+		move.w	$C(a0),$30(a1)
+		move.w	$E(a0),$38(a1)
+		adda.w	#$20,a0
+		adda.w	#$48,a1
+		move.w	(a0),(a1)
+		move.w	2(a0),8(a1)
+		move.w	4(a0),$10(a1)
+		move.w	6(a0),$18(a1)
+		move.w	8(a0),$20(a1)
+		move.w	$A(a0),$28(a1)
+		move.w	$C(a0),$30(a1)
+		move.w	$E(a0),$38(a1)
+		adda.w	#$20,a0
+		adda.w	#$48,a1
+		rts	
+; End of function SS_AniWallsRings
+
+; ===========================================================================
+S1SS_WaRiVramSet:	dc.w	$0142, $6142, $0142, $0142, $0142, $0142, $0142, $6142
 		dc.w	$0142, $6142, $0142, $0142, $0142, $0142, $0142, $6142
 		dc.w	$2142, $0142, $2142, $2142, $2142, $2142, $2142, $0142
 		dc.w	$2142, $0142, $2142, $2142, $2142, $2142, $2142, $0142
@@ -38425,1122 +39103,1227 @@ S1SS_WaRiVramSet: ; loc_217F4:
 		dc.w	$4142, $2142, $4142, $4142, $4142, $4142, $4142, $2142
 		dc.w	$6142, $4142, $6142, $6142, $6142, $6142, $6142, $4142
 		dc.w	$6142, $4142, $6142, $6142, $6142, $6142, $6142, $4142
-loc_21874:
-		lea	(Chunk_Table+$4400), A2
-		move.w	#$001F, D0
+; ---------------------------------------------------------------------------
+; Subroutine to	remove items when you collect them in the special stage
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+S1SS_RemoveCollectedItem:
+		lea	(Chunk_Table+$4400).l,a2
+		move.w	#$1F,d0
+
 loc_2187E:
-		tst.b	(A2)
+		tst.b	(a2)
 		beq.s	loc_21888
-		addq.w	#$08, A2
-		dbf    D0, loc_2187E
+		addq.w	#8,a2
+		dbf	d0,loc_2187E
+
 loc_21888:
 		rts
-loc_2188A:
-		lea	(Chunk_Table+$4400), A0
-		move.w	#$001F, D7
+; End of function SS_RemoveCollectedItem
+
+; ---------------------------------------------------------------------------
+; Subroutine to	animate	special	stage items when you touch them
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+S1_SS_AniItems:
+		lea	(Chunk_Table+$4400).l,a0
+		move.w	#$1F,d7
+
 loc_21894:
-		moveq	#$00, D0
-		move.b	(A0), D0
+		moveq	#0,d0
+		move.b	(a0),d0
 		beq.s	loc_218A2
-		lsl.w	#$02, D0
-		move.l	S1SS_AniIndex-$04(PC, D0), A1 ; loc_218AA
-		jsr	(A1)
+		lsl.w	#2,d0
+		movea.l	S1SS_AniIndex-4(pc,d0.w),a1 ; loc_218AA
+		jsr	(a1)
+
 loc_218A2:
-		addq.w	#$08, A0
-		dbf    D7, loc_21894
+		addq.w	#8,a0
+		dbf	d7,loc_21894
 		rts
 ;===============================================================================
-S1SS_AniIndex: ; loc_218AA:
-		dc.l	loc_218C2
-		dc.l	loc_218F2
-		dc.l	loc_21928
-		dc.l	loc_21958
-		dc.l	loc_2198E
-		dc.l	loc_219CE
-loc_218C2:
-		subq.b	#$01, $0002(A0)
-		bpl.s	loc_218EA
-		move.b	#$05, $0002(A0)
-		moveq	#$00, D0
-		move.b	$0003(A0), D0
-		addq.b	#$01, $0003(A0)
-		move.l	$0004(A0), A1
-		move.b	loc_218EC(PC, D0), D0
-		move.b	D0, (A1)
-		bne.s	loc_218EA
-		clr.l	(A0)
-		clr.l	$0004(A0)
-loc_218EA:
+S1SS_AniIndex:	dc.l	SS_AniRingSparks
+		dc.l	SS_AniBumper
+		dc.l	SS_Ani1Up
+		dc.l	SS_AniReverse
+		dc.l	SS_AniEmeraldSparks
+		dc.l	SS_AniGlassBlock
+; ===========================================================================
+
+SS_AniRingSparks:
+		subq.b	#1,2(a0)
+		bpl.s	locret_1B530
+		move.b	#5,2(a0)
+		moveq	#0,d0
+		move.b	3(a0),d0
+		addq.b	#1,3(a0)
+		movea.l	4(a0),a1
+		move.b	SS_AniRingData(pc,d0.w),d0
+		move.b	d0,(a1)
+		bne.s	locret_1B530
+		clr.l	(a0)
+		clr.l	4(a0)
+
+locret_1B530:
 		rts
-loc_218EC:
-		dc.b	$42, $43, $44, $45, $00, $00
-loc_218F2:
-		subq.b	#$01, $0002(A0)
-		bpl.s	loc_21920
-		move.b	#$07, $0002(A0)
-		moveq	#$00, D0
-		move.b	$0003(A0), D0
-		addq.b	#$01, $0003(A0)
-		move.l	$0004(A0), A1
-		move.b	loc_21922(PC, D0), D0
-		bne.s	loc_2191E
-		clr.l	(A0)
-		clr.l	$0004(A0)
-		move.b	#$25, (A1)
+; ===========================================================================
+SS_AniRingData:	dc.b $42, $43, $44, $45, 0, 0
+; ===========================================================================
+
+SS_AniBumper:
+		subq.b	#1,2(a0)
+		bpl.s	locret_1B566
+		move.b	#7,2(a0)
+		moveq	#0,d0
+		move.b	3(a0),d0
+		addq.b	#1,3(a0)
+		movea.l	4(a0),a1
+		move.b	SS_AniBumpData(pc,d0.w),d0
+		bne.s	loc_1B564
+		clr.l	(a0)
+		clr.l	4(a0)
+		move.b	#$25,(a1)
+		rts	
+; ===========================================================================
+
+loc_1B564:
+		move.b	d0,(a1)
+
+locret_1B566:
+		rts	
+; ===========================================================================
+SS_AniBumpData:	dc.b $32, $33, $32, $33, 0, 0
+; ===========================================================================
+
+SS_Ani1Up:
+		subq.b	#1,2(a0)
+		bpl.s	locret_1B596
+		move.b	#5,2(a0)
+		moveq	#0,d0
+		move.b	3(a0),d0
+		addq.b	#1,3(a0)
+		movea.l	4(a0),a1
+		move.b	SS_Ani1UpData(pc,d0.w),d0
+		move.b	d0,(a1)
+		bne.s	locret_1B596
+		clr.l	(a0)
+		clr.l	4(a0)
+
+locret_1B596:
+		rts	
+; ===========================================================================
+SS_Ani1UpData:	dc.b $46, $47, $48, $49, 0, 0
+; ===========================================================================
+
+SS_AniReverse:
+		subq.b	#1,2(a0)
+		bpl.s	locret_1B5CC
+		move.b	#7,2(a0)
+		moveq	#0,d0
+		move.b	3(a0),d0
+		addq.b	#1,3(a0)
+		movea.l	4(a0),a1
+		move.b	SS_AniRevData(pc,d0.w),d0
+		bne.s	loc_1B5CA
+		clr.l	(a0)
+		clr.l	4(a0)
+		move.b	#$2B,(a1)
+		rts	
+; ===========================================================================
+
+loc_1B5CA:
+		move.b	d0,(a1)
+
+locret_1B5CC:
+		rts	
+; ===========================================================================
+SS_AniRevData:	dc.b $2B, $31, $2B, $31, 0, 0
+; ===========================================================================
+
+SS_AniEmeraldSparks:
+		subq.b	#1,2(a0)
+		bpl.s	locret_1B60C
+		move.b	#5,2(a0)
+		moveq	#0,d0
+		move.b	3(a0),d0
+		addq.b	#1,3(a0)
+		movea.l	4(a0),a1
+		move.b	SS_AniEmerData(pc,d0.w),d0
+		move.b	d0,(a1)
+		bne.s	locret_1B60C
+		clr.l	(a0)
+		clr.l	4(a0)
+		move.b	#4,(Object_RAM+$24).w
+		move.w	#$A8,d0
+		jmp	(PlaySound).l	; play special stage GOAL sound
+locret_1B60C:
 		rts
-loc_2191E:
-		move.b	D0, (A1)
-loc_21920:
+; ===========================================================================
+SS_AniEmerData:	dc.b $46, $47, $48, $49, 0, 0
+; ===========================================================================
+
+SS_AniGlassBlock:
+		subq.b	#1,2(a0)
+		bpl.s	locret_1B640
+		move.b	#1,2(a0)
+		moveq	#0,d0
+		move.b	3(a0),d0
+		addq.b	#1,3(a0)
+		movea.l	4(a0),a1
+		move.b	SS_AniGlassData(pc,d0.w),d0
+		move.b	d0,(a1)
+		bne.s	locret_1B640
+		move.b	4(a0),(a1)
+		clr.l	(a0)
+		clr.l	4(a0)
+
+locret_1B640:
 		rts
-loc_21922:
-		dc.b	$32, $33, $32, $33, $00, $00
-loc_21928:
-		subq.b	#$01, $0002(A0)
-		bpl.s	loc_21950
-		move.b	#$05, $0002(A0)
-		moveq	#$00, D0
-		move.b	$0003(A0), D0
-		addq.b	#$01, $0003(A0)
-		move.l	$0004(A0), A1
-		move.b	loc_21952(PC, D0), D0
-		move.b	D0, (A1)
-		bne.s	loc_21950
-		clr.l	(A0)
-		clr.l	$0004(A0)
-loc_21950:
-		rts
-loc_21952:
-		dc.b	$46, $47, $48, $49, $00, $00
-loc_21958:
-		subq.b	#$01, $0002(A0)
-		bpl.s	loc_21986
-		move.b	#$07, $0002(A0)
-		moveq	#$00, D0
-		move.b	$0003(A0), D0
-		addq.b	#$01, $0003(A0)
-		move.l	$0004(A0), A1
-		move.b	loc_21988(PC, D0), D0
-		bne.s	loc_21984
-		clr.l	(A0)
-		clr.l	$0004(A0)
-		move.b	#$2B, (A1)
-		rts
-loc_21984:
-		move.b	D0, (A1)
-loc_21986:
-		rts
-loc_21988:
-		dc.b	$2B, $31, $2B, $31, $00, $00
-loc_2198E:
-		subq.b	#$01, $0002(A0)
-		bpl.s	loc_219C6
-		move.b	#$05, $0002(A0)
-		moveq	#$00, D0
-		move.b	$0003(A0), D0
-		addq.b	#$01, $0003(A0)
-		move.l	$0004(A0), A1
-		move.b	loc_219C8(PC, D0), D0
-		move.b	D0, (A1)
-		bne.s	loc_219C6
-		clr.l	(A0)
-		clr.l	$0004(A0)
-		move.b	#$04, ($FFFFB024).w
-		move.w	#$00A8, D0
-		jsr	(PlaySound).l		  ; loc_14C6
-loc_219C6:
-		rts
-loc_219C8:
-		dc.b	$46, $47, $48, $49, $00, $00
-loc_219CE:
-		subq.b	#$01, $0002(A0)
-		bpl.s	loc_219FA
-		move.b	#$01, $0002(A0)
-		moveq	#$00, D0
-		move.b	$0003(A0), D0
-		addq.b	#$01, $0003(A0)
-		move.l	$0004(A0), A1
-		move.b	loc_219FC(PC, D0), D0
-		move.b	D0, (A1)
-		bne.s	loc_219FA
-		move.b	$0004(A0), (A1)
-		clr.l	(A0)
-		clr.l	$0004(A0)
-loc_219FA:
-		rts
-loc_219FC:
-		dc.b	$4B, $4C, $4D, $4E, $4B, $4C, $4D, $4E, $00, $00
-S1SS_LayoutIndex: ; loc_21A06:
-		dc.l	Special_Stage_1   ; loc_31CEA
-		dc.l	Special_Stage_2   ; loc_31F64
-		dc.l	Special_Stage_3   ; loc_32376
-		dc.l	Special_Stage_4   ; loc_326D2
-		dc.l	Special_Stage_5   ; loc_32BAC
-		dc.l	Special_Stage_6   ; loc_3305C
-S1SS_StartLoc: ; loc_21A1E:
+; ===========================================================================
+SS_AniGlassData:dc.b $4B, $4C, $4D, $4E, $4B, $4C, $4D,	$4E, 0,	0
+; ===========================================================================
+
+; ---------------------------------------------------------------------------
+; Special stage	layout pointers
+; ---------------------------------------------------------------------------
+S1SS_LayoutIndex:
+		dc.l	Special_Stage_1
+		dc.l	Special_Stage_2
+		dc.l	Special_Stage_3
+		dc.l	Special_Stage_4
+		dc.l	Special_Stage_5
+		dc.l	Special_Stage_6
+		even
+
+; ---------------------------------------------------------------------------
+; Special stage start locations
+; ---------------------------------------------------------------------------
+S1SS_StartLoc:
 		dc.l	$03D002E0   ; Sonic Start Position in Special Stage 1
 		dc.l	$03280574   ; Sonic Start Position in Special Stage 2
 		dc.l	$04E402E0   ; Sonic Start Position in Special Stage 3
 		dc.l	$03AD02E0   ; Sonic Start Position in Special Stage 4
 		dc.l	$034006B8   ; Sonic Start Position in Special Stage 5
 		dc.l	$049B0358   ; Sonic Start Position in Special Stage 6
-S1_Special_Stage_Load: ; loc_21A36:
-		moveq	#$00, D0
-		move.b	(Current_Special_Stage).w, D0
-		addq.b	#$01, (Current_Special_Stage).w
-		cmpi.b	#$06, (Current_Special_Stage).w
-		bcs.s	loc_21A4E
-		move.b	#$00, (Current_Special_Stage).w
-loc_21A4E:
-		cmpi.b	#$06, (Emerald_count).w
-		beq.s	loc_21A70
-		moveq	#$00, D1
-		move.b	(Emerald_count).w, D1
-		subq.b	#$01, D1
-		bcs.s	loc_21A70
-		lea	(Got_Emeralds_array).w, A3
-loc_21A64:
-		cmp.b	$00(A3, D1), D0
-		bne.s	loc_21A6C
-		bra.s	S1_Special_Stage_Load	; loc_21A36
-loc_21A6C:
-		dbf    D1, loc_21A64
-loc_21A70:
-		lsl.w	#$02, D0
-		lea	S1SS_StartLoc(PC, D0), A1 ; loc_21A1E
-		move.w	(A1)+, ($FFFFB008).w
-		move.w	(A1)+, ($FFFFB00C).w
-		move.l	S1SS_LayoutIndex(PC, D0), A0 ; loc_21A06
-		lea	(Chunk_Table+$4000), A1
-		move.w	#$0000, D0
+
+; ---------------------------------------------------------------------------
+; Subroutine to	load special stage layout
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+S1_Special_Stage_Load:
+		moveq	#0,d0
+		move.b	(Current_Special_Stage).w,d0 ; load number of last special stage entered
+		addq.b	#1,(Current_Special_Stage).w
+		cmpi.b	#6,(Current_Special_Stage).w
+		bcs.s	S1SS_ChkEmldNum
+		move.b	#0,(Current_Special_Stage).w ; reset if higher than 6
+
+S1SS_ChkEmldNum:
+		cmpi.b	#6,(Emerald_count).w ; do you have all emeralds?
+		beq.s	S1SS_LoadData	; if yes, branch
+		moveq	#0,d1
+		move.b	(Emerald_count).w,d1
+		subq.b	#1,d1
+		bcs.s	S1SS_LoadData
+		lea	(Got_Emeralds_array).w,a3 ; check which emeralds you have
+
+S1SS_ChkEmldLoop:
+		cmp.b	(a3,d1),d0
+		bne.s	S1SS_ChkEmldRepeat
+		bra.s	S1_Special_Stage_Load
+; ===========================================================================
+
+S1SS_ChkEmldRepeat:
+		dbf	d1,S1SS_ChkEmldLoop
+
+S1SS_LoadData:
+		lsl.w	#2,d0
+		lea	S1SS_StartLoc(pc,d0),a1
+		move.w	(a1)+,(Object_RAM+$8).w
+		move.w	(a1)+,(Object_RAM+$C).w
+		movea.l	S1SS_LayoutIndex(pc,d0),a0 ; loc_21A06
+		lea	(Chunk_Table+$4000).l,a1
+		move.w	#0,d0
 		jsr	(EniDec).l		 ; loc_18DA
-		lea	(Chunk_Table), A1
-		move.w	#$0FFF, D0
+		lea	(Chunk_Table).l,a1
+		move.w	#$FFF,d0
+
 loc_21A9C:
-		clr.l	(A1)+
-		dbf    D0, loc_21A9C
-		lea	(Chunk_Table+$1020), A1
-		lea	(Chunk_Table+$4000), A0
-		moveq	#$3F, D1
+		clr.l	(a1)+
+		dbf	d0,loc_21A9C
+
+		lea	(Chunk_Table+$1020).l,a1
+		lea	(Chunk_Table+$4000).l,a0
+		moveq	#$3F,d1
+
 loc_21AB0:
-		moveq	#$3F, D2
+		moveq	#$3F,d2
+
 loc_21AB2:
-		move.b	(A0)+, (A1)+
-		dbf    D2, loc_21AB2
-		lea	$0040(A1), A1
-		dbf    D1, loc_21AB0
-		lea	(Chunk_Table+$4008), A1
-		lea	(loc_21AF2).l, A0
-		moveq	#$4D, D1
+		move.b	(a0)+,(a1)+
+		dbf	d2,loc_21AB2
+
+		lea	$40(a1),a1
+		dbf	d1,loc_21AB0
+
+		lea	(Chunk_Table+$4008).l,a1
+		lea	(SS_MapIndex).l,a0
+		moveq	#$4D,d1
+
 loc_21ACE:
-		move.l	(A0)+, (A1)+
-		move.w	#$0000, (A1)+
-		move.b	-4(A0), -1(A1)
-		move.w	(A0)+, (A1)+
-		dbf    D1, loc_21ACE
-		lea	(Chunk_Table+$4400), A1
-		move.w	#$003F, D1
+		move.l	(a0)+,(a1)+
+		move.w	#0,(a1)+
+		move.b	-4(a0),-1(a1)
+		move.w	(a0)+,(a1)+
+		dbf	d1,loc_21ACE
+
+		lea	(Chunk_Table+$4400).l,a1
+		move.w	#$3F,d1
+
 loc_21AEA:
-		clr.l	(A1)+
-		dbf    D1, loc_21AEA
+		clr.l	(a1)+
+		dbf	d1,loc_21AEA
 		rts
-loc_21AF2:
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$2142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$4142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$6142
-		dc.l	S1_Obj_0x47_Mappings ; loc_1401E
-		dc.w	$023B
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0570
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0251
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0370
-		dc.l	SS_Up_Mappings		; loc_21CFA
-		dc.w	$0263
-		dc.l	SS_Down_Mappings	; loc_21D0A
-		dc.w	$0263
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$22F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$0470
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$05F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$65F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$25F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$45F0
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$02F0
-		dc.l	(($01<<$18)|S1_Obj_0x47_Mappings) ; loc_1401E
-		dc.w	$023B
-		dc.l	(($02<<$18)|S1_Obj_0x47_Mappings) ; loc_1401E
-		dc.w	$023B
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0797
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$07A0
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$07A9
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$0797
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$07A0
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$07A9
-		dc.l	Obj25_MapUnc_B036	   ; loc_B036
-		dc.w	$27B2
-		dc.l	SS_Emerald_Mappings	; loc_21D22
-		dc.w	$0770
-		dc.l	SS_Emerald_Mappings	; loc_21D22
-		dc.w	$2770
-		dc.l	SS_Emerald_Mappings	; loc_21D22
-		dc.w	$4770
-		dc.l	SS_Emerald_Mappings	; loc_21D22
-		dc.w	$6770
-		dc.l	SS_Red_Emerald_Mappings ; loc_21D1A
-		dc.w	$0770
-		dc.l	SS_Gray_Emerald_Mappings ; loc_21D1E
-		dc.w	$0770
-		dc.l	SS_Reverse_Goal_Mappings ; loc_21CC6
-		dc.w	$04F0
-		dc.l	(($04<<$18)|Obj25_MapUnc_B036) ; loc_B036
-		dc.w	$27B2
-		dc.l	(($05<<$18)|Obj25_MapUnc_B036) ; loc_B036
-		dc.w	$27B2
-		dc.l	(($06<<$18)|Obj25_MapUnc_B036) ; loc_B036
-		dc.w	$27B2
-		dc.l	(($07<<$18)|Obj25_MapUnc_B036) ; loc_B036
-		dc.w	$27B2
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$23F0
-		dc.l	(($01<<$18)|SS_Red_White_Ball_Mappings) ; loc_21CDA
-		dc.w	$23F0
-		dc.l	(($02<<$18)|SS_Red_White_Ball_Mappings) ; loc_21CDA
-		dc.w	$23F0
-		dc.l	(($03<<$18)|SS_Red_White_Ball_Mappings) ; loc_21CDA
-		dc.w	$23F0
-		dc.l	(($02<<$18)|SS_Reverse_Goal_Mappings) ; loc_21CC6
-		dc.w	$04F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$05F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$65F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$25F0
-		dc.l	SS_Red_White_Ball_Mappings ; loc_21CDA
-		dc.w	$45F0
-SS_Reverse_Goal_Mappings: ; loc_21CC6:
-		dc.w	loc_21CCC-SS_Reverse_Goal_Mappings
-		dc.w	loc_21CD2-SS_Reverse_Goal_Mappings
-		dc.w	loc_21CD8-SS_Reverse_Goal_Mappings
-loc_21CCC:
-		dc.b	$01
-		dc.b	$F4, $0A, $00, $00, $F4        ; Sonic 1 Mappings Format
-loc_21CD2:
-		dc.b	$01
-		dc.b	$F4, $0A, $00, $09, $F4        ; Sonic 1 Mappings Format
-loc_21CD8:
-		dc.b	$00
-		dc.b	$00		     ; Filler
-SS_Red_White_Ball_Mappings: ; loc_21CDA:
-		dc.w	loc_21CE2-SS_Red_White_Ball_Mappings
-		dc.w	loc_21CE8-SS_Red_White_Ball_Mappings
-		dc.w	loc_21CEE-SS_Red_White_Ball_Mappings
-		dc.w	loc_21CF4-SS_Red_White_Ball_Mappings
-loc_21CE2:
-		dc.b	$01
-		dc.b	$F4, $0A, $00, $00, $F4        ; Sonic 1 Mappings Format
-loc_21CE8:
-		dc.b	$01
-		dc.b	$F4, $0A, $08, $00, $F4        ; Sonic 1 Mappings Format
-loc_21CEE:
-		dc.b	$01
-		dc.b	$F4, $0A, $18, $00, $F4        ; Sonic 1 Mappings Format
-loc_21CF4:
-		dc.b	$01
-		dc.b	$F4, $0A, $10, $00, $F4        ; Sonic 1 Mappings Format
-SS_Up_Mappings: ; loc_21CFA:
-		dc.w	loc_21CFE-SS_Up_Mappings
-		dc.w	loc_21D04-SS_Up_Mappings
-loc_21CFE:
-		dc.b	$01
-		dc.b	$F4, $0A, $00, $00, $F4        ; Sonic 1 Mappings Format
-loc_21D04:
-		dc.b	$01
-		dc.b	$F4, $0A, $00, $12, $F4        ; Sonic 1 Mappings Format
-SS_Down_Mappings: ; loc_21D0A:
-		dc.w	loc_21D0E-SS_Down_Mappings
-		dc.w	loc_21D14-SS_Down_Mappings
-loc_21D0E:
-		dc.b	$01
-		dc.b	$F4, $0A, $00, $09, $F4        ; Sonic 1 Mappings Format
-loc_21D14:
-		dc.b	$01
-		dc.b	$F4, $0A, $00, $12, $F4        ; Sonic 1 Mappings Format
-SS_Red_Emerald_Mappings: ; loc_21D1A:
-		dc.w	loc_21D26-SS_Red_Emerald_Mappings
-		dc.w	loc_21D38-SS_Red_Emerald_Mappings
-SS_Gray_Emerald_Mappings: ; loc_21D1E:
-		dc.w	loc_21D2C-SS_Gray_Emerald_Mappings
-		dc.w	loc_21D38-SS_Gray_Emerald_Mappings
-SS_Emerald_Mappings: ; loc_21D22:  {Blue / Yellow / Purple / Green}
-		dc.w	loc_21D32-SS_Emerald_Mappings
-		dc.w	loc_21D38-SS_Emerald_Mappings
-loc_21D26:
-		dc.b	$01
-		dc.b	$F8, $05, $00, $00, $F8        ; Sonic 1 Mappings Format
-loc_21D2C:
-		dc.b	$01
-		dc.b	$F8, $05, $00, $04, $F8        ; Sonic 1 Mappings Format
-loc_21D32:
-		dc.b	$01
-		dc.b	$F8, $05, $00, $08, $F8        ; Sonic 1 Mappings Format
-loc_21D38:
-		dc.b	$01
-		dc.b	$F8, $05, $00, $0C, $F8        ; Sonic 1 Mappings Format
+; End of function SS_Load
+
+; ===========================================================================
+
+; ---------------------------------------------------------------------------
+; Special stage	mappings and VRAM pointers
+; ---------------------------------------------------------------------------
+SS_MapIndex:
+	dc.l Map_SSWalls	; address of mappings
+	dc.w $142		; VRAM setting
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $2142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $4142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SSWalls
+	dc.w $6142
+	dc.l Map_SS_Bumber
+	dc.w $23B
+	dc.l Map_SS_R
+	dc.w $570
+	dc.l Map_SS_R
+	dc.w $251
+	dc.l Map_SS_R
+	dc.w $370
+	dc.l Map_SS_Up
+	dc.w $263
+	dc.l Map_SS_Down
+	dc.w $263
+	dc.l Map_SS_R
+	dc.w $22F0
+	dc.l Map_SS_Glass
+	dc.w $470
+	dc.l Map_SS_Glass
+	dc.w $5F0
+	dc.l Map_SS_Glass
+	dc.w $65F0
+	dc.l Map_SS_Glass
+	dc.w $25F0
+	dc.l Map_SS_Glass
+	dc.w $45F0
+	dc.l Map_SS_R
+	dc.w $2F0
+	dc.l Map_SS_Bumber+$1000000	; add frame no.	* $1000000
+	dc.w $23B
+	dc.l Map_SS_Bumber+$2000000
+	dc.w $23B
+	dc.l Map_SS_R
+	dc.w $797
+	dc.l Map_SS_R
+	dc.w $7A0
+	dc.l Map_SS_R
+	dc.w $7A9
+	dc.l Map_SS_R
+	dc.w $797
+	dc.l Map_SS_R
+	dc.w $7A0
+	dc.l Map_SS_R
+	dc.w $7A9
+	dc.l Obj25_MapUnc_B036
+	dc.w $27B2
+	dc.l Map_SS_Chaos3
+	dc.w $770
+	dc.l Map_SS_Chaos3
+	dc.w $2770
+	dc.l Map_SS_Chaos3
+	dc.w $4770
+	dc.l Map_SS_Chaos3
+	dc.w $6770
+	dc.l Map_SS_Chaos1
+	dc.w $770
+	dc.l Map_SS_Chaos2
+	dc.w $770
+	dc.l Map_SS_R
+	dc.w $4F0
+	dc.l Obj25_MapUnc_B036+$4000000
+	dc.w $27B2
+	dc.l Obj25_MapUnc_B036+$5000000
+	dc.w $27B2
+	dc.l Obj25_MapUnc_B036+$6000000
+	dc.w $27B2
+	dc.l Obj25_MapUnc_B036+$7000000
+	dc.w $27B2
+	dc.l Map_SS_Glass
+	dc.w $23F0
+	dc.l Map_SS_Glass+$1000000
+	dc.w $23F0
+	dc.l Map_SS_Glass+$2000000
+	dc.w $23F0
+	dc.l Map_SS_Glass+$3000000
+	dc.w $23F0
+	dc.l Map_SS_R+$2000000
+	dc.w $4F0
+	dc.l Map_SS_Glass
+	dc.w $5F0
+	dc.l Map_SS_Glass
+	dc.w $65F0
+	dc.l Map_SS_Glass
+	dc.w $25F0
+	dc.l Map_SS_Glass
+	dc.w $45F0
+
+Map_SS_R:	include	"mappings/SS R Block.asm"
+Map_SS_Glass:	include	"mappings/SS Glass Block.asm"
+Map_SS_Up:	include	"mappings/SS UP Block.asm"
+Map_SS_Down:	include	"mappings/SS DOWN Block.asm"
+Map_SS_Bumber:	include	"mappings/SS Bumper.asm"
+
+Map_SSWalls:	include	"mappings/SS Walls.asm"
+		include	"mappings/SS Chaos Emeralds.asm"
 ;===============================================================================
 ; Special Stage - Sub-routine
 ; [ End ]
 ;===============================================================================
-		nop			     ; Filler
+
 ;===============================================================================
 ; Object 0x09 - Sonic In Special Stage
 ; [ Begin ]
 ;===============================================================================
-Obj_0x09_Sonic_In_Special_Stage: ; loc_21D40:
-		tst.w	(Debug_placement_mode).w
-		beq.s	Sonic_In_SS_Normal	; loc_21D4E
-		bsr.w	  S1SS_FixCamera	  ; loc_21F76
-		bra.w	  DebugMode		 ; loc_23B70
-Sonic_In_SS_Normal: ; loc_21D4E:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_21D5C(PC, D0), D1
-		jmp	loc_21D5C(PC, D1)
-loc_21D5C:
-		dc.w	loc_21D64-loc_21D5C
-		dc.w	loc_21DA4-loc_21D5C
-		dc.w	loc_21FA0-loc_21D5C
-		dc.w	loc_21FF4-loc_21D5C
-loc_21D64:
-		addq.b	#$02, $0024(A0)
-		move.b	#$0E, $0016(A0)
-		move.b	#$07, $0017(A0)
-		move.l	#MapUnc_Sonic, $0004(A0) ; loc_614C0
-		move.w	#$0780, $0002(A0)
-		bsr.w	  J_Adjust2PArtPointer_26 ; loc_223E4
-		move.b	#$04, $0001(A0)
-		move.b	#$00, $0018(A0)
-		move.b	#$02, $001C(A0)
-		bset	#$02, $0022(A0)
-		bset	#$01, $0022(A0)
-loc_21DA4:
-		tst.w	(Debug_mode_flag).w
-		beq.s	loc_21DB8
-		btst	#$04, (Ctrl_1_Press).w
-		beq.s	loc_21DB8
-		move.w	#$0001, (Debug_placement_mode).w
-loc_21DB8:
-		move.b	#$00, $0030(A0)
-		moveq	#$00, D0
-		move.b	$0022(A0), D0
-		andi.w	#$0002, D0
-		move.w	SonicInSS_Modes(PC, D0), D1 ; loc_21DDC
-		jsr	SonicInSS_Modes(PC, D1)     ; loc_21DDC
-		jsr	LoadSonicDynPLC  ; (loc_10DDC)
-		jmp	DisplaySprite		; (loc_D3C2)
-SonicInSS_Modes: ; loc_21DDC:
-		dc.w	SonicInSS_OnWall-SonicInSS_Modes ; loc_21DE0
-		dc.w	SonicInSS_InAir-SonicInSS_Modes  ; loc_21DEE
-SonicInSS_OnWall: ; loc_21DE0:
-		bsr.w	  SonicInSS_Jump	  ; loc_21F16
-		bsr.w	  SonicInSS_Move	  ; loc_21E20
-		bsr.w	  SonicInSS_Fall	  ; loc_22016
-		bra.s	SonicInSS_Display	; loc_21DFA
+
+Obj_0x09_Sonic_In_Special_Stage:
+		tst.w	(Debug_placement_mode).w	; is debug mode	being used?
+		beq.s	Sonic_In_SS_Normal	; if not, branch
+		bsr.w	S1SS_FixCamera
+		bra.w	DebugMode
+; ===========================================================================
+
+Sonic_In_SS_Normal:
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	SonicInSS_Index(pc,d0),d1
+		jmp	SonicInSS_Index(PC,d1)
+; ===========================================================================
+SonicInSS_Index:	dc.w	SonicInSS_Main-SonicInSS_Index
+		dc.w	SonicInSS_ChkDebug-SonicInSS_Index
+		dc.w	SonicInSS_ExitStage-SonicInSS_Index
+		dc.w	SonicInSS_Exit2-SonicInSS_Index
+; ===========================================================================
+SonicInSS_Main:
+		addq.b	#2,$24(a0)
+		move.b	#$E,$16(a0)
+		move.b	#7,$17(a0)
+		move.l	#MapUnc_Sonic,$4(a0)
+		move.w	#$780,$2(a0)
+		move.b	#4,$1(a0)
+		move.b	#0,$18(a0)
+		move.b	#2,$1C(a0)
+		bset	#2,$22(a0)
+		bset	#1,$22(a0)
+
+SonicInSS_ChkDebug:
+		tst.w	(Debug_mode_flag).w	; is debug mode	cheat enabled?
+		beq.s	SonicInSS_NoDebug	; if not, branch
+		btst	#4,(Ctrl_1_Press).w ; is button B pressed?
+		beq.s	SonicInSS_NoDebug	; if not, branch
+		move.w	#1,(Debug_placement_mode).w ; change Sonic into a ring
+
+SonicInSS_NoDebug:
+		move.b	#0,$30(a0)
+		moveq	#0,d0
+		move.b	$22(a0),d0
+		andi.w	#2,d0
+		move.w	SonicInSS_Modes(pc,d0.w),d1
+		jsr	SonicInSS_Modes(pc,d1.w)
+		jsr	(LoadSonicDynPLC).l
+		jmp	(DisplaySprite).l
+; ===========================================================================
+SonicInSS_Modes:	dc.w	SonicInSS_OnWall-SonicInSS_Modes
+		dc.w	SonicInSS_InAir-SonicInSS_Modes
+; ===========================================================================
+
+SonicInSS_OnWall:
+		bclr	#7,$22(a0)	; clear "Sonic has jumped" flag
+		bsr.w	SonicInSS_Jump
+		bsr.w	SonicInSS_Move
+		bsr.w	SonicInSS_Fall
+		bra.s	SonicInSS_Display
+; ===========================================================================
+
 SonicInSS_InAir: ; loc_21DEE:
-		bsr.w	  SonicInSS_Null	  ; loc_21F5A
-		bsr.w	  SonicInSS_Move	  ; loc_21E20
-		bsr.w	  SonicInSS_Fall	  ; loc_22016
+		bsr.w	  SonicInSS_JumpHeight
+		bsr.w	  SonicInSS_Move
+		bsr.w	  SonicInSS_Fall
+
 SonicInSS_Display: ; loc_21DFA:
-		bsr.w	  SonicInSS_ChkItems	  ; loc_22112
-		bsr.w	  SonicInSS_ChkItems2	  ; loc_2224E
-		jsr	SpeedToPos		; (loc_D27A)
-		bsr.w	  S1SS_FixCamera	  ; loc_21F76
-		move.w	(SpecialStage_angle).w, D0
-		add.w	(SpecialStage_speed).w, D0
-		move.w	D0, (SpecialStage_angle).w
-		jsr	Sonic_Animate		; (loc_10AB2)
-		rts
-SonicInSS_Move: ; loc_21E20:
-		btst	#$02, (Ctrl_1_Held_Logical).w
-		beq.s	loc_21E2C
-		bsr.w	  SonicInSS_MoveLeft	      ; loc_21EB8
-loc_21E2C:
-		btst	#$03, (Ctrl_1_Held_Logical).w
+		bsr.w	SonicInSS_ChkItems	  ; loc_22112
+		bsr.w	SonicInSS_ChkItems2	  ; loc_2224E
+		jsr	(SpeedToPos).l
+		bsr.w	S1SS_FixCamera
+		move.w	(SpecialStage_angle).w,d0
+		add.w	(SpecialStage_speed).w,d0
+		move.w	d0,(SpecialStage_angle).w
+		jmp	Sonic_Animate
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+SonicInSS_Move:
+		btst	#2,(Ctrl_1_Held_Logical).w
+		beq.s	SonicInSS_ChkRight
+		bsr.w	SonicInSS_MoveLeft
+
+SonicInSS_ChkRight:
+		btst	#3,(Ctrl_1_Held_Logical).w
 		beq.s	loc_21E38
-		bsr.w	  SonicInSS_MoveRight	  ; loc_21EE8
+		bsr.w	SonicInSS_MoveRight
+
 loc_21E38:
-		move.b	(Ctrl_1_Held_Logical).w, D0
-		andi.b	#$0C, D0
+		move.b	(Ctrl_1_Held_Logical).w,d0
+		andi.b	#$C,d0
 		bne.s	loc_21E68
-		move.w	$0014(A0), D0
+		move.w	$14(a0),d0
 		beq.s	loc_21E68
 		bmi.s	loc_21E5A
-		subi.w	#$000C, D0
+		subi.w	#$C,d0
 		bcc.s	loc_21E54
-		move.w	#$0000, D0
-loc_21E54:
-		move.w	D0, $0014(A0)
-		bra.s	loc_21E68
-loc_21E5A:
-		addi.w	#$000C, D0
-		bcc.s	loc_21E64
-		move.w	#$0000, D0
-loc_21E64:
-		move.w	D0, $0014(A0)
-loc_21E68:
-		move.b	(SpecialStage_angle).w, D0
-		addi.b	#$20, D0
-		andi.b	#$C0, D0
-		neg.b	D0
-		jsr    ( CalcSine).l		; loc_320A
-		muls.w	$0014(A0), D1
-		add.l	D1, $0008(A0)
-		muls.w	$0014(A0), D0
-		add.l	D0, $000C(A0)
-		movem.l D0/D1, -(A7)
-		move.l	$000C(A0), D2
-		move.l	$0008(A0), D3
-		bsr.w	  loc_220A8
-		beq.s	loc_21EB2
-		movem.l (A7)+, D0/D1
-		sub.l	D1, $0008(A0)
-		sub.l	D0, $000C(A0)
-		move.w	#$0000, $0014(A0)
-		rts
-loc_21EB2:
-		movem.l (A7)+, D0/D1
-		rts
+		move.w	#0,d0
 
-;===============================================================================
-; Sub Routine SonicInSS_MoveLeft
-; [ Begin ]
-;===============================================================================
-SonicInSS_MoveLeft: ; loc_21EB8:
-		bset	#$00, $0022(A0)
-		move.w	$0014(A0), D0
+loc_21E54:
+		move.w	d0,$14(a0)
+		bra.s	loc_21E68
+; ===========================================================================
+
+loc_21E5A:
+		addi.w	#$C,d0
+		bcc.s	loc_21E64
+		move.w	#0,d0
+
+loc_21E64:
+		move.w	d0,$14(a0)
+
+loc_21E68:
+		move.b	(SpecialStage_angle).w,d0
+		addi.b	#$20,d0
+		andi.b	#$C0,d0
+		neg.b	d0
+		jsr    (CalcSine).l
+		muls.w	$14(a0),d1
+		add.l	d1,$8(a0)
+		muls.w	$14(a0),d0
+		add.l	d0,$C(a0)
+		movem.l d0-d1,-(sp)
+		move.l	$C(a0),d2
+		move.l	8(A0),d3
+		bsr.w	loc_220A8
+		beq.s	loc_21EB2
+		movem.l (sp)+,d0-d1
+		sub.l	d1,$8(a0)
+		sub.l	d0,$C(a0)
+		move.w	#0,$14(a0)
+		rts
+; ===========================================================================
+
+loc_21EB2:
+		movem.l (sp)+,d0-d1
+		rts
+; End of function SonicInSS_Move
+
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+SonicInSS_MoveLeft:
+		bset	#0,$22(a0)
+		move.w	$14(a0),d0
 		beq.s	loc_21EC6
 		bpl.s	loc_21EDA
+
 loc_21EC6:
-		subi.w	#$000C, D0
-		cmpi.w	#$F800, D0
+		subi.w	#$C,d0
+		cmpi.w	#-$800,d0
 		bgt.s	loc_21ED4
-		move.w	#$F800, D0
+		move.w	#-$800,d0
+
 loc_21ED4:
-		move.w	D0, $0014(A0)
+		move.w	d0,$14(a0)
 		rts
+; ===========================================================================
+
+
 loc_21EDA:
-		subi.w	#$0040, D0
-		bcc.s	loc_21EE2
-		nop
-loc_21EE2:
-		move.w	D0, $0014(A0)
+		subi.w	#$40,d0
+		move.w	d0,$14(a0)
 		rts
-;===============================================================================
-; Sub Routine SonicInSS_MoveLeft
-; [ End ]
-;===============================================================================
+; End of function SonicInSS_MoveLeft
 
-;===============================================================================
-; Sub Routine SonicInSS_MoveRight
-; [ Begin ]
-;===============================================================================
-SonicInSS_MoveRight: ; loc_21EE8:
-		bclr	#$00, $0022(A0)
-		move.w	$0014(A0), D0
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+SonicInSS_MoveRight:
+		bclr	#0,$22(a0)
+		move.w	$14(a0),d0
 		bmi.s	loc_21F08
-		addi.w	#$000C, D0
-		cmpi.w	#$0800, D0
+		addi.w	#$C,d0
+		cmpi.w	#$800,d0
 		blt.s	loc_21F02
-		move.w	#$0800, D0
+		move.w	#$800,d0
+
 loc_21F02:
-		move.w	D0, $0014(A0)
-		bra.s	loc_21F14
+		move.w	d0,$14(a0)
+		rts
+; ===========================================================================
+
 loc_21F08:
-		addi.w	#$0040, D0
-		bcc.s	loc_21F10
-		nop
-loc_21F10:
-		move.w	D0, $0014(A0)
-loc_21F14:
+		addi.w	#$40,d0
+		move.w	d0,$14(a0)
 		rts
-;===============================================================================
-; Sub Routine SonicInSS_MoveRight
-; [ End ]
-;===============================================================================
+; End of function SonicInSS_MoveRight
 
-;===============================================================================
-; Sub Routine SonicInSS_Jump
-; [ Begin ]
-;===============================================================================
-SonicInSS_Jump: ; loc_21F16:
-		move.b	(Ctrl_1_Press_Logical).w, D0
-		andi.b	#$70, D0
-		beq.s	loc_21F58
-		move.b	(SpecialStage_angle).w, D0
-		andi.b	#$FC, D0
-		neg.b	D0
-		subi.b	#$40, D0
-		jsr    ( CalcSine).l		; loc_320A
-		muls.w	#$0680, D1
-		asr.l	#$08, D1
-		move.w	D1, $0010(A0)
-		muls.w	#$0680, D0
-		asr.l	#$08, D0
-		move.w	D0, $0012(A0)
-		bset	#$01, $0022(A0)
-		move.w	#$00A0, D0
-		jsr	(PlaySound).l		  ; loc_14C6
-loc_21F58:
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+SonicInSS_Jump:
+		move.b	(Ctrl_1_Press_Logical).w,d0
+		andi.b	#$70,d0	; is A,	B or C pressed?
+		beq.s	SonicInSS_NoJump	; if not, branch
+		move.b	(SpecialStage_angle).w,d0
+		andi.b	#$FC,d0
+		neg.b	d0
+		subi.b	#$40,d0
+		jsr	(CalcSine).l
+		muls.w	#$680,d1
+		asr.l	#8,d1
+		move.w	d1,$10(a0)
+		muls.w	#$680,d0
+		asr.l	#8,d0
+		move.w	d0,$12(a0)
+		bset	#1,$22(a0)
+		bset	#7,$22(a0)	; set "Sonic has jumped" flag
+		move.w	#$A0,d0
+		jmp	(PlaySound).l	; play jumping sound
+
+SonicInSS_NoJump:
 		rts
-;===============================================================================
-; Sub Routine SonicInSS_Jump
-; [ End ]
-;===============================================================================
+; End of function SonicInSS_Jump
 
-;===============================================================================
-; Sub Routine SonicInSS_Null
-; [ Begin ]
-;===============================================================================
-SonicInSS_Null: ; loc_21F5A:
+; ===========================================================================
+; ---------------------------------------------------------------------------
+; Subroutine to limit Sonic's upward vertical speed
+; ---------------------------------------------------------------------------
+
+SonicInSS_JumpHeight:
+		move.b	(Ctrl_1_Held_Logical).w,d0	; is the jump button up?
+		andi.b	#$70,d0
+		bne.s	locret_1BBB4		; if not, branch to return
+		btst	#7,$22(a0)		; did Sonic jump or is he just falling or hit by a bumper?
+		beq.s	locret_1BBB4		; if not, branch to return
+		move.b	(SpecialStage_angle).w,d0	; get SS angle
+		andi.b	#$FC,d0
+		neg.b	d0
+		subi.b	#$40,d0
+		jsr	(CalcSine).l
+		move.w	$12(a0),d2		; get Y speed
+		muls.w	d2,d0			; multiply Y speed by sin
+		asr.l	#8,d0			; find the new Y speed
+		move.w	$10(a0),d2		; get X speed
+		muls.w	d2,d1			; multiply X speed by cos
+		asr.l	#8,d1			; find the new X speed
+		add.w	d0,d1			; combine the two speeds
+		cmpi.w	#$400,d1		; compare the combined speed with the jump release speed
+		ble.s	locret_1BBB4		; if it's less, branch to return
+		move.b	(SpecialStage_angle).w,d0
+		andi.b	#$FC,d0
+		neg.b	d0
+		subi.b	#$40,d0
+		jsr	(CalcSine).l
+		muls.w	#$400,d1
+		asr.l	#8,d1
+		move.w	d1,$10(a0)
+		muls.w	#$400,d0
+		asr.l	#8,d0
+		move.w	d0,$12(a0)		; set the speed to the jump release speed
+		bclr	#7,$22(a0)		; clear "Sonic has jumped" flag
+
+locret_1BBB4:
 		rts
-;===============================================================================
-; Sub Routine SonicInSS_Null
-; [ End ]
-;===============================================================================
+; ---------------------------------------------------------------------------
+; Subroutine to	fix the	camera on Sonic's position (special stage)
+; ---------------------------------------------------------------------------
 
-		move.w	#$FC00, D1
-		cmp.w	$0012(A0), D1
-		ble.s	loc_21F74
-		move.b	(Ctrl_1_Held_Logical).w, D0
-		andi.b	#$70, D0
-		bne.s	loc_21F74
-		move.w	D1, $0012(A0)
-loc_21F74:
-		rts
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
 
-;===============================================================================
-; Sub Routine S1SS_FixCamera
-; [ Begin ]
-;===============================================================================
-S1SS_FixCamera: ; loc_21F76:
-		move.w	$000C(A0), D2
-		move.w	$0008(A0), D3
-		move.w	(Camera_X_pos).w, D0
-		subi.w	#$00A0, D3
+
+S1SS_FixCamera:
+		move.w	$C(a0),d2
+		move.w	$8(a0),d3
+		move.w	(Camera_X_pos).w,d0
+		subi.w	#$A0,d3
 		bcs.s	loc_21F8E
-		sub.w	D3, D0
-		sub.w	D0, (Camera_X_pos).w
+		sub.w	d3,d0
+		sub.w	d0,(Camera_X_pos).w
+
 loc_21F8E:
-		move.w	(Camera_Y_pos).w, D0
-		subi.w	#$0070, D2
+		move.w	(Camera_Y_pos).w,d0
+		subi.w	#$70,d2
 		bcs.s	loc_21F9E
-		sub.w	D2, D0
-		sub.w	D0, (Camera_Y_pos).w
+		sub.w	d2,d0
+		sub.w	d0,(Camera_Y_pos).w
+
 loc_21F9E:
 		rts
-;===============================================================================
-; Sub Routine S1SS_FixCamera
-; [ End ]
-;===============================================================================
-loc_21FA0:
-		addi.w	#$0040, (SpecialStage_speed).w
-		cmpi.w	#$1800, (SpecialStage_speed).w
-		bne.s	loc_21FB4
-		move.b	#GameModeID_Level, (Game_Mode).w
-loc_21FB4:
-		cmpi.w	#$3000, (SpecialStage_speed).w
-		blt.s	loc_21FD2
-		move.w	#$0000, (SpecialStage_speed).w
-		move.w	#$4000, (SpecialStage_angle).w
-		addq.b	#$02, $0024(A0)
-		move.w	#$003C, $0038(A0)
-loc_21FD2:
-		move.w	(SpecialStage_angle).w, D0
-		add.w	(SpecialStage_speed).w, D0
-		move.w	D0, (SpecialStage_angle).w
-		jsr	Sonic_Animate		; (loc_10AB2)
-		jsr	LoadSonicDynPLC  ; (loc_10DDC)
-		bsr.w	  S1SS_FixCamera	  ; loc_21F76
-		jmp	DisplaySprite		; (loc_D3C2)
-loc_21FF4:
-		subq.w	#$01, $0038(A0)
-		bne.s	loc_22000
-		move.b	#GameModeID_Level, (Game_Mode).w
-loc_22000:
-		jsr	Sonic_Animate		; (loc_10AB2)
-		jsr	LoadSonicDynPLC  ; (loc_10DDC)
-		bsr.w	  S1SS_FixCamera	  ; loc_21F76
-		jmp	DisplaySprite		; (loc_D3C2)
+; End of function S1SS_FixCamera
 
-;===============================================================================
-; Sub Routine SonicInSS_Fall
-; [ Begin ]
-;===============================================================================
+; ===========================================================================
+
+SonicInSS_ExitStage:
+		addi.w	#$40,(SpecialStage_speed).w
+		cmpi.w	#$1800,(SpecialStage_speed).w
+		bne.s	loc_21FB4
+		move.b	#GameModeID_Level,(Game_Mode).w
+
+loc_21FB4:
+		cmpi.w	#$3000,(SpecialStage_speed).w
+		blt.s	loc_21FD2
+		move.w	#0,(SpecialStage_speed).w
+		move.w	#$4000,(SpecialStage_angle).w
+		addq.b	#2,$24(a0)
+		move.w	#$3C,$38(a0)
+
+loc_21FD2:
+		move.w	(SpecialStage_angle).w,d0
+		add.w	(SpecialStage_speed).w,d0
+		move.w	d0,(SpecialStage_angle).w
+		jsr	(Sonic_Animate).l
+		jsr	(LoadSonicDynPLC).l
+		bsr.s	S1SS_FixCamera
+		jmp	(DisplaySprite).l
+; ===========================================================================
+
+SonicInSS_Exit2:
+		subq.w	#1,$38(a0)
+		bne.s	loc_22000
+		move.b	#GameModeID_Level,(Game_Mode).w
+
+loc_22000:
+		jsr	(Sonic_Animate).l
+		jsr	(LoadSonicDynPLC).l
+		bsr.w	S1SS_FixCamera
+		jmp	(DisplaySprite).l
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
 SonicInSS_Fall: ; loc_22016:
-		move.l	$000C(A0), D2
-		move.l	$0008(A0), D3
-		move.b	(SpecialStage_angle).w, D0
-		andi.b	#$FC, D0
-		jsr    ( CalcSine).l		; loc_320A
-		move.w	$0010(A0), D4
-		ext.l	D4
-		asl.l	#$08, D4
-		muls.w	#$002A, D0
-		add.l	D4, D0
-		move.w	$0012(A0), D4
-		ext.l	D4
-		asl.l	#$08, D4
-		muls.w	#$002A, D1
-		add.l	D4, D1
-		add.l	D0, D3
-		bsr.w	  loc_220A8
+		move.l	$C(a0),d2
+		move.l	$8(a0),d3
+		move.b	(SpecialStage_angle).w,d0
+		andi.b	#$FC,d0
+		jsr	(CalcSine).l
+		move.w	$10(a0),d4
+		ext.l	d4
+		asl.l	#8,d4
+		muls.w	#$2A,d0
+		add.l	d4,d0
+		move.w	$12(a0),d4
+		ext.l	d4
+		asl.l	#8,d4
+		muls.w	#$2A,d1
+		add.l	d4,d1
+		add.l	d0,d3
+		bsr.w	loc_220A8
 		beq.s	loc_22070
-		sub.l	D0, D3
-		moveq	#$00, D0
-		move.w	D0, $0010(A0)
-		bclr	#$01, $0022(A0)
-		add.l	D1, D2
-		bsr.w	  loc_220A8
+		sub.l	d0,d3
+		moveq	#0,d0
+		move.w	d0,$10(a0)
+		bclr	#1,$22(a0)
+		add.l	d1,d2
+		bsr.w	loc_220A8
 		beq.s	loc_22086
-		sub.l	D1, D2
-		moveq	#$00, D1
-		move.w	D1, $0012(A0)
+		sub.l	d1,d2
+		moveq	#0,d1
+		move.w	d1,$12(a0)
 		rts
+; ===========================================================================
+
 loc_22070:
-		add.l	D1, D2
-		bsr.w	  loc_220A8
+		add.l	d1,d2
+		bsr.w	loc_220A8
 		beq.s	loc_22094
-		sub.l	D1, D2
-		moveq	#$00, D1
-		move.w	D1, $0012(A0)
-		bclr	#$01, $0022(A0)
+		sub.l	d1,d2
+		moveq	#0,d1
+		move.w	d1,$12(a0)
+		bclr	#1,$22(a0)
+
 loc_22086:
-		asr.l	#$08, D0
-		asr.l	#$08, D1
-		move.w	D0, $0010(A0)
-		move.w	D1, $0012(A0)
+		asr.l	#8,d0
+		asr.l	#8,d1
+		move.w	d0,$10(a0)
+		move.w	d1,$12(a0)
 		rts
+
 loc_22094:
-		asr.l	#$08, D0
-		asr.l	#$08, D1
-		move.w	D0, $0010(A0)
-		move.w	D1, $0012(A0)
-		bset	#$01, $0022(A0)
+		asr.l	#8,d0
+		asr.l	#8,d1
+		move.w	d0,$10(a0)
+		move.w	d1,$12(a0)
+		bset	#1,$22(a0)
 		rts
-;===============================================================================
-; Sub Routine SonicInSS_Fall
-; [ End ]
-;===============================================================================
+; End of function SonicInSS_Fall
+
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
 
 loc_220A8:
-		lea	(Chunk_Table), A1
-		moveq	#$00, D4
-		swap  D2
-		move.w	D2, D4
-		swap  D2
-		addi.w	#$0044, D4
-		divu.w	#$0018, D4
-		mulu.w	#$0080, D4
-		adda.l	D4, A1
-		moveq	#$00, D4
-		swap  D3
-		move.w	D3, D4
-		swap  D3
-		addi.w	#$0014, D4
-		divu.w	#$0018, D4
-		adda.w	D4, A1
-		moveq	#$00, D5
-		move.b	(A1)+, D4
-		bsr.s	loc_220F0
-		move.b	(A1)+, D4
-		bsr.s	loc_220F0
-		adda.w	#$007E, A1
-		move.b	(A1)+, D4
-		bsr.s	loc_220F0
-		move.b	(A1)+, D4
-		bsr.s	loc_220F0
-		tst.b	D5
-		rts
-loc_220F0:
-		beq.s	loc_22104
-		cmpi.b	#$28, D4
-		beq.s	loc_22104
-		cmpi.b	#$3A, D4
-		bcs.s	loc_22106
-		cmpi.b	#$4B, D4
-		bcc.s	loc_22106
-loc_22104:
-		rts
-loc_22106:
-		move.b	D4, $0030(A0)
-		move.l	A1, $0032(A0)
-		moveq	#-1, D5
-		rts
+		lea	(Chunk_Table),a1
+		moveq	#0,d4
+		swap	d2
+		move.w	d2,d4
+		swap	d2
+		addi.w	#$44,d4
+		divu.w	#$18,d4
+		mulu.w	#$80,d4
+		adda.l	d4,a1
+		moveq	#0,d4
+		swap	d3
+		move.w	d3,d4
+		swap	d3
+		addi.w	#$14,d4
+		divu.w	#$18,d4
+		adda.w	d4,a1
+		moveq	#0,d5
+		move.b	(a1)+,d4
+		bsr.s	sub_1BD30
+		move.b	(a1)+,d4
+		bsr.s	sub_1BD30
+		adda.w	#$7E,a1
+		move.b	(a1)+,d4
+		bsr.s	sub_1BD30
+		move.b	(a1)+,d4
+		bsr.s	sub_1BD30
+		tst.b	d5
+		rts	
+; End of function sub_1BCE8
 
-;===============================================================================
-; Sub Routine SonicInSS_ChkItems
-; [ Begin ]
-;===============================================================================
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+sub_1BD30:
+		beq.s	locret_1BD44
+		cmpi.b	#$28,d4
+		beq.s	locret_1BD44
+		cmpi.b	#$3A,d4
+		bcs.s	loc_1BD46
+		cmpi.b	#$4B,d4
+		bcc.s	loc_1BD46
+
+locret_1BD44:
+		rts	
+; ===========================================================================
+
+loc_1BD46:
+		move.b	d4,$30(a0)
+		move.l	a1,$32(a0)
+		moveq	#-1,d5
+		rts	
+; End of function sub_1BD30
+
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
 SonicInSS_ChkItems: ; loc_22112:
-		lea	(Chunk_Table), A1
-		moveq	#$00, D4
-		move.w	$000C(A0), D4
-		addi.w	#$0050, D4
-		divu.w	#$0018, D4
-		mulu.w	#$0080, D4
-		adda.l	D4, A1
-		moveq	#$00, D4
-		move.w	$0008(A0), D4
-		addi.w	#$0020, D4
-		divu.w	#$0018, D4
-		adda.w	D4, A1
-		move.b	(A1), D4
-		bne.s	loc_2214C
-		tst.b	$003A(A0)
-		bne.w	 loc_2221C
-		moveq	#$00, D4
+		lea	(Chunk_Table),a1
+		moveq	#$00,d4
+		move.w	$C(a0),d4
+		addi.w	#$50,d4
+		divu.w	#$18,d4
+		mulu.w	#$80,d4
+		adda.l	d4,a1
+		moveq	#0,d4
+		move.w	$8(a0),d4
+		addi.w	#$20,d4
+		divu.w	#$18,d4
+		adda.w	d4,a1
+		move.b	(a1),d4
+		bne.s	SonicInSS_ChkCont
+		tst.b	$3A(a0)
+		bne.w	 SonicInSS_MakeGhostSolid
+		moveq	#0,d4
 		rts
-loc_2214C:
-		cmpi.b	#$3A, D4
-		bne.s	loc_22188
-		bsr.w	  loc_21874
-		bne.s	loc_22160
-		move.b	#$01, (A2)
-		move.l	A1, $0004(A2)
-loc_22160:
+; ===========================================================================
+
+SonicInSS_ChkCont:
+		cmpi.b	#$3A,d4		; is the item a	ring?
+		bne.s	SonicInSS_Chk1Up
+		bsr.w	S1SS_RemoveCollectedItem
+		bne.s	SonicInSS_GetCont
+		move.b	#1,(a2)
+		move.l	a1,4(a2)
+
+SonicInSS_GetCont:
 		jsr	(CollectRing)
-		cmpi.w	#$0032, (Ring_count).w
-		bcs.s	loc_22184
-		bset	#$00, (Extra_life_flags).w
-		bne.s	loc_22184
-		addq.b	#$01, (Continue_count).w
-		move.w	#$00BF, D0
-		jsr	(PlayMusic).l		 ; loc_14C0
-loc_22184:
-		moveq	#$00, D4
-		rts
-loc_22188:
-		cmpi.b	#$28, D4
-		bne.s	loc_221B2
-		bsr.w	  loc_21874
-		bne.s	loc_2219C
-		move.b	#$03, (A2)
-		move.l	A1, $0004(A2)
-loc_2219C:
-		addq.b	#$01, (Life_count).w
-		addq.b	#$01, (Update_HUD_lives).w
-		move.w	#S1MusID_ExtraLife, D0
-		jsr	(PlayMusic).l		 ; loc_14C0
-		moveq	#$00, D4
-		rts
-loc_221B2:
-		cmpi.b	#$3B, D4
-		bcs.s	loc_221F8
-		cmpi.b	#$40, D4
-		bhi.s	loc_221F8
-		bsr.w	  loc_21874
-		bne.s	loc_221CC
-		move.b	#$05, (A2)
-		move.l	A1, $0004(A2)
-loc_221CC:
-		cmpi.b	#$06, (Emerald_count).w
-		beq.s	loc_221EA
-		subi.b	#$3B, D4
-		moveq	#$00, D0
-		move.b	(Emerald_count).w, D0
-		lea	(Got_Emeralds_array).w, A2
-		move.b	D4, $00(A2, D0)
-		addq.b	#$01, (Emerald_count).w
-loc_221EA:
-		move.w	#S1MusID_Emerald, D0
-		jsr	(PlaySound).l		  ; loc_14C6
-		moveq	#$00, D4
-		rts
-loc_221F8:
-		cmpi.b	#$41, D4
-		bne.s	loc_22204
-		move.b	#$01, $003A(A0)
-loc_22204:
-		cmpi.b	#$4A, D4
-		bne.s	loc_22218
-		cmpi.b	#$01, $003A(A0)
-		bne.s	loc_22218
-		move.b	#$02, $003A(A0)
-loc_22218:
-		moveq	#-1, D4
-		rts
-loc_2221C:
-		cmpi.b	#$02, $003A(A0)
-		bne.s	loc_22246
-		lea	(Chunk_Table+$1020), A1
-		moveq	#$3F, D1
-loc_2222C:
-		moveq	#$3F, D2
-loc_2222E:
-		cmpi.b	#$41, (A1)
-		bne.s	loc_22238
-		move.b	#$2C, (A1)
-loc_22238:
-		addq.w	#$01, A1
-		dbf    D2, loc_2222E
-		lea	$0040(A1), A1
-		dbf    D1, loc_2222C
-loc_22246:
-		clr.b	$003A(A0)
-		moveq	#$00, D4
-		rts
-;===============================================================================
-; Sub Routine SonicInSS_ChkItems
-; [ End ]
-;===============================================================================
+		cmpi.w	#50,(Ring_count).w	; check if you have 50 rings
+		bcs.s	SonicInSS_NoCont
+		bset	#0,(Extra_life_flags).w
+		bne.s	SonicInSS_NoCont
+		addq.b	#1,(Continue_count).w ; add 1 to number of continues
+		move.w	#$BF,d0
+		jsr	(PlaySound).l	; play extra continue sound
 
-;===============================================================================
-; Sub Routine SonicInSS_ChkItems2
-; [ Begin ]
-;===============================================================================
-SonicInSS_ChkItems2: ; loc_2224E:
-		move.b	$0030(A0), D0
-		bne.s	loc_2226E
-		subq.b	#$01, $0036(A0)
+SonicInSS_NoCont:
+		moveq	#0,d4
+		rts
+; ===========================================================================
+
+SonicInSS_Chk1Up:
+		cmpi.b	#$28,d4		; is the item an extra life?
+		bne.s	SonicInSS_ChkEmer
+		bsr.w	S1SS_RemoveCollectedItem
+		bne.s	SonicInSS_Get1Up
+		move.b	#$03,(a2)
+		move.l	a1,4(a2)
+
+SonicInSS_Get1Up:
+		addq.b	#1,(Life_count).w	; add 1 to number of lives
+		addq.b	#1,(Update_HUD_lives).w ; update the lives counter
+		move.w	#MusID_ExtraLife,d0
+		jsr	(PlaySound).l	; play extra life music
+		moveq	#0,d4
+		rts
+; ===========================================================================
+
+SonicInSS_ChkEmer:
+		cmpi.b	#$3B,d4		; is the item an emerald?
+		bcs.s	SonicInSS_ChkGhost
+		cmpi.b	#$40,d4
+		bhi.s	SonicInSS_ChkGhost
+		bsr.w	S1SS_RemoveCollectedItem
+		bne.s	SonicInSS_GetEmer
+		move.b	#5,(a2)
+		move.l	a1,4(a2)
+
+SonicInSS_GetEmer:
+		cmpi.b	#6,(Emerald_count).w; do you have all the emeralds?
+		beq.s	SonicInSS_NoEmer
+		subi.b	#$3B,d4
+		moveq	#0,d0
+		move.b	(Emerald_count).w,d0
+		lea	(Got_Emeralds_array).w,a2
+		move.b	d4,(a2,d0.w)
+		addq.b	#1,(Emerald_count).w ; add 1 to number of emeralds
+
+SonicInSS_NoEmer:
+		move.w	#$9D,d0
+		jsr	(PlayMusic).l ;	play emerald music
+		moveq	#0,d4
+		rts
+; ===========================================================================
+
+SonicInSS_ChkGhost:
+		cmpi.b	#$41,d4		; is the item a	ghost block?
+		bne.s	SonicInSS_ChkGhostTag
+		move.b	#1,$3A(a0)	; mark the ghost block as "passed"
+
+SonicInSS_ChkGhostTag:
+		cmpi.b	#$4A,d4		; is the item a	switch for ghost blocks?
+		bne.s	SonicInSS_NoGhost	; if not, branch
+		cmpi.b	#1, $3A(a0)	; have the ghost blocks	been passed?
+		bne.s	SonicInSS_NoGhost	; if not, branch
+		move.b	#2,$3A(a0)	; mark the ghost blocks	as "solid"
+
+SonicInSS_NoGhost:
+		moveq	#-1,d4
+		rts
+; ===========================================================================
+
+SonicInSS_MakeGhostSolid:
+		cmpi.b	#2,$3A(a0)	; is the ghost marked as "solid"?
+		bne.s	SonicInSS_GhostNotSolid ; if not, branch
+		lea	(Chunk_Table+$1020),a1
+		moveq	#$3F,d1
+
+SonicInSS_GhostLoop2:
+		moveq	#$3F,d2
+
+SonicInSS_GhostLoop:
+		cmpi.b	#$41,(a1)	; is the item a	ghost block?
+		bne.s	SonicInSS_NoReplace	; if not, branch
+		move.b	#$2C,(a1)	; replace ghost	block with a solid block
+
+SonicInSS_NoReplace:
+		addq.w	#1,a1
+		dbf	d2,SonicInSS_GhostLoop
+		lea	$40(a1),a1
+		dbf	d1,SonicInSS_GhostLoop2
+
+SonicInSS_GhostNotSolid:
+		clr.b	$3A(a0)
+		moveq	#0,d4
+		rts
+; End of function SonicInSS_ChkItems
+
+
+; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
+
+
+SonicInSS_ChkItems2:
+		move.b	$30(a0),d0
+		bne.s	SonicInSS_ChkBumper
+		subq.b	#1,$36(a0)
 		bpl.s	loc_22260
-		move.b	#$00, $0036(A0)
-loc_22260:
-		subq.b	#$01, $0037(A0)
-		bpl.s	loc_2226C
-		move.b	#$00, $0037(A0)
-loc_2226C:
-		rts
-loc_2226E:
-		cmpi.b	#$25, D0
-		bne.s	loc_222E6
-		move.l	$0032(A0), D1
-		subi.l	#$FFFF0001, D1
-		move.w	D1, D2
-		andi.w	#$007F, D1
-		mulu.w	#$0018, D1
-		subi.w	#$0014, D1
-		lsr.w	#$07, D2
-		andi.w	#$007F, D2
-		mulu.w	#$0018, D2
-		subi.w	#$0044, D2
-		sub.w	$0008(A0), D1
-		sub.w	$000C(A0), D2
-		jsr    ( CalcAngle).l		   ; loc_34A2
-		jsr    ( CalcSine).l		; loc_320A
-		muls.w	#$F900, D1
-		asr.l	#$08, D1
-		move.w	D1, $0010(A0)
-		muls.w	#$F900, D0
-		asr.l	#$08, D0
-		move.w	D0, $0012(A0)
-		bset	#$01, $0022(A0)
-		bsr.w	  loc_21874
-		bne.s	loc_222DC
-		move.b	#$02, (A2)
-		move.l	$0032(A0), D0
-		subq.l	#$01, D0
-		move.l	D0, $0004(A2)
-loc_222DC:
-		move.w	#$00B4, D0
-		jmp	(PlaySound).l		  ; loc_14C6
-loc_222E6:
-		cmpi.b	#$27, D0
-		bne.s	loc_222FC
-		addq.b	#$02, $0024(A0)
-		move.w	#$00A8, D0
-		jsr	(PlaySound).l		  ; loc_14C6
-		rts
-loc_222FC:
-		cmpi.b	#$29, D0
-		bne.s	loc_22330
-		tst.b	$0036(A0)
-		bne.w	 loc_223E0
-		move.b	#$1E, $0036(A0)
-		btst	#$06, (SpecialStage_direction).w
-		beq.s	loc_22326
-		asl.w	(SpecialStage_speed).w
-		move.l	$0032(A0), A1
-		subq.l	#$01, A1
-		move.b	#$2A, (A1)
-loc_22326:
-		move.w	#$00A9, D0
-		jmp	(PlaySound).l		  ; loc_14C6
-loc_22330:
-		cmpi.b	#$2A, D0
-		bne.s	loc_22364
-		tst.b	$0036(A0)
-		bne.w	 loc_223E0
-		move.b	#$1E, $0036(A0)
-		btst	#$06, (SpecialStage_direction).w
-		bne.s	loc_2235A
-		asr.w	(SpecialStage_speed).w
-		move.l	$0032(A0), A1
-		subq.l	#$01, A1
-		move.b	#$29, (A1)
-loc_2235A:
-		move.w	#$00A9, D0
-		jmp	(PlaySound).l		  ; loc_14C6
-loc_22364:
-		cmpi.b	#$2B, D0
-		bne.s	loc_2239A
-		tst.b	$0037(A0)
-		bne.w	 loc_223E0
-		move.b	#$1E, $0037(A0)
-		bsr.w	  loc_21874
-		bne.s	loc_2238C
-		move.b	#$04, (A2)
-		move.l	$0032(A0), D0
-		subq.l	#$01, D0
-		move.l	D0, $0004(A2)
-loc_2238C:
-		neg.w	(SpecialStage_speed).w
-		move.w	#$00A9, D0
-		jmp	(PlaySound).l		  ; loc_14C6
-loc_2239A:
-		cmpi.b	#$2D, D0
-		beq.s	loc_223B2
-		cmpi.b	#$2E, D0
-		beq.s	loc_223B2
-		cmpi.b	#$2F, D0
-		beq.s	loc_223B2
-		cmpi.b	#$30, D0
-		bne.s	loc_223E0
-loc_223B2:
-		bsr.w	  loc_21874
-		bne.s	loc_223D6
-		move.b	#$06, (A2)
-		move.l	$0032(A0), A1
-		subq.l	#$01, A1
-		move.l	A1, $0004(A2)
-		move.b	(A1), D0
-		addq.b	#$01, D0
-		cmpi.b	#$30, D0
-		bls.s	loc_223D2
-		clr.b	D0
-loc_223D2:
-		move.b	D0, $0004(A2)
-loc_223D6:
-		move.w	#$00BA, D0
-		jmp	(PlaySound).l		  ; loc_14C6
-loc_223E0:
-		rts
-;===============================================================================
-; Sub Routine SonicInSS_ChkItems2
-; [ Begin ]
-;===============================================================================
+		move.b	#0,$36(a0)
 
-;===============================================================================
-; Object 0x09 - Sonic In Special Stage
-; [ End ]
-;===============================================================================
+loc_22260:
+		subq.b	#1,$37(a0)
+		bpl.s	locret_2226C
+		move.b	#0,$37(a0)
+
+locret_2226C:
+		rts
+; ===========================================================================
+
+SonicInSS_ChkBumper:
+		cmpi.b	#$25,d0		; is the item a	bumper?
+		bne.s	SonicInSS_GOAL
+		move.l	$32(a0),d1
+		subi.l	#$FF0001,d1
+		move.w	d1,d2
+		andi.w	#$7F,d1
+		mulu.w	#$18,d1
+		subi.w	#$14,d1
+		lsr.w	#7,d2
+		andi.w	#$7F,d2
+		mulu.w	#$18,d2
+		subi.w	#$44,d2
+		sub.w	$8(a0),d1
+		sub.w	$C(a0),d2
+		jsr	(CalcAngle).l
+		jsr	(CalcSine).l
+		muls.w	#-$700,d1
+		asr.l	#8,d1
+		move.w	D1,$10(a0)
+		muls.w	#-$700,d0
+		asr.l	#8,d0
+		move.w	d0,$12(a0)
+		bset	#1,$22(a0)
+		bclr	#7,$22(a0)	; clear "Sonic has jumped" flag
+		bsr.w	S1SS_RemoveCollectedItem
+		bne.s	SonicInSS_BumpSnd
+		move.b	#2,(a2)
+		move.l	$32(a0),d0
+		subq.l	#1,d0
+		move.l	d0,4(a2)
+
+SonicInSS_BumpSnd:
+		move.w	#$B4,d0
+		jmp	(PlaySound).l	; play bumper sound
+; ===========================================================================
+
+SonicInSS_GOAL:
+		cmpi.b	#$27,d0		; is the item a	"GOAL"?
+		bne.s	SonicInSS_UPblock
+		addq.b	#2,$24(a0) ; run routine "SonicInSS_ExitStage"
+		move.w	#$A8,d0
+		jmp	(PlaySound).l	; play "GOAL" sound
+; ===========================================================================
+
+SonicInSS_UPblock:
+		cmpi.b	#$29,d0		; is the item an "UP" block?
+		bne.s	SonicInSS_DOWNblock
+		tst.b	$36(a0)
+		bne.w	SonicInSS_NoGlass
+		move.b	#$1E,$36(a0)
+		btst	#6,(SpecialStage_direction).w
+		beq.s	SonicInSS_UPsnd
+		asl.w	(SpecialStage_speed).w	; increase stage rotation speed
+		movea.l	$32(a0),a1
+		subq.l	#1,a1
+		move.b	#$2A,(a1)	; change item to a "DOWN" block
+
+SonicInSS_UPsnd:
+		move.w	#$A9,d0
+		jmp	(PlaySound).l
+; ===========================================================================
+
+SonicInSS_DOWNblock:
+		cmpi.b	#$2A,d0		; is the item a	"DOWN" block?
+		bne.s	SonicInSS_Rblock
+		tst.b	$36(a0)
+		bne.w	 SonicInSS_NoGlass
+		move.b	#$1E,$36(a0)
+		btst	#6,(SpecialStage_direction).w
+		bne.s	loc_2235A
+		asr.w	(SpecialStage_speed).w	; reduce stage rotation speed
+		movea.l	$32(a0),a1
+		subq.l	#1,a1
+		move.b	#$29,(a1)	; change item to an "UP" block
+
+loc_2235A:
+		move.w	#$A9,d0
+		jmp	(PlaySound).l	; play up/down sound
+; ===========================================================================
+
+SonicInSS_Rblock:
+		cmpi.b	#$2B,d0		; is the item an "R" block?
+		bne.s	SonicInSS_ChkGlass
+		tst.b	$37(a0)
+		bne.w	SonicInSS_NoGlass
+		move.b	#$1E,$37(a0)
+		bsr.w	S1SS_RemoveCollectedItem
+		bne.s	SonicInSS_RevStage
+		move.b	#4,(a2)
+		move.l	$32(a0),d0
+		subq.l	#1,d0
+		move.l	d0,4(a2)
+
+SonicInSS_RevStage:
+		neg.w	(SpecialStage_speed).w	; reverse stage rotation
+		move.w	#$A9,d0
+		jmp	(PlaySound).l
+; ===========================================================================
+
+SonicInSS_ChkGlass:
+		cmpi.b	#$2D,d0		; is the item a	glass block?
+		beq.s	SonicInSS_Glass	; if yes, branch
+		cmpi.b	#$2E,d0
+		beq.s	SonicInSS_Glass
+		cmpi.b	#$2F,d0
+		beq.s	SonicInSS_Glass
+		cmpi.b	#$30,d0
+		bne.s	SonicInSS_NoGlass	; if not, branch
+
+SonicInSS_Glass:
+		bsr.w	S1SS_RemoveCollectedItem
+		bne.s	SonicInSS_GlassSnd
+		move.b	#6,(a2)
+		move.l	$32(a0),a1
+		subq.l	#1,a1
+		move.l	a1,$4(a2)
+		move.b	(a1),d0
+		addq.b	#1,d0		; change glass type when touched
+		cmpi.b	#$30,d0
+		bls.s	SonicInSS_GlassUpdate ; if glass is	still there, branch
+		clr.b	d0		; remove the glass block when it's destroyed
+
+SonicInSS_GlassUpdate:
+		move.b	d0,$4(a2)	; update the stage layout
+
+SonicInSS_GlassSnd:
+		move.w	#$BA,d0
+		jmp	(PlaySound).l	; play glass block sound
+
+SonicInSS_NoGlass:
+		rts
+; End of function SonicInSS_ChkItems2
 
 ;===============================================================================
 ; Object 0x10
 ; [ Begin ]
 ;===============================================================================
 Obj_0x10:
-loc_223E2:
 		rts
 ;===============================================================================
 ; Object 0x10
 ; [ End ]
 ;===============================================================================
-J_Adjust2PArtPointer_26: ; loc_223E4:
-		jmp	Adjust2PArtPointer     ; (loc_DC30)
-		dc.w	$0000		   ; Filler
-
 
 Dynamic_Art_Cues: ; loc_223EC: ; Dynamic reload sprites routine
-		moveq	#$00, D0
-		move.b	(Current_Zone).w, D0
-		add.w	D0, D0
-		add.w	D0, D0
-		move.w	off_22408+2(PC, D0), D1
-		lea	off_22408(PC, D1), A2
-		move.w	off_22408(PC, D0), D0
-		jmp	off_22408(PC, D0)
+		moveq	#0,d0
+		move.b	(Current_Zone).w,d0
+		add.w	d0,d0
+		add.w	d0,d0
+		move.w	off_22408+2(PC,d0),d1
+		lea	off_22408(PC,d1),a2
+		move.w	off_22408(PC,d0),d0
+		jmp	off_22408(PC,d0)
 		rts
 ; ---------------------------------------------------------------------------
 ; ZONE ANIMATION PROCEDURES AND SCRIPTS
@@ -40000,14 +40783,14 @@ loc_2298A:
 		rts
 ; off_229A2:
 Map16Delta_Index: zoneOrderedOffsetTable 2,1
-	zoneOffsetTableEntry.w Map16Delta_GHz  ; loc_229C4 - Green Hill 16x16 mappings
+	zoneOffsetTableEntry.w Map16Delta_EHZ  ; loc_229C4 - Emerald Hill 16x16 mappings
 	zoneOffsetTableEntry.w Map16Delta_Null ; loc_22D60 - Null
 	zoneOffsetTableEntry.w Map16Delta_Null ; loc_22D60 - Wood (Null)
 	zoneOffsetTableEntry.w Map16Delta_Null ; loc_22D60 - Null
 	zoneOffsetTableEntry.w Map16Delta_Mz   ; loc_22A40 - Metropolis 16x16 mappings
 	zoneOffsetTableEntry.w Map16Delta_Mz   ; loc_22A40 - Metropolis 16x16 mappings
 	zoneOffsetTableEntry.w Map16Delta_Null ; loc_22D60 - Null
-	zoneOffsetTableEntry.w Map16Delta_GHz  ; loc_229C4 - Hill Top 16x16 mappings
+	zoneOffsetTableEntry.w Map16Delta_EHZ  ; loc_229C4 - Hill Top 16x16 mappings
 	zoneOffsetTableEntry.w Map16Delta_HPz  ; loc_22B14 - Hidden Palace 16x16 mappings
 	zoneOffsetTableEntry.w Map16Delta_Null ; loc_22D60 - Null
 	zoneOffsetTableEntry.w Map16Delta_OOz  ; loc_22C08 - Oil Ocean 16x16 mappings
@@ -40022,7 +40805,7 @@ Map16Delta_Index: zoneOrderedOffsetTable 2,1
 ; Green Hill Mappings 16x16 Delta
 ; [ Begin ]
 ;===============================================================================
-Map16Delta_GHz: ; loc_229C4: ; Green Hill / Hill Top 16x16 mappings used by dynamic reload sprites...
+Map16Delta_EHZ: ; loc_229C4: ; Green Hill / Hill Top 16x16 mappings used by dynamic reload sprites...
 		dc.w	$1788 ; Ram Address to start loading ($1788+$FFFF9000)	    -> adda.w  (A0)+, A1
 		dc.w	$003B ; Number of words to load in Ram Array ($0000..$003B) -> move.w  (A0)+, D1
 		dc.w	$4500, $4504, $4501, $4505, $4508, $450C, $4509, $450D
@@ -40911,7 +41694,7 @@ loc_23D9E:
 		rts
 ; off_23DBE:
 Debug_Index: zoneOrderedOffsetTable 2,1
-	zoneOffsetTableEntry.w Debug_GHz   ; Green Hill
+	zoneOffsetTableEntry.w Debug_EHZ   ; Green Hill
 	zoneOffsetTableEntry.w Debug_Null  ; Null
 	zoneOffsetTableEntry.w Debug_Null  ; Wood
 	zoneOffsetTableEntry.w Debug_Null  ; Null
@@ -40936,7 +41719,7 @@ Debug_Null: ; loc_23DE0:  ; Null
 		dc.b	$00, $00, $26, $BC
 		dc.l	($26<<$18)|Obj26_MapUnc_B6D2	       ; loc_B6D2
 		dc.b	$00, $00, $06, $80
-Debug_GHz: ; loc_23DF2:  ; Green Hill
+Debug_EHZ: ; loc_23DF2:  ; Green Hill
 		dc.w	$0012
 		dc.l	($25<<$18)|Obj25_MapUnc_B036		  ; loc_B036
 		dc.b	$00, $00, $26, $BC
@@ -40952,9 +41735,9 @@ Debug_GHz: ; loc_23DF2:  ; Green Hill
 		dc.b	$02, $03, $23, $AE
 		dc.l	($49<<$18)|Obj49_MapUnc_15404	       ; loc_15404
 		dc.b	$04, $05, $23, $AE
-		dc.l	($18<<$18)|Obj18_MapUnc_9078	   ; loc_9078
+		dc.l	($18<<$18)|Ghz_Platform_Mappings	   ; loc_9078
 		dc.b	$01, $00, $40, $00
-		dc.l	($18<<$18)|Obj18_MapUnc_9078	   ; loc_9078
+		dc.l	($18<<$18)|Ghz_Platform_Mappings	   ; loc_9078
 		dc.b	$9A, $01, $40, $00
 		dc.l	($36<<$18)|Obj36_MapUnc_CAB0		  ; loc_CBA0
 		dc.b	$00, $00, $24, $34
@@ -41014,7 +41797,7 @@ Debug_Mz: ; loc_23ECC:	; Metropolis
 		dc.b	$13, $01, $60, $00
 		dc.l	($47<<$18)|Obj47_MapUnc_18E3E		  ; loc_18E3E
 		dc.b	$00, $02, $04, $24
-		dc.l	($2D<<$18)|Obj2D_MapUnc_9E1E	 ; loc_9E1E
+		dc.l	($2D<<$18)|Automatic_Door_Mappings	 ; loc_9E1E
 		dc.b	$01, $01, $60, $00
 		dc.l	($66<<$18)|Obj66_MapUnc_1B084	     ; loc_1B084
 		dc.b	$01, $00, $86, $80
@@ -41040,7 +41823,7 @@ Debug_Mz: ; loc_23ECC:	; Metropolis
 		dc.b	$00, $00, $65, $3F
 		dc.l	($70<<$18)|Obj70_MapUnc_1CA16	  ; loc_1CA16
 		dc.b	$10, $00, $E3, $78
-		dc.l	($71<<$18)|Obj71_MapUnc_9BBE	    ; loc_9BBE
+		dc.l	($71<<$18)|Lava_Bubble_Mappings	    ; loc_9BBE
 		dc.b	$22, $05, $45, $36
 		dc.l	($1C<<$18)|Obj1C_MapUnc_9B9A
 		dc.b	$00, $00, $43, $FD
@@ -41060,15 +41843,15 @@ Debug_HTz: ; loc_23FAE:  ; Hill Top
 		dc.b	$01, $00, $04, $7C
 		dc.l	($03<<$18)|Obj03_MapUnc_147D0	    ; loc_147D0
 		dc.b	$09, $01, $26, $BC
-		dc.l	($18<<$18)|Obj18_MapUnc_9078	   ; loc_9078
+		dc.l	($18<<$18)|Ghz_Platform_Mappings	   ; loc_9078
 		dc.b	$01, $00, $40, $00
-		dc.l	($18<<$18)|Obj18_MapUnc_9078	   ; loc_9078
+		dc.l	($18<<$18)|Ghz_Platform_Mappings	   ; loc_9078
 		dc.b	$9A, $01, $40, $00
 		dc.l	($36<<$18)|Obj36_MapUnc_CAB0		  ; loc_CBA0
 		dc.b	$00, $00, $24, $34
 		dc.l	($14<<$18)|Obj14_MapUnc_15F54		 ; loc_15F54
 		dc.b	$00, $00, $03, $C6
-		dc.l	($2D<<$18)|Obj2D_MapUnc_9E1E	 ; loc_9E1E
+		dc.l	($2D<<$18)|Automatic_Door_Mappings	 ; loc_9E1E
 		dc.b	$00, $00, $24, $26
 		dc.l	($2F<<$18)|Obj2F_MapUnc_1786A	 ; loc_1786A
 		dc.b	$00, $00, $C0, $00
@@ -41084,11 +41867,11 @@ Debug_HTz: ; loc_23FAE:  ; Hill Top
 		dc.b	$30, $07, $04, $3C
 		dc.l	($41<<$18)|Spring_Mappings	       ; loc_EF70
 		dc.b	$40, $0A, $04, $3C
-		dc.l	($16<<$18)|Obj16_MapUnc_1611E	      ; loc_1611E
+		dc.l	($16<<$18)|Teleferics_Mappings	      ; loc_1611E
 		dc.b	$00, $00, $43, $E6
-		dc.l	($1C<<$18)|Obj16_MapUnc_1611E	      ; loc_1611E
+		dc.l	($1C<<$18)|Teleferics_Mappings	      ; loc_1611E
 		dc.b	$04, $03, $43, $E6
-		dc.l	($1C<<$18)|Obj16_MapUnc_1611E	      ; loc_1611E
+		dc.l	($1C<<$18)|Teleferics_Mappings	      ; loc_1611E
 		dc.b	$05, $04, $43, $E6
 		dc.l	($1C<<$18)|Obj1C_MapUnc_9B3A
 		dc.b	$07, $00, $40, $00
@@ -41108,11 +41891,11 @@ Debug_HPz: ; loc_24078:  ; Hidden Palace
 		dc.b	$00, $00, $26, $BC
 		dc.l	($26<<$18)|Obj26_MapUnc_B6D2	       ; loc_B6D2
 		dc.b	$07, $00, $06, $80
-		dc.l	($71<<$18)|Obj71_MapUnc_9AFA	       ; loc_9AFA
+		dc.l	($71<<$18)|Hpz_Orbs_Mappings	       ; loc_9AFA
 		dc.b	$11, $03, $E3, $5A
 		dc.l	($13<<$18)|Obj13_MapUnc_14CF4	  ; loc_14CF4
 		dc.b	$04, $04, $E3, $15
-		dc.l	($1A<<$18)|Obj1A_MapUnc_9858 ; loc_9858
+		dc.l	($1A<<$18)|HPz_Collapsing_Platforms_Mappings ; loc_9858
 		dc.b	$00, $00, $43, $4A
 		dc.l	($03<<$18)|Obj03_MapUnc_147D0	    ; loc_147D0
 		dc.b	$09, $01, $26, $BC
@@ -41154,7 +41937,7 @@ Debug_OOz: ; loc_240F2:  ; Oil Ocean
 		dc.b	$00, $01, $63, $54
 		dc.l	($47<<$18)|Obj47_MapUnc_18E3E		  ; loc_18E3E
 		dc.b	$00, $02, $04, $24
-		dc.l	($15<<$18)|Obj15_MapUnc_8AD8	; loc_8AD8
+		dc.l	($15<<$18)|Swing_Platforms_Mappings	; loc_8AD8
 		dc.b	$88, $01, $43, $E3
 		dc.l	($3D<<$18)|Break_Boost_Mappings        ; loc_1916E
 		dc.b	$00, $00, $63, $32
@@ -41166,7 +41949,7 @@ Debug_OOz: ; loc_240F2:  ; Oil Ocean
 		dc.b	$82, $02, $63, $68
 		dc.l	($48<<$18)|Cannon_Mappings	       ; loc_194CA
 		dc.b	$83, $03, $63, $68
-		dc.l	($1F<<$18)|Obj1A_MapUnc_9902 ; loc_9902
+		dc.l	($1F<<$18)|OOz_Collapsing_Platforms_Mappings ; loc_9902
 		dc.b	$00, $00, $63, $9D
 		dc.l	($1C<<$18)|Obj1C_MapUnc_9B6A			      ; Out of Pointers
 		dc.b	$0A, $00, $43, $46
@@ -41184,13 +41967,13 @@ Debug_DHz: ; loc_24194:  ; Dust Hill
 		dc.b	$00, $00, $06, $80
 		dc.l	($15<<$18)|Dhz_Swing_Platforms_Mappings ; loc_8B46
 		dc.b	$48, $02, $00, $00
-		dc.l	($1F<<$18)|Obj1A_MapUnc_9942 ; loc_9942
+		dc.l	($1F<<$18)|Dhz_Collapsing_Platforms_Mappings ; loc_9942
 		dc.b	$00, $00, $63, $F4
 		dc.l	($73<<$18)|MapUnc_Obj73_1CE1C	  ; loc_1CE1C
 		dc.b	$F5, $00, $26, $BC
 		dc.l	($6A<<$18)|Rotating_Boxes_Mappings     ; loc_1BCB0
 		dc.b	$18, $00, $63, $D4
-		dc.l	($2A<<$18)|Obj2A_MapUnc_9CAE	 ; loc_9CAE
+		dc.l	($2A<<$18)|Up_Down_Pillar_Mappings	 ; loc_9CAE
 		dc.b	$00, $00, $40, $00
 		dc.l	($36<<$18)|Obj36_MapUnc_CAB0		  ; loc_CBA0
 		dc.b	$00, $00, $24, $34
@@ -41202,11 +41985,11 @@ Debug_DHz: ; loc_24194:  ; Dust Hill
 		dc.b	$90, $03, $04, $70
 		dc.l	($40<<$18)|Diagonal_Spring_Mappings	 ; loc_1A58A
 		dc.b	$01, $00, $04, $40
-		dc.l	($74<<$18)|Obj74_MapUnc_156B2	 ; loc_156B2
+		dc.l	($74<<$18)|Invisible_Block_Mappings	 ; loc_156B2
 		dc.b	$11, $00, $86, $80
 		dc.l	($75<<$18)|Spikeball_Chain_Mappings    ; loc_1D00A
 		dc.b	$18, $02, $20, $00
-		dc.l	($76<<$18)|Obj76_MapUnc_1D1BA	 ; loc_1D1BA
+		dc.l	($76<<$18)|Platform_Spikes_Mappings	 ; loc_1D1BA
 		dc.b	$00, $00, $00, $00
 		dc.l	($77<<$18)|Dhz_Bridge_Mappings	       ; loc_1D2E0
 		dc.b	$01, $00, $64, $3C
@@ -41230,7 +42013,7 @@ Debug_CPz: ; loc_24228:  ; Chemical Plant
 		dc.b	$15, $00, $E4, $3C
 		dc.l	($19<<$18)|Obj19_MapUnc_16412		; loc_16412
 		dc.b	$06, $00, $63, $A0
-		dc.l	($2D<<$18)|Obj2D_MapUnc_9E1E	 ; loc_9E1E
+		dc.l	($2D<<$18)|Automatic_Door_Mappings	 ; loc_9E1E
 		dc.b	$02, $02, $23, $94
 		dc.l	($32<<$18)|Tunel_Obstacule_Mappings    ; loc_179F6
 		dc.b	$00, $00, $64, $30
@@ -41262,13 +42045,13 @@ Debug_NGHz: ; loc_242C2:  ; Neo Green Hill
 		dc.b	$00, $00, $26, $BC
 		dc.l	($26<<$18)|Obj26_MapUnc_B6D2	       ; loc_B6D2
 		dc.b	$00, $00, $06, $80
-		dc.l	($15<<$18)|Obj15_MapUnc_8B0E ; loc_8B0E
+		dc.l	($15<<$18)|Nghz_Swing_Platforms_Mappings ; loc_8B0E
 		dc.b	$88, $02, $00, $00
-		dc.l	($18<<$18)|Obj18_MapUnc_90D0	  ; loc_90D0
+		dc.l	($18<<$18)|Nghz_Platform_Mappings	  ; loc_90D0
 		dc.b	$01, $00, $40, $00
-		dc.l	($18<<$18)|Obj18_MapUnc_90D0	  ; loc_90D0
+		dc.l	($18<<$18)|Nghz_Platform_Mappings	  ; loc_90D0
 		dc.b	$9A, $01, $40, $00
-		dc.l	($22<<$18)|Obj22_MapUnc_197C6	  ; loc_197C6
+		dc.l	($22<<$18)|Arrow_Shooter_Mappings	  ; loc_197C6
 		dc.b	$00, $01, $04, $17
 		dc.l	($23<<$18)|Pillar_Mappings	       ; loc_199AA
 		dc.b	$00, $00, $20, $00
@@ -41337,23 +42120,23 @@ cur_zone_str := "\{cur_zone_id}"
 
 ; dword_24354: MainLoadBlocks: saArtPtrs: TilesMainTable:
 LevelArtPointers:
-	levartptrs $04,		$05, PalID_GHZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;   0 ; GHZ  ; GREEN HILL ZONE
-	levartptrs $06,		$07, PalID_OWZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;   1 ; OWZ  ; OCEAN WIND ZONE (UNUSED)
+	levartptrs $04,		$05, PalID_EHZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;   0 ; GHZ  ; GREEN HILL ZONE
+	levartptrs $06,		$07, PalID_OWZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;   1 ; OWZ  ; OCEAN WIND ZONE (UNUSED)
 	levartptrs $08,		$09, PalID_WZ,	 ArtNem_WZ,  BM16_WZ,  BM128_WZ		;   2 ; WZ   ; WOOD ZONE
-	levartptrs $0A,		$0B, PalID_SSZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;   3 ; SSZ  ; SAND SHOWER ZONE (UNUSED)
+	levartptrs $0A,		$0B, PalID_SSZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;   3 ; SSZ  ; SAND SHOWER ZONE (UNUSED)
 	levartptrs $0C,		$0D, PalID_MTZ,  ArtNem_MTZ, BM16_MTZ, BM128_MTZ	;   4 ; MTZ  ; METROPOLIS ZONE
 	levartptrs $0C,		$0D, PalID_MTZ2, ArtNem_MTZ, BM16_MTZ, BM128_MTZ	;   5 ; MTZ  ; METROPOLIS ZONE 2
-	levartptrs $10,		$11, PalID_BLZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;   6 ; BLZ  ; BLUE LAKE ZONE (UNUSED, LATER REPLACED WITH WING FORTRESS)
-	levartptrs $12,		$13, PalID_HTZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;   7 ; HTZ  ; HILL TOP ZONE
+	levartptrs $10,		$11, PalID_BLZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;   6 ; BLZ  ; BLUE LAKE ZONE (UNUSED, LATER REPLACED WITH WING FORTRESS)
+	levartptrs $12,		$13, PalID_HTZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;   7 ; HTZ  ; HILL TOP ZONE
 	levartptrs $14,		$15, PalID_HPZ,  ArtNem_HPZ, BM16_HPZ, BM128_HPZ	;   8 ; HPZ  ; HIDDEN PALACE ZONE
-	levartptrs $16,		$17, PalID_RWZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;   9 ; RWZ  ; ROCK WORLD ZONE (UNUSED)
+	levartptrs $16,		$17, PalID_RWZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;   9 ; RWZ  ; ROCK WORLD ZONE (UNUSED)
 	levartptrs $18,		$19, PalID_OOZ,  ArtNem_OOZ, BM16_OOZ, BM128_OOZ	;   A ; OOZ  ; OIL OCEAN ZONE
 	levartptrs $1A,		$1B, PalID_DHZ,  ArtNem_DHZ, BM16_DHZ, BM128_DHZ	;   B ; DHZ  ; DUST HILL ZONE
 	levartptrs $1C,		$1D, PalID_CNZ,  ArtNem_CNZ, BM16_CNZ, BM128_CNZ	;   C ; CNZ  ; CASINO NIGHT ZONE
 	levartptrs $1E,		$1F, PalID_CPZ,  ArtNem_CPZ, BM16_CPZ, BM128_CPZ	;   D ; CPZ  ; CHEMICAL PLANT ZONE
-	levartptrs $20,		$21, PalID_GCZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;   E ; GCZ  ; GENOCIDE CITY ZONE (BLANK, LATER REPLACED WITH DEATH EGG)
+	levartptrs $20,		$21, PalID_GCZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;   E ; GCZ  ; GENOCIDE CITY ZONE (BLANK, LATER REPLACED WITH DEATH EGG)
 	levartptrs $22,		$23, PalID_NGHZ, ArtNem_NGHZ,BM16_NGHZ,BM128_NGHZ	;   F ; NGHZ ; NEO GREEN HILL ZONE
-	levartptrs $24,		$25, PalID_DEZ,  ArtNem_GHZ, BM16_GHZ, BM128_GHZ	;  10 ; DEZ  ; DEATH EGG ZONE (BLANK, LATER REPLACED WITH SKY CHASE)
+	levartptrs $24,		$25, PalID_DEZ,  ArtNem_EHZ, BM16_GHZ, BM128_GHZ	;  10 ; DEZ  ; DEATH EGG ZONE (BLANK, LATER REPLACED WITH SKY CHASE)
 
     if (cur_zone_id<>no_of_zones)&&(MOMPASS=1)
 	message "Warning: Table LevelArtPointers has \{cur_zone_id/1.0} entries, but it should have \{no_of_zones/1.0} entries"
@@ -41363,51 +42146,51 @@ LevelArtPointers:
 ; ===========================================================================
 ; off_24420:
 ArtLoadCues:	offsetTable
-PLCptr_Std1:	offsetTableEntry.w PlrList_Std1
-PLCptr_Std2:	offsetTableEntry.w PlrList_Std2
-		offsetTableEntry.w Standard_Sprites_3
-		offsetTableEntry.w Standard_Sprites_4
-		offsetTableEntry.w Green_Hill_Sprites_1
-		offsetTableEntry.w Green_Hill_Sprites_2
-		offsetTableEntry.w Wood_Sprites_1
-		offsetTableEntry.w Wood_Sprites_1
-		offsetTableEntry.w Wood_Sprites_1
-		offsetTableEntry.w Wood_Sprites_2
-		offsetTableEntry.w Metropolis_Sprites_1
-		offsetTableEntry.w Metropolis_Sprites_1
-		offsetTableEntry.w Metropolis_Sprites_1
-		offsetTableEntry.w Metropolis_Sprites_2
-		offsetTableEntry.w Hill_Top_Sprites_1
-		offsetTableEntry.w Hill_Top_Sprites_1
-		offsetTableEntry.w Hill_Top_Sprites_1
-		offsetTableEntry.w Hill_Top_Sprites_1
-		offsetTableEntry.w Hill_Top_Sprites_1
-		offsetTableEntry.w Hill_Top_Sprites_2
-		offsetTableEntry.w Hidden_Palace_Sprites_1
-		offsetTableEntry.w Hidden_Palace_Sprites_2
-		offsetTableEntry.w Oil_Ocean_Sprites_1
-		offsetTableEntry.w Oil_Ocean_Sprites_1
-		offsetTableEntry.w Oil_Ocean_Sprites_1
-		offsetTableEntry.w Oil_Ocean_Sprites_2
-		offsetTableEntry.w Dust_Hill_Sprites_1
-		offsetTableEntry.w Dust_Hill_Sprites_2
-		offsetTableEntry.w Casino_Night_Sprites_1
-		offsetTableEntry.w Casino_Night_Sprites_2
-		offsetTableEntry.w Chemical_Plant_Sprites_1
-		offsetTableEntry.w Chemical_Plant_Sprites_2
-		offsetTableEntry.w Neo_Green_Hill_Sprites_1
-		offsetTableEntry.w Neo_Green_Hill_Sprites_1
-		offsetTableEntry.w Neo_Green_Hill_Sprites_1
-		offsetTableEntry.w Neo_Green_Hill_Sprites_2
-		offsetTableEntry.w End_Level_Results_Sprites
-		offsetTableEntry.w End_Level_Results_Sprites
-		offsetTableEntry.w End_Level_Results_Sprites
-		offsetTableEntry.w End_Level_Sprites
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
-		offsetTableEntry.w Green_Hill_Boss
+PLCptr_Std1:	offsetTableEntry.w PlrList_Std1	; 0
+PLCptr_Std2:	offsetTableEntry.w PlrList_Std2	; 1
+		offsetTableEntry.w PlrList_Std3	; 2
+		offsetTableEntry.w PlrList_Std4	; 3
+		offsetTableEntry.w PlrList_EHZ1	; 4
+		offsetTableEntry.w PlrList_EHZ2	; 5
+		offsetTableEntry.w PlrList_WZ1	; 6
+		offsetTableEntry.w PlrList_WZ1	; 7
+		offsetTableEntry.w PlrList_WZ1	; 8
+		offsetTableEntry.w PlrList_WZ2	; 9
+		offsetTableEntry.w PlrList_MTZ1	; $A
+		offsetTableEntry.w PlrList_MTZ1	; $B
+		offsetTableEntry.w PlrList_MTZ1	; $C
+		offsetTableEntry.w PlrList_MTZ2	; $D
+		offsetTableEntry.w PlrList_HTZ1	; $E
+		offsetTableEntry.w PlrList_HTZ1	; $F
+		offsetTableEntry.w PlrList_HTZ1	; $10
+		offsetTableEntry.w PlrList_HTZ1	; $11
+		offsetTableEntry.w PlrList_HTZ1	; $12
+		offsetTableEntry.w PlrList_HTZ2	; $13
+		offsetTableEntry.w PlrList_HPZ1	; $14
+		offsetTableEntry.w PlrList_HPZ2	; $15
+		offsetTableEntry.w PlrList_OOZ1	; $16
+		offsetTableEntry.w PlrList_OOZ1	; $17
+		offsetTableEntry.w PlrList_OOZ1	; $18
+		offsetTableEntry.w PlrList_OOZ2	; $19
+		offsetTableEntry.w PlrList_DHZ1	; $1A
+		offsetTableEntry.w PlrList_DHZ2	; $1B
+		offsetTableEntry.w PlrList_CNZ1	; $1C
+		offsetTableEntry.w PlrList_CNZ2	; $1D
+		offsetTableEntry.w PlrList_CPZ1	; $1E
+		offsetTableEntry.w PlrList_CPZ2	; $1F
+		offsetTableEntry.w PlrList_ARZ1	; $20
+		offsetTableEntry.w PlrList_ARZ1	; $21
+		offsetTableEntry.w PlrList_ARZ1	; $22
+		offsetTableEntry.w PlrList_ARZ2	; $23
+		offsetTableEntry.w PlrList_Results	; $24
+		offsetTableEntry.w PlrList_Results	; $25
+		offsetTableEntry.w PlrList_Results	; $26
+		offsetTableEntry.w PlrList_EOL	; $27
+		offsetTableEntry.w PlrList_EHZB	; $28
+		offsetTableEntry.w PlrList_SS	; $29
+		offsetTableEntry.w PlrList_EHZB	; $2A
+		offsetTableEntry.w PlrList_EHZB	; $2B
+		offsetTableEntry.w PlrList_EHZB	; $2C
 
 ; macro for a pattern load request list header
 ; must be on the same line as a label that has a corresponding _End label later
@@ -41427,1454 +42210,342 @@ plreq macro toVRAMaddr,fromROMaddr
 ; PATTERN LOAD REQUEST LIST
 ; Standard 1 - loaded for every level
 ;---------------------------------------------------------------------------------------
-; PlrList_2447A: Standard_Sprites_1:
 PlrList_Std1:	plrlistheader
 		plreq $047C, ArtNem_Checkpoint
-		plreq $06CA, Head_up_display_Sprites
-		plreq $07D4, Head_up_display_Sonic
+		plreq $06CA, ArtNem_HUD
+		plreq $07D4, ArtNem_Lives
 		plreq $06BC, ArtNem_Ring
-		plreq $04AC, Enemy_Points_Spr
+		plreq $04AC, ArtNem_Points
 PlrList_Std1_End:
 ;---------------------------------------------------------------------------------------
 ; PATTERN LOAD REQUEST LIST
 ; Standard 2 - loaded for every level
 ;---------------------------------------------------------------------------------------
-; PlrList_2449A: Standard_Sprites_2:
 PlrList_Std2:	plrlistheader
 		plreq $0680, ArtNem_Powerups
 		plreq $04BE, ArtNem_Shield
-		plreq $04DE, Invencibility_Stars
+		plreq $04DE, ArtNem_Stars
 PlrList_Std2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Standard 3 - loaded for every level
+;---------------------------------------------------------------------------------------
+PlrList_Std3:	plrlistheader
+		plreq $05A0, Explosion
+;		plreq $0580, Rabbit
+;		plreq $0592, White_Bird
+PlrList_Std3_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Game/Time over
+;---------------------------------------------------------------------------------------
+PlrList_Std4:	plrlistheader
+		plreq $055E, Game_Time_Over
+PlrList_Std4_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Emerald Hill Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_EHZ1:	plrlistheader
+		plreq $0000, ArtNem_EHZ
+		plreq $03AE, ArtNem_GHZ_Waterfall
+		plreq $03C6, ArtNem_GHZ_Bridge
+		plreq $03CE, ArtNem_HtzSeeSaw
+		plreq $039E, FireBall
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_DignlSprng
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_EHZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Emerald Hill Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_EHZ2:	plrlistheader
+		plreq $03E6, ArtNem_Buzzer
+		plreq $0402, ArtNem_Snail
+		plreq $041C, ArtNem_Masher
+PlrList_EHZ2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Wood Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_WZ1:	plrlistheader
+		plreq $0000, ArtNem_WZ
+PlrList_WZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Wood Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_WZ2:	plrlistheader
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_DignlSprng
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_WZ2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Metropolis Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_MTZ1:	plrlistheader
+		plreq $0000, ArtNem_MTZ
+		plreq $033C, Mz_Teleport
+		plreq $0378, ArtNem_MtzWheel
+		plreq $03F0, ArtNem_MtzWheelIndent
+		plreq $03F9, ArtNem_LavaCup
+		plreq $03FD, ArtNem_BoltEnd_Rope
+		plreq $0405, ArtNem_MtzSteam
+		plreq $0414, ArtNem_MtzSpikeBlock
+		plreq $041C, ArtNem_MtzSpike
+PlrList_MTZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Metropolis Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_MTZ2:	plrlistheader
+		plreq $0424, ArtNem_Button
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_DignlSprng
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+		plreq $0500, ArtNem_MtzAsstBlocks
+		plreq $0536, ArtNem_MtzLavaBubble
+		plreq $053F, ArtNem_MTZ_Platform
+		plreq $055F, ArtNem_MtzCog
+PlrList_MTZ2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Hill Top Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_HTZ1:	plrlistheader
+		plreq $0000, ArtNem_EHZ
+		plreq $01FC, ArtNem_HTZ
+		plreq $039E, FireBall
+		plreq $03B2, ArtNem_HtzRock
+		plreq $03C6, ArtNem_HtzSeeSaw
+		plreq $03DE, Htz_See_saw_badnick
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_DignlSprng
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_HTZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Hill Top Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_HTZ2:	plrlistheader
+		plreq $03E6, ArtNem_HtzZipline
+		plreq $0416, Htz_Lava_Bubble
+		plreq $0426, ArtNem_HtzValveBarrier
+PlrList_HTZ2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Hideen Palace Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_HPZ1:	plrlistheader
+		plreq $0000, ArtNem_HPZ
+		plreq $0300, ArtNem_HPZ_Bridge
+		plreq $0315, ArtNem_HPZ_Waterfall
+		plreq $034A, ArtNem_HPZPlatform
+		plreq $035A, ArtNem_HPZOrb
+		plreq $037C, Hpz_Unknown_Platform
+		plreq $0392, ArtNem_HPZ_Emerald
+		plreq $0400, Water_Surface
+PlrList_HPZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Hideen Palace Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_HPZ2:	plrlistheader
+		plreq $0500, ArtNem_Redz
+		plreq $0530, ArtNem_Batbot
+PlrList_HPZ2_End:
+		; Not all sprites are loaded into VRam
+		plreq $0300, Hpz_Crocobot	; Left Over
+		plreq $032C, ArtNem_Buzzer
+		plreq $0350, ArtNem_Batbot
+		plreq $03C4, Hpz_Rhinobot	; Left Over
+		plreq $0530, Hpz_Piranha	; Left Over
 
-loc_244AE:
-Standard_Sprites_3:
-		dc.w	(((loc_244C2-loc_244AE-$02)/$06)-$01)
-		dc.l	Explosion		; loc_7F012
-		dc.w	$B400
-		dc.l	Rabbit		  ; loc_80348
-		dc.w	$B000
-		dc.l	White_Bird		; loc_804A0
-		dc.w	$B240
-Standard_Sprites_4:
-loc_244C2:
-		dc.w	(((loc_244CA-loc_244C2-$02)/$06)-$01)
-		dc.l	Game_Time_Over		; loc_7F678
-		dc.w	$ABC0
-Green_Hill_Sprites_1:
-loc_244CA:
-		dc.w	(((loc_244FC-loc_244CA-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_GHZ    ; loc_81C00
-		dc.w	$0000
-		dc.l	ArtNem_GHZ_Waterfall	       ; loc_73B3C
-		dc.w	$75C0
-		dc.l	ArtNem_GHZ_Bridge	       ; loc_73D90
-		dc.w	$78C0
-		dc.l	FireBall		; loc_739C6
-		dc.w	$79C0
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DignlSprng	  ; loc_7883E
-		dc.w	$8780
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Green_Hill_Sprites_2:
-loc_244FC:
-		dc.w	(((loc_24510-loc_244FC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Buzzer	    ; loc_7A4BC
-		dc.w	$7CC0
-		dc.l	ArtNem_Snail		 ; loc_7C514
-		dc.w	$8040
-		dc.l	ArtNem_Masher		  ; loc_7CA92
-		dc.w	$8380
-Wood_Sprites_1:
-loc_24510:
-		dc.w	(((loc_24518-loc_24510-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_WZ	   ; loc_8AB2E
-		dc.w	$0000
-Wood_Sprites_2:
-loc_24518:
-		dc.w	(((loc_24532-loc_24518-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DignlSprng	  ; loc_7883E
-		dc.w	$8780
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Metropolis_Sprites_1:
-loc_24532:
-		dc.w	(((loc_2456A-loc_24532-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_MTZ    ; loc_91716
-		dc.w	$0000
-		dc.l	Mz_Teleport		; loc_75382
-		dc.w	$6780
-		dc.l	ArtNem_MtzWheel        ; loc_7461C
-		dc.w	$6F00
-		dc.l	ArtNem_MtzWheelIndent	      ; loc_74A74
-		dc.w	$7E00
-		dc.l	ArtNem_LavaCup
-		dc.w	$7F20
-		dc.l	ArtNem_BoltEnd_Rope
-		dc.w	$7FA0
-		dc.l	ArtNem_MtzSteam		; loc_74BEA
-		dc.w	$80A0
-		dc.l	ArtNem_MtzSpikeBlock		; loc_74B1C
-		dc.w	$8280
-		dc.l	ArtNem_MtzSpike 	     ; loc_74CF4
-		dc.w	$8380
-loc_2456A:
-Metropolis_Sprites_2:
-		dc.w	(((loc_245A2-loc_2456A-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Button		  ; loc_78580
-		dc.w	$8480
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DignlSprng	  ; loc_7883E
-		dc.w	$8780
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-		dc.l	ArtNem_MtzAsstBlocks		; loc_74DB6
-		dc.w	$A000
-		dc.l	ArtNem_MtzLavaBubble	      ; loc_74E2C
-		dc.w	$A6C0
-		dc.l	ArtNem_MTZ_Platform  ; loc_74F52
-		dc.w	$A7E0
-		dc.l	ArtNem_MtzCog		 ; loc_752A0
-		dc.w	$ABE0
-Hill_Top_Sprites_1:
-loc_245A2:
-		dc.w	(((loc_245E0-loc_245A2-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_GHZ    ; loc_81C00
-		dc.w	$0000
-		dc.l	ArtNem_HTZ	; loc_85200
-		dc.w	$3F80
-		dc.l	FireBall		; loc_739C6
-		dc.w	$73C0
-		dc.l	ArtNem_HtzRock		; loc_7447A
-		dc.w	$7640
-		dc.l	ArtNem_HtzSeeSaw	     ; loc_741D4
-		dc.w	$78C0
-		dc.l	Htz_See_saw_badnick	; loc_745B0
-		dc.w	$7BC0
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DignlSprng	  ; loc_7883E
-		dc.w	$8780
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Hill_Top_Sprites_2:
-loc_245E0:
-		dc.w	(((loc_245F4-loc_245E0-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_HtzZipline	    ; loc_73E68
-		dc.w	$7CC0
-		dc.l	Htz_Lava_Bubble 	; loc_73C42
-		dc.w	$82C0
-		dc.l	ArtNem_HtzValveBarrier	    ; loc_7415C
-		dc.w	$84C0
-Hidden_Palace_Sprites_1:
-loc_245F4:
-		dc.w	(((loc_24626-loc_245F4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_HPZ ; loc_98B76
-		dc.w	$0000
-		dc.l	ArtNem_HPZ_Bridge	       ; loc_7538E
-		dc.w	$6000
-		dc.l	ArtNem_HPZ_Waterfall	       ; loc_75506
-		dc.w	$62A0
-		dc.l	ArtNem_HPZPlatform	      ; loc_75ADA
-		dc.w	$6940
-		dc.l	ArtNem_HPZOrb		; loc_75B9A
-		dc.w	$6B40
-		dc.l	Hpz_Unknow_Platform	; loc_75DD6
-		dc.w	$6F80
-		dc.l	ArtNem_HPZ_Emerald	       ; loc_75868
-		dc.w	$7240
-		dc.l	Water_Surface		; loc_777D2
-		dc.w	$8000
-Hidden_Palace_Sprites_2:
-loc_24626:
-		dc.w   (((loc_2463A-loc_24626-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Redz		; loc_7B114
-		dc.w	$A000
-		dc.l	ArtNem_Batbot		   ; loc_7A6A2
-		dc.w	$A600
-loc_2463A: ; Not all sprites are loaded in to VRam
-		dc.l	Hpz_Crocobot		; loc_7A11A ; Left Over
-		dc.w	$6000
-		dc.l	ArtNem_Buzzer	    ; loc_7A4BC
-		dc.w	$6580
-		dc.l	ArtNem_Batbot		   ; loc_7A6A2
-		dc.w	$6A00
-		dc.l	Hpz_Rhinobot		; loc_7AD18 ; Left Over
-		dc.w	$7880
-		dc.l	ArtNem_Redz		; loc_7B114
-		dc.w	$A000
-		dc.l	Hpz_Piranha		; loc_7B4EA ; Left Over
-		dc.w	$A600
-Oil_Ocean_Sprites_1:
-loc_24658:
-		dc.w	(((loc_24684-loc_24658-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_OOZ     ; loc_9ED58
-		dc.w	$0000
-		dc.l	ArtNem_OOZElevator	      ; loc_75F70
-		dc.w	$6000
-		dc.l	ArtNem_SpikyThing     ; loc_76060
-		dc.w	$6180
-		dc.l	ArtNem_BurnerLid      ; loc_76258
-		dc.w	$6580
-		dc.l	ArtNem_StripedBlocksVert	 ; loc_762EE
-		dc.w	$6640
-		dc.l	ArtNem_Oilfall		 ; loc_7635A
-		dc.w	$66C0
-		dc.l	ArtNem_Oilfall2 	  ; loc_764D6
-		dc.w	$68C0
-Oil_Ocean_Sprites_2:
-loc_24684:
-		dc.w	(((loc_246C2-loc_24684-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_OOZBall		; loc_76602
-		dc.w	$6A80
-		dc.l	ArtNem_LaunchBall	       ; loc_76722
-		dc.w	$6D00
-		dc.l	ArtNem_OOZPlatform ; loc_76A12
-		dc.w	$73A0
-		dc.l	ArtNem_PushSpring   ; loc_76CA6
-		dc.w	$78A0
-		dc.l	ArtNem_OOZSwingPlat	 ; loc_76E68
-		dc.w	$7C60
-		dc.l	ArtNem_Button		  ; loc_78580
-		dc.w	$8480
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DignlSprng	  ; loc_7883E
-		dc.w	$8780
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Dust_Hill_Sprites_1:
-loc_246C2:
-		dc.w	(((loc_246E2-loc_246C2-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_DHZ     ; loc_A5248
-		dc.w	$0000
-		dc.l	ArtNem_Crate		 ; loc_7708A
-		dc.w	$7A80
-		dc.l	ArtNem_DHZCollapsePlat ; loc_772C8
-		dc.w	$7E80
-		dc.l	ArtNem_VineSwitch		; loc_77472
-		dc.w	$81C0
-		dc.l	ArtNem_VinePulley	      ; loc_7756A
-		dc.w	$83C0
-Dust_Hill_Sprites_2:
-loc_246E2:
-		dc.w	(((loc_24708-loc_246E2-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_HorizSpike   ; loc_79A44
-		dc.w	$8580
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DHZGateLog	       ; loc_77614
-		dc.w	$8780
-		dc.l	ArtNem_LeverSpring	 ; loc_798F4
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Casino_Night_Sprites_1:
-loc_24708:
-		dc.w	(((loc_24716-loc_24708-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_CNZ  ; loc_ABF2A
-		dc.w	$0000
-		dc.l	ArtNem_CNZCards 	      ; loc_AEF3C
-		dc.w	$7A00
-Casino_Night_Sprites_2:
-loc_24716:
-		dc.w	(((loc_24730-loc_24716-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DignlSprng	  ; loc_7883E
-		dc.w	$8780
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Chemical_Plant_Sprites_1:
-loc_24730:
-		dc.w	(((loc_2476E-loc_24730-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_CPZ ; loc_B2506
-		dc.w	$0000
-		dc.l	Cpz_Metal_Structure	; loc_77A1C
-		dc.w	$6E60
-		dc.l	ArtNem_ConstructionStripes	; loc_77C66
-		dc.w	$7280
-		dc.l	ArtNem_CPZBooster	; loc_77942
-		dc.w	$7380
-		dc.l	ArtNem_CPZElevator	      ; loc_77684
-		dc.w	$7400
-		dc.l	ArtNem_CPZAnimatedBits ; loc_77CD2
-		dc.w	$7600
-		dc.l	ArtNem_CPZTubeSpring	    ; loc_78074
-		dc.w	$7C00
-		dc.l	Water_Surface		; loc_777D2
-		dc.w	$8000
-		dc.l	ArtNem_CPZStairBlock	       ; loc_77EB4
-		dc.w	$8300
-		dc.l	ArtNem_CPZMetalBlock
-		dc.w	$8600
-Chemical_Plant_Sprites_2:
-loc_2476E:
-		dc.w	(((loc_24794-loc_2476E-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Air_Bubbles_Numbers	; loc_79AC0
-		dc.w	$A000
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_CPZDroplet		; loc_779AA
-		dc.w	$8780
-		dc.l	ArtNem_LeverSpring	 ; loc_798F4
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Neo_Green_Hill_Sprites_1:
-loc_24794:
-		dc.w	(((loc_247B4-loc_24794-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_NGHZ ; loc_B9E58
-		dc.w	$0000
-		dc.l	Nghz_Water_Surface	; loc_78270
-		dc.w	$8000
-		dc.l	Nghz_Leaves		; loc_78356
-		dc.w	$8200
-		dc.l	ArtNem_ArrowAndShooter	    ; loc_783E2
-		dc.w	$82E0
-		dc.l	Nghz_Water_Splash	; loc_78540
-		dc.w	$8500
-Neo_Green_Hill_Sprites_2:
-loc_247B4:
-		dc.w	(((loc_247D4-loc_247B4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Air_Bubbles_Numbers	; loc_79AC0
-		dc.w	$A000
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_LeverSpring	 ; loc_798F4
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-End_Level_Results_Sprites:
-loc_247D4:
-		dc.w	(((loc_247DC-loc_247D4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Title_Cards		; loc_7EA04
-		dc.w	$B000
-End_Level_Sprites:
-loc_247DC:
-		dc.w	(((loc_247E4-loc_247DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Signpost 	      ; loc_7931E
-		dc.w	$8680
-loc_247E4: ; Not all sprites are loaded in to VRam
-		dc.l	Hidden_Points		; loc_7FB5C
-		dc.w	$96C0
-		dc.l	Big_Ring_Flash		; loc_7F9E8
-		dc.w	$8C40
-Green_Hill_Boss:
-loc_247F0:
-		dc.w	(((loc_24804-loc_247F0-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Robotnik_Ship		; loc_7CC9E
-		dc.w	$8C00
-		dc.l	ArtNem_GHZBoss		  ; loc_7E124
-		dc.w	$9800
-		dc.l	ArtNem_EggChoppers	   ; loc_7E910
-		dc.w	$A800
-loc_24804: ; Not all sprites are loaded in to VRam
-		dc.l	Robotnik_Ship		; loc_7CC9E
-		dc.w	$8000
-		dc.l	Cpz_Boss		; loc_7D3DA
-		dc.w	$8C00
-		dc.l	Ship_Boost		; loc_7DFC0
-		dc.w	$9A00
-		dc.l	Boss_Smoke		; loc_7E03E
-		dc.w	$9B00
-		dc.l	ArtNem_GHZBoss		  ; loc_7E124
-		dc.w	$9D00
-		dc.l	ArtNem_EggChoppers	   ; loc_7E910
-		dc.w	$AD00
-		dc.w	(ArtNem_LeverSpring&$FFFF) ; loc_798F4 ; Left over from previous build
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-loc_24838:
-		dc.w	(((loc_24840-loc_24838-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Title_Cards		; loc_7EA04
-		dc.w	$B000
-loc_24840:
-		dc.w	(((loc_24848-loc_24840-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Signpost 	      ; loc_7931E
-		dc.w	$8680
-loc_24848:
-		dc.l	Hidden_Points		; loc_7FB5C
-		dc.w	$96C0
-		dc.l	Big_Ring_Flash		; loc_7F9E8
-		dc.w	$8C40
-loc_24854:
-		dc.w	(((loc_24868-loc_24854-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Robotnik_Ship		; loc_7CC9E
-		dc.w	$8C00
-		dc.l	ArtNem_GHZBoss		  ; loc_7E124
-		dc.w	$9800
-		dc.l	ArtNem_EggChoppers	   ; loc_7E910
-		dc.w	$A800
-loc_24868:
-		dc.l	Robotnik_Ship		; loc_7CC9E
-		dc.w	$8000
-		dc.l	Cpz_Boss		; loc_7D3DA
-		dc.w	$8C00
-		dc.l	Ship_Boost		; loc_7DFC0
-		dc.w	$9A00
-		dc.l	Boss_Smoke		; loc_7E03E
-		dc.w	$9B00
-		dc.l	ArtNem_GHZBoss		  ; loc_7E124
-		dc.w	$9D00
-		dc.l	ArtNem_EggChoppers	   ; loc_7E910
-		dc.w	$AD00
-		dc.w	(Boss_Smoke&$FFFF)	; loc_7E03E ; Left over from previous build
-		dc.w	$9B00
-		dc.l	ArtNem_GHZBoss		  ; loc_7E124
-		dc.w	$9D00
-		dc.l	ArtNem_EggChoppers	   ; loc_7E910
-		dc.w	$AD00
-		dc.l	ArtNem_DHZGateLog	       ; loc_77614
-		dc.w	$8780
-		dc.l	(ArtNem_LeverSpring-$0188) ; loc_7976C ; Left over from previous build
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Casino_Night_Sprites_Previous_Build_1:
-loc_248B4:
-		dc.w	(((loc_248C2-loc_248B4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_CNZ-$07E2 ; loc_AB748 ; Left over from previous build
-		dc.w	$0000
-		dc.l	ArtNem_CNZCards-$07E2		   ; loc_AE75A ; Left over from previous build
-		dc.w	$7A00
-Casino_Night_Sprites_Previous_Build_2:
-loc_248C2:
-		dc.w	(((loc_248DC-loc_248C2-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_DignlSprng	  ; loc_7883E
-		dc.w	$8780
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Chemical_Plant_Sprites_Previous_Build_1:
-loc_248DC:
-		dc.w	(((loc_2491A-loc_248DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_CPZ-$07E2 ; loc_B1D24
-		dc.w	$0000
-		dc.l	Cpz_Metal_Structure	; loc_77A1C
-		dc.w	$6E60
-		dc.l	ArtNem_ConstructionStripes	; loc_77C66
-		dc.w	$7280
-		dc.l	ArtNem_CPZBooster	; loc_77942
-		dc.w	$7380
-		dc.l	ArtNem_CPZElevator	      ; loc_77684
-		dc.w	$7400
-		dc.l	ArtNem_CPZAnimatedBits ; loc_77CD2
-		dc.w	$7600
-		dc.l	ArtNem_CPZTubeSpring	    ; loc_78074
-		dc.w	$7C00
-		dc.l	Water_Surface		; loc_777D2
-		dc.w	$8000
-		dc.l	ArtNem_CPZStairBlock	       ; loc_77EB4
-		dc.w	$8300
-		dc.l	ArtNem_CPZMetalBlock
-		dc.w	$8600
-Chemical_Plant_Sprites_Previous_Build_2:
-loc_2491A:
-		dc.w	(((loc_2493A-loc_2491A-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	ArtNem_CPZDroplet		; loc_779AA
-		dc.w	$8780
-		dc.l	(ArtNem_LeverSpring-$0188) ; loc_7976C
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-Neo_Green_Hill_Sprites_Previous_Build_1:
-loc_2493A:
-		dc.w	(((loc_2495A-loc_2493A-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_NGHZ-$07D2 ; loc_B9686
-		dc.w	$0000
-		dc.l	Nghz_Water_Surface	; loc_78270
-		dc.w	$8000
-		dc.l	Nghz_Leaves		; loc_78356
-		dc.w	$8200
-		dc.l	ArtNem_ArrowAndShooter	    ; loc_783E2
-		dc.w	$82E0
-		dc.l	Nghz_Water_Splash	; loc_78540
-		dc.w	$8500
-Neo_Green_Hill_Sprites_Previous_Build_2:
-loc_2495A:
-		dc.w	(((loc_24974-loc_2495A-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l	(ArtNem_LeverSpring-$0188) ; loc_7976C
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-End_Level_Results_Sprites_Previous_Build:
-loc_24974:
-		dc.w	(((loc_2497C-loc_24974-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Title_Cards-$07E2	; loc_7E222
-		dc.w	$B000
-End_Level_Sprites_Previous_Build:
-loc_2497C:
-		dc.w	(((loc_24990-loc_2497C-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Signpost 	      ; loc_7931E
-		dc.w	$D000
-		dc.l	Hidden_Points-$07E2	; loc_7F37A
-		dc.w	$96C0
-		dc.l	Big_Ring_Flash-$07E2	; loc_7F206
-		dc.w	$8C40
-Green_Hill_Boss_Previous_Build:
-loc_24990:
-		dc.w	(((loc_249A4-loc_24990-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Robotnik_Ship-$07E2	; loc_7C4BC
-		dc.w	$8C00
-		dc.l	ArtNem_GHZBoss-$07E2	  ; loc_7D942
-		dc.w	$9800
-		dc.l	ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$A800
-loc_249A4:
-		dc.l	Robotnik_Ship-$07E2	; loc_7C4BC
-		dc.w	$8000
-		dc.l	Cpz_Boss-$07E2		; loc_7CBF8
-		dc.w	$8C00
-		dc.l	Ship_Boost-$07E2	; loc_7D7DE
-		dc.w	$9A00
-		dc.l	Boss_Smoke-$07E2	; loc_7D85C
-		dc.w	$9B00
-		dc.l	ArtNem_GHZBoss-$07E2	  ; loc_7D942
-		dc.w	$9D00
-		dc.l	ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$AD00
-		dc.w	$8680
-		dc.l	(ArtNem_LeverSpring-$0188) ; loc_7976C
-		dc.w	$8800
-		dc.l	ArtNem_VrtclSprng	  ; loc_78658
-		dc.w	$8B80
-		dc.l	ArtNem_HrzntlSprng	 ; loc_78774
-		dc.w	$8E00
-loc_249DC:
-		dc.w	(((loc_249E4-loc_249DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Title_Cards-$07E2	; loc_7E222
-		dc.w	$B000
-loc_249E4:
-		dc.w	(((loc_249F8-loc_249E4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	ArtNem_Signpost 	      ; loc_7931E
-		dc.w	$D000
-		dc.l	Hidden_Points-$07E2	; loc_7F37A
-		dc.w	$96C0
-		dc.l	Big_Ring_Flash-$07E2	; loc_7F206
-		dc.w	$8C40
-loc_249F8:
-		dc.w	(((loc_24A0C-loc_249F8-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l	Robotnik_Ship-$07E2	; loc_7C4BC
-		dc.w	$8C00
-		dc.l	ArtNem_GHZBoss-$07E2	  ; loc_7D942
-		dc.w	$9800
-		dc.l	ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$A800
-loc_24A0C:
-		dc.l	Robotnik_Ship-$07E2	; loc_7C4BC
-		dc.w	$8000
-		dc.l	Cpz_Boss-$07E2		; loc_7CBF8
-		dc.w	$8C00
-		dc.l	Ship_Boost-$07E2	; loc_7D7DE
-		dc.w	$9A00
-		dc.l	Boss_Smoke-$07E2	; loc_7D85C
-		dc.w	$9B00
-		dc.l	ArtNem_GHZBoss-$07E2	  ; loc_7D942
-		dc.w	$9D00
-		dc.l	ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$AD00
-Unknow_Data_0x024A30:
-loc_24A30:
-		dc.b	$00, $78, $00, $06, $00, $07, $00, $06, $00, $10, $80, $06, $03, $0A, $06, $00
-		dc.b	$07, $08, $60, $00, $06, $66, $88, $89, $07, $01, $10, $06, $0A, $01, $07, $00
-		dc.b	$01, $10, $00, $11, $10, $00, $70, $02, $06, $77, $00, $11, $11, $66, $77, $03
-		dc.b	$01, $07, $03, $01, $17, $03, $02, $9F, $10, $02, $02, $01, $10, $02, $01, $01
-		dc.b	$02, $02, $09, $61, $02, $0A, $18, $66, $09, $EF, $87, $00, $97, $10, $6F, $76
-		dc.b	$02, $0C, $10, $10, $77, $11, $06, $00, $17, $00, $10, $00, $01, $10, $02, $2D
-		dc.b	$01, $01, $01, $61, $11, $06, $10, $77, $86, $17, $78, $88, $F7, $11, $0F, $07
-		dc.b	$77, $00, $66, $FF, $17, $61, $01, $06, $07, $70, $67, $71, $16, $10, $76, $11
-		dc.b	$10, $01, $10, $61, $06, $00, $61, $77, $E8, $9E, $9E, $E9, $77, $03, $0C, $F0
-		dc.b	$07, $10, $00, $7F, $00, $01, $00, $17, $F0, $77, $61, $02, $0E, $77, $07, $67
-		dc.b	$87, $11, $67, $F8, $11, $00, $01, $E9, $86, $66, $11, $02, $02, $07, $11, $05
-		dc.b	$02, $E0, $71, $05, $01, $0E, $05, $0C, $71, $00, $E0, $77, $70, $00, $77, $77
-		dc.b	$70, $16, $00, $70, $02, $01, $10, $02, $08, $07, $00, $07, $07, $00, $01, $00
-		dc.b	$70, $04, $0E, $70, $00, $10, $00, $07, $00, $01, $07, $00, $10, $00, $11, $66
-		dc.b	$71, $03, $02, $07, $11, $02, $01, $70, $04, $01, $01, $03, $01, $10, $02, $01
-		dc.b	$70, $03, $01, $07, $03, $04, $61, $00, $01, $16, $0A, $02, $10, $70, $02, $01
-		dc.b	$07, $02, $01, $01, $04, $01, $70, $05, $04, $60, $01, $76, $66, $10, $01, $70
-		dc.b	$09, $06, $11, $00, $98, $88, $67, $10, $0B, $03, $01, $00, $0E, $05, $05, $70
-		dc.b	$00, $E0, $07, $07, $04, $04, $88, $76, $61, $66, $05, $01, $10, $18, $04, $16
-		dc.b	$66, $00, $01, $02, $05, $01, $10, $70, $00, $01, $04, $01, $07, $0B, $01, $07
-		dc.b	$02, $08, $66, $00, $66, $76, $00, $70, $01, $10, $02, $01, $10, $02, $02, $07
-		dc.b	$01, $07, $02, $71, $01, $03, $01, $11, $03, $04, $10, $66, $66, $61, $08, $01
-		dc.b	$11, $03, $01, $10, $10, $05, $01, $66, $88, $89, $17, $03, $02, $77, $70, $02
-		dc.b	$03, $70, $00, $E0, $05, $01, $70, $07, $02, $07, $70, $02, $06, $07, $76, $68
-		dc.b	$88, $07, $01, $08, $01, $10, $02, $01, $70, $04, $01, $01, $02, $03, $07, $00
-		dc.b	$10, $02, $06, $70, $01, $66, $66, $61, $11, $09, $05, $01, $10, $00, $10, $67
-		dc.b	$02, $02, $06, $07, $02, $02, $70, $70, $02, $14, $07, $00, $10, $00, $FF, $8F
-		dc.b	$FF, $EE, $87, $00, $10, $70, $18, $F7, $76, $F8, $01, $78, $FF, $07, $02, $08
-		dc.b	$70, $70, $00, $10, $00, $01, $00, $01, $04, $10, $17, $10, $EE, $9E, $E8, $91
-		dc.b	$77, $07, $88, $80, $88, $88, $61, $11, $01, $11, $02, $01, $10, $0F, $01, $10
-		dc.b	$03, $01, $10, $1B, $03, $61, $10, $11, $02, $01, $10, $04, $08, $10, $00, $07
-		dc.b	$10, $01, $01, $E0, $71, $03, $06, $07, $10, $00, $0E, $00, $71, $02, $07, $E0
-		dc.b	$07, $01, $88, $86, $77, $16, $02, $03, $10, $00, $10, $03, $01, $01, $03, $01
-		dc.b	$70, $08, $04, $10, $01, $07, $77, $03, $05, $76, $10, $00, $11, $70, $0A, $01
-		dc.b	$01, $03, $02, $01, $01, $03, $01, $70, $03, $02, $07, $10, $02, $04, $66, $11
-		dc.b	$66, $66, $05, $01, $17, $06, $01, $11, $03, $01, $10, $04, $01, $70, $06, $04
-		dc.b	$11, $66, $66, $66, $10, $01, $71, $0B, $01, $61, $1A, $01, $01, $03, $05, $10
-		dc.b	$22, $22, $22, $33, $1C, $0B, $23, $23, $44, $44, $10, $00, $70, $00, $11, $01
-		dc.b	$07, $03, $02, $10, $70, $02, $02, $01, $07, $03, $01, $10, $07, $04, $01, $66
-		dc.b	$66, $61, $03, $01, $71, $06, $01, $07, $02, $03, $07, $70, $71, $02, $03, $11
-		dc.b	$77, $10, $04, $01, $01, $02, $05, $01, $60, $00, $16, $10, $1B, $05, $17, $66
-		dc.b	$66, $68, $9E, $04, $0B, $07, $70, $0E, $00, $70, $17, $00, $EE, $01, $01, $70
-		dc.b	$03, $06, $07, $77, $00, $01, $01, $10, $02, $06, $10, $01, $98, $89, $88, $88
-		dc.b	$08, $01, $E0, $03, $02, $0E, $E0, $02, $02, $70, $0E, $02, $01, $07, $07, $08
-		dc.b	$97, $00, $99, $EE, $00, $07, $01, $70, $07, $01, $17, $03, $01, $01, $05, $02
-		dc.b	$07, $01, $05, $06, $E0, $77, $11, $00, $07, $01, $02, $01, $70, $08, $01, $10
-		dc.b	$0E, $04, $99, $86, $61, $11, $11, $01, $0E, $0A, $06, $99, $98, $61, $11, $00
-		dc.b	$10, $1A, $08, $99, $86, $66, $10, $00, $0E, $00, $71, $03, $01, $07, $02, $01
-		dc.b	$E0, $04, $01, $07, $0A, $0D, $0E, $00, $9E, $E9, $89, $70, $17, $00, $10, $10
-		dc.b	$10, $77, $71, $02, $01, $07, $02, $01, $01, $04, $04, $07, $01, $01, $11, $03
-		dc.b	$17, $10, $70, $07, $00, $77, $77, $66, $10, $70, $70, $10, $01, $00, $07, $01
-		dc.b	$10, $07, $00, $70, $10, $00, $07, $70, $02, $05, $70, $10, $07, $00, $01, $04
-		dc.b	$07, $10, $70, $00, $76, $77, $00, $07, $03, $01, $70, $18, $03, $76, $66, $66
-		dc.b	$07, $09, $01, $00, $01, $00, $17, $00, $70, $11, $78, $02, $05, $7F, $80, $00
-		dc.b	$07, $80, $02, $09, $08, $01, $10, $66, $6E, $FE, $E8, $00, $16, $02, $3C, $11
-		dc.b	$78, $FF, $F0, $FF, $00, $11, $18, $00, $80, $10, $01, $11, $00, $01, $10, $01
-		dc.b	$00, $01, $11, $10, $01, $00, $01, $FF, $FE, $EF, $FF, $70, $00, $61, $00, $0F
-		dc.b	$FF, $87, $11, $81, $11, $00, $FF, $10, $01, $08, $00, $01, $10, $00, $11, $11
-		dc.b	$10, $00, $10, $10, $00, $10, $01, $FF, $FE, $FE, $EE, $02, $03, $01, $01, $10
-		dc.b	$02, $1A, $10, $71, $00, $10, $77, $87, $11, $07, $07, $08, $F7, $00, $71, $00
-		dc.b	$08, $70, $00, $01, $10, $80, $00, $FF, $FE, $87, $00, $10, $02, $01, $10, $02
-		dc.b	$08, $01, $00, $10, $01, $70, $00, $71, $07, $02, $01, $77, $03, $02, $10, $17
-		dc.b	$02, $01, $07, $03, $04, $01, $11, $10, $16, $02, $02, $11, $77, $02, $02, $10
-		dc.b	$07, $02, $02, $01, $70, $07, $01, $17, $08, $06, $10, $01, $00, $01, $01, $01
-		dc.b	$07, $01, $10, $02, $01, $70, $0C, $01, $10, $02, $05, $70, $66, $88, $88, $10
-		dc.b	$13, $02, $10, $0E, $02, $01, $07, $03, $04, $9E, $0E, $99, $98, $03, $01, $01
-		dc.b	$0E, $01, $70, $06, $01, $E0, $02, $04, $89, $86, $61, $11, $05, $01, $10, $02
-		dc.b	$01, $10, $13, $04, $99, $98, $61, $11, $02, $01, $07, $19, $04, $99, $98, $66
-		dc.b	$11, $1C, $04, $99, $98, $88, $61, $0F, $01, $E7, $0C, $06, $89, $EE, $EE, $96
-		dc.b	$00, $70, $03, $04, $70, $00, $71, $07, $03, $06, $07, $70, $00, $07, $11, $07
-		dc.b	$03, $01, $17, $02, $02, $71, $07, $02, $06, $70, $11, $67, $00, $10, $01, $03
-		dc.b	$01, $70, $07, $01, $77, $02, $03, $10, $00, $10, $02, $05, $70, $10, $70, $00
-		dc.b	$07, $02, $04, $77, $07, $67, $70, $1D, $0E, $08, $99, $98, $00, $08, $11, $10
-		dc.b	$00, $08, $00, $01, $00, $80, $11, $03, $02, $01, $01, $02, $01, $10, $02, $01
-		dc.b	$80, $02, $19, $77, $7F, $F8, $88, $FF, $FE, $E8, $89, $10, $10, $11, $01, $00
-		dc.b	$11, $01, $10, $01, $10, $01, $11, $11, $10, $11, $10, $01, $02, $1E, $01, $01
-		dc.b	$00, $10, $10, $00, $88, $88, $00, $10, $89, $98, $00, $10, $11, $01, $01, $01
-		dc.b	$10, $11, $00, $11, $10, $01, $10, $01, $11, $01, $11, $10, $02, $14, $10, $01
-		dc.b	$01, $00, $10, $00, $88, $88, $00, $01, $99, $80, $FE, $01, $11, $80, $00, $10
-		dc.b	$00, $80, $02, $09, $11, $08, $00, $10, $10, $00, $01, $00, $01, $04, $0A, $08
-		dc.b	$77, $88, $8F, $F7, $77, $66, $00, $01, $11, $06, $01, $10, $07, $02, $01, $11
-		dc.b	$02, $04, $10, $11, $10, $07, $02, $08, $71, $00, $70, $11, $61, $66, $61, $10
-		dc.b	$17, $01, $10, $02, $06, $01, $00, $61, $00, $01, $11, $07, $01, $01, $0B, $03
-		dc.b	$10, $07, $10, $05, $05, $07, $70, $78, $88, $9E, $05, $01, $E0, $02, $01, $70
-		dc.b	$07, $01, $0E, $0B, $01, $E0, $02, $01, $EE, $06, $01, $0E, $0F, $01, $E0, $05
-		dc.b	$03, $9E, $E9, $77, $02, $07, $70, $10, $70, $00, $01, $01, $07, $08, $01, $07
-		dc.b	$02, $02, $10, $70, $07, $05, $01, $10, $00, $01, $01, $07, $02, $07, $10, $06
-		dc.b	$02, $70, $01, $07, $01, $70, $02, $04, $16, $61, $11, $61, $03, $01, $07, $02
-		dc.b	$01, $10, $04, $01, $70, $06, $01, $01, $08, $01, $07, $03, $02, $11, $10, $0B
-		dc.b	$01, $01, $03, $01, $70, $08, $01, $10, $04, $05, $06, $66, $07, $00, $07, $02
-		dc.b	$05, $01, $01, $70, $00, $70, $09, $02, $07, $E0, $06, $07, $10, $97, $71, $00
-		dc.b	$10, $00, $10, $04, $02, $01, $07, $03, $01, $77, $07, $01, $01, $02, $02, $17
-		dc.b	$70, $04, $04, $77, $66, $70, $71, $03, $0B, $70, $77, $70, $77, $01, $00, $77
-		dc.b	$11, $00, $10, $01, $02, $06, $17, $70, $00, $10, $00, $10, $06, $07, $06, $01
-		dc.b	$16, $66, $10, $01, $07, $03, $01, $10, $04, $01, $07, $06, $01, $17, $04, $01
-		dc.b	$71, $04, $05, $66, $11, $07, $06, $07, $02, $0C, $77, $70, $11, $10, $71, $01
-		dc.b	$00, $10, $10, $10, $00, $01, $02, $02, $01, $10, $06, $01, $01, $02, $08, $10
-		dc.b	$00, $11, $66, $10, $00, $10, $70, $02, $02, $01, $07, $03, $01, $10, $03, $01
-		dc.b	$01, $0C, $08, $88, $88, $66, $66, $00, $0E, $00, $70, $05, $01, $E0, $06, $03
-		dc.b	$0E, $00, $07, $09, $05, $E7, $77, $61, $17, $07, $06, $01, $10, $09, $01, $70
-		dc.b	$04, $02, $01, $07, $04, $04, $70, $00, $11, $16, $08, $03, $70, $07, $01, $07
-		dc.b	$02, $70, $10, $08, $04, $66, $66, $61, $11, $1C, $04, $66, $10, $00, $01, $0C
-		dc.b	$01, $07, $0F, $00, $0E, $F6, $0A, $00, $10, $00, $5F, $00, $11, $00, $5F, $00
-		dc.b	$01, $04, $80, $8C, $60, $C6, $60, $C7, $00, $10, $00, $10, $80, $D6, $80, $D7
-		dc.b	$00, $14, $00, $15, $00, $12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11
-		dc.b	$00, $10, $00, $10, $00, $17, $00, $16, $00, $15, $00, $14, $80, $D2, $80, $D2
-		dc.b	$00, $10, $00, $10, $08, $93, $00, $92, $00, $10, $00, $10, $00, $B2, $08, $B3
-		dc.b	$00, $10, $00, $10, $80, $D4, $80, $D4, $00, $10, $00, $10, $00, $16, $00, $16
-		dc.b	$00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11
-		dc.b	$00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $16, $00, $16
-		dc.b	$00, $10, $00, $10, $80, $D4, $80, $D4, $00, $10, $00, $10, $88, $F7, $88, $B7
-		dc.b	$00, $50, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $45, $00, $16
-		dc.b	$03, $07, $10, $00, $51, $00, $42, $00, $10, $02, $04, $08, $41, $08, $51, $03
-		dc.b	$07, $10, $00, $52, $00, $41, $00, $10, $03, $2D, $16, $00, $55, $00, $10, $00
-		dc.b	$10, $00, $12, $E8, $52, $00, $10, $E8, $50, $08, $31, $08, $31, $00, $10, $00
-		dc.b	$10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $16, $00, $16, $00, $10, $00
-		dc.b	$10, $00, $63, $00, $62, $00, $61, $02, $03, $08, $61, $08, $04, $5D, $61, $00
-		dc.b	$72, $00, $12, $00, $10, $00, $10, $00, $16, $00, $16, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $08, $F1, $08, $F1, $80, $10, $80, $10, $80
-		dc.b	$12, $80, $12, $80, $13, $00, $10, $80, $15, $00, $16, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $00, $16, $00, $16, $00, $10, $88, $13, $00
-		dc.b	$12, $88, $11, $88, $10, $80, $10, $00, $91, $08, $31, $03, $38, $A1, $00, $A2
-		dc.b	$00, $91, $00, $A2, $00, $22, $00, $91, $00, $16, $00, $25, $00, $10, $00, $12
-		dc.b	$00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $00, $12
-		dc.b	$08, $27, $00, $10, $08, $25, $08, $24, $00, $16, $08, $22, $08, $A2, $00, $12
-		dc.b	$08, $00, $08, $A1, $08, $02, $80, $AB, $C6, $00, $C7, $00, $10, $00, $12, $00
-		dc.b	$30, $00, $30, $00, $10, $00, $10, $00, $F6, $00, $14, $00, $F0, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $00, $16, $08, $11, $00, $10, $00, $10, $08
-		dc.b	$15, $08, $F2, $00, $10, $08, $F0, $00, $14, $00, $16, $00, $10, $00, $10, $00
-		dc.b	$32, $00, $30, $00, $12, $00, $10, $08, $DD, $08, $DF, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $10, $00, $10, $00, $10, $00, $10, $08, $11, $00, $10, $00, $10, $01
-		dc.b	$19, $09, $1E, $00, $43, $00, $47, $00, $50, $00, $51, $00, $52, $00, $53, $09
-		dc.b	$4D, $09, $42, $00, $10, $00, $1F, $08, $48, $00, $49, $00, $30, $00, $30, $00
-		dc.b	$10, $00, $10, $00, $11, $00, $11, $00, $6E, $08, $6F, $00, $22, $00, $22, $00
-		dc.b	$20, $00, $22, $00, $26, $00, $24, $00, $26, $08, $27, $00, $24, $08, $25, $08
-		dc.b	$27, $08, $25, $00, $24, $00, $26, $00, $24, $00, $24, $00, $22, $00, $22, $08
-		dc.b	$2B, $08, $46, $03, $3F, $6C, $00, $5D, $00, $5E, $00, $1A, $00, $16, $00, $18
-		dc.b	$08, $15, $00, $16, $00, $1A, $00, $73, $08, $7C, $00, $70, $00, $70, $00, $76
-		dc.b	$00, $76, $00, $70, $00, $70, $00, $72, $00, $72, $00, $70, $00, $70, $08, $73
-		dc.b	$08, $73, $00, $70, $00, $70, $00, $76, $00, $76, $00, $70, $00, $70, $00, $0C
-		dc.b	$00, $4A, $00, $47, $02, $14, $08, $09, $08, $0A, $00, $24, $00, $24, $08, $27
-		dc.b	$08, $27, $08, $25, $00, $24, $00, $2F, $08, $76, $03, $1F, $5B, $00, $5C, $00
-		dc.b	$5D, $00, $30, $00, $30, $00, $32, $00, $32, $00, $30, $00, $30, $08, $33, $08
-		dc.b	$33, $00, $30, $00, $30, $00, $36, $08, $6C, $08, $5B, $03, $35, $1B, $00, $6A
-		dc.b	$00, $1B, $00, $10, $00, $3D, $00, $44, $00, $70, $00, $70, $00, $72, $08, $73
-		dc.b	$00, $70, $00, $70, $00, $46, $00, $44, $00, $24, $00, $24, $00, $2D, $08, $50
-		dc.b	$08, $00, $08, $7D, $08, $7E, $08, $7F, $00, $26, $00, $26, $08, $25, $00, $59
-		dc.b	$08, $7D, $03, $0B, $3D, $08, $3D, $00, $70, $00, $70, $00, $4D, $08, $15, $03
-		dc.b	$07, $30, $00, $59, $00, $68, $00, $30, $03, $2B, $75, $00, $1D, $00, $67, $00
-		dc.b	$61, $00, $73, $00, $75, $00, $03, $00, $53, $00, $01, $08, $50, $00, $06, $08
-		dc.b	$07, $08, $05, $08, $05, $00, $53, $00, $03, $00, $30, $00, $10, $00, $10, $08
-		dc.b	$1B, $08, $7A, $00, $0B, $03, $2F, $10, $00, $02, $00, $18, $00, $90, $00, $28
-		dc.b	$00, $96, $00, $2E, $00, $28, $00, $28, $00, $8F, $00, $89, $00, $8D, $00, $8B
-		dc.b	$08, $2B, $08, $2B, $00, $28, $00, $28, $00, $2E, $00, $2E, $00, $28, $00, $90
-		dc.b	$00, $20, $08, $92, $00, $10, $02, $81, $0E, $08, $15, $00, $0F, $00, $10, $00
-		dc.b	$10, $00, $66, $00, $66, $00, $F0, $00, $F0, $00, $F0, $00, $F0, $00, $F2, $00
-		dc.b	$F2, $00, $10, $00, $10, $00, $43, $00, $41, $08, $42, $08, $40, $00, $41, $00
-		dc.b	$43, $08, $F2, $08, $F0, $00, $10, $00, $E1, $00, $A0, $00, $51, $00, $51, $00
-		dc.b	$53, $00, $53, $00, $51, $00, $51, $00, $43, $00, $D9, $00, $CB, $00, $03, $00
-		dc.b	$0C, $00, $89, $00, $86, $00, $30, $00, $30, $00, $32, $00, $32, $00, $30, $00
-		dc.b	$30, $00, $26, $00, $26, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $08, $E7, $08, $E7, $00, $F2, $00, $F2, $00, $F2, $00, $F2, $00, $F0, $00
-		dc.b	$F0, $00, $86, $00, $86, $00, $10, $00, $10, $08, $3E, $08, $37, $00, $10, $00
-		dc.b	$E1, $00, $89, $00, $71, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $00, $06, $00, $06, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $08, $25, $08, $25, $00, $30, $00, $30, $00, $32, $00, $32, $00, $30, $00
-		dc.b	$30, $00, $80, $00, $80, $00, $10, $00, $10, $00, $82, $00, $82, $00, $10, $00
-		dc.b	$10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $BA, $00, $BA, $00, $0C, $00
-		dc.b	$03, $08, $D3, $08, $DC, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $08, $45, $08, $45, $00, $43, $00, $51, $00, $41, $00, $53, $00, $53, $00
-		dc.b	$51, $00, $E3, $00, $E8, $00, $E1, $00, $10, $08, $C8, $08, $D9, $00, $B0, $00
-		dc.b	$59, $00, $59, $00, $B1, $00, $5B, $03, $23, $72, $00, $C1, $00, $10, $00, $10
-		dc.b	$00, $12, $00, $12, $00, $10, $00, $10, $00, $16, $00, $16, $00, $C4, $00, $3D
-		dc.b	$00, $D4, $00, $A3, $00, $2D, $00, $5B, $00, $F9, $08, $D4, $03, $1D, $2D, $08
-		dc.b	$C5, $00, $3D, $00, $3D, $08, $C4, $00, $3B, $08, $C2, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $08, $D1, $00, $39, $03, $2F, $5B, $08, $E8
-		dc.b	$08, $B2, $00, $59, $08, $B0, $08, $DA, $08, $10, $00, $8B, $00, $7B, $00, $0A
-		dc.b	$00, $30, $00, $10, $00, $10, $00, $16, $00, $16, $00, $EC, $00, $ED, $88, $79
-		dc.b	$88, $78, $08, $87, $00, $F0, $80, $EE, $88, $88, $00, $30, $03, $01, $10, $03
-		dc.b	$01, $70, $02, $80, $F4, $80, $AF, $80, $FC, $00, $10, $00, $01, $00, $11, $00
-		dc.b	$01, $00, $11, $00, $01, $00, $F5, $00, $F4, $00, $10, $00, $10, $81, $1B, $81
-		dc.b	$1B, $00, $10, $00, $10, $00, $12, $00, $10, $00, $10, $00, $16, $00, $10, $00
-		dc.b	$16, $00, $07, $00, $07, $89, $7D, $89, $7D, $00, $F0, $00, $F0, $89, $8A, $89
-		dc.b	$8A, $00, $16, $00, $14, $00, $16, $00, $14, $00, $0B, $00, $0B, $00, $0B, $00
-		dc.b	$0B, $00, $09, $00, $09, $00, $09, $08, $0A, $08, $10, $00, $10, $08, $10, $08
-		dc.b	$13, $00, $0B, $00, $1A, $01, $08, $00, $3B, $01, $1B, $00, $10, $00, $3F, $00
-		dc.b	$16, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $13, $08
-		dc.b	$13, $00, $10, $00, $10, $00, $16, $09, $34, $00, $10, $09, $1B, $08, $77, $08
-		dc.b	$5E, $00, $0C, $00, $0C, $00, $0E, $00, $0E, $00, $0C, $00, $0C, $00, $0E, $00
-		dc.b	$0E, $00, $08, $00, $08, $00, $0A, $00, $57, $00, $08, $00, $55, $89, $D5, $89
-		dc.b	$D5, $00, $30, $00, $30, $00, $32, $00, $32, $00, $30, $00, $30, $00, $12, $00
-		dc.b	$12, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $80, $00
-		dc.b	$80, $00, $10, $00, $10, $88, $33, $08, $31, $00, $10, $00, $10, $08, $09, $88
-		dc.b	$0B, $00, $0C, $00, $03, $08, $17, $08, $18, $00, $22, $00, $22, $08, $25, $08
-		dc.b	$2A, $00, $10, $00, $1F, $08, $1E, $08, $1F, $04, $2C, $08, $78, $08, $79, $00
-		dc.b	$F2, $00, $F2, $00, $F2, $00, $F2, $00, $F0, $00, $F0, $08, $80, $00, $81, $00
-		dc.b	$24, $00, $24, $08, $24, $00, $25, $00, $22, $00, $22, $88, $21, $88, $23, $00
-		dc.b	$10, $00, $10, $E0, $1A, $E0, $19, $04, $0C, $68, $29, $68, $21, $00, $E1, $00
-		dc.b	$10, $68, $C8, $68, $31, $80, $A4, $5C, $E0, $00, $E0, $00, $E0, $00, $E0, $00
-		dc.b	$E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00
-		dc.b	$E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00
-		dc.b	$E0, $00, $60, $00, $E0, $00, $60, $00, $E0, $00, $60, $00, $E0, $00, $60, $00
-		dc.b	$E0, $00, $20, $00, $E0, $00, $20, $00, $60, $0A, $E0, $09, $00, $10, $00, $10
-		dc.b	$00, $12, $80, $10, $00, $22, $00, $22, $08, $25, $08, $2A, $00, $10, $00, $1F
-		dc.b	$68, $1F, $68, $1E, $04, $1F, $E0, $0A, $E0, $09, $00, $10, $00, $10, $60, $1A
-		dc.b	$40, $19, $80, $00, $A0, $00, $40, $00, $40, $00, $40, $00, $40, $00, $A0, $00
-		dc.b	$A0, $00, $A0, $00, $A0, $1B, $01, $E0, $03, $43, $E0, $00, $80, $00, $10, $03
-		dc.b	$80, $00, $10, $03, $C0, $00, $E0, $00, $C0, $00, $E0, $00, $C0, $00, $E0, $00
-		dc.b	$C0, $00, $E0, $00, $C0, $00, $E0, $00, $C0, $00, $E0, $00, $E0, $00, $E0, $00
-		dc.b	$E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $40, $00
-		dc.b	$E0, $00, $E0, $00, $60, $00, $80, $00, $E0, $00, $C0, $00, $20, $03, $01, $60
-		dc.b	$03, $07, $60, $00, $40, $00, $60, $00, $40, $03, $27, $C0, $00, $20, $00, $C0
-		dc.b	$00, $60, $00, $80, $00, $60, $00, $80, $00, $E0, $00, $20, $00, $E0, $00, $E0
-		dc.b	$00, $80, $00, $20, $00, $80, $00, $E0, $00, $C0, $00, $20, $00, $C0, $00, $20
-		dc.b	$00, $40, $03, $01, $40, $03, $01, $C0, $03, $01, $C0, $03, $15, $60, $00, $80
-		dc.b	$00, $60, $00, $80, $00, $C0, $00, $E0, $00, $C0, $00, $60, $00, $E0, $00, $60
-		dc.b	$00, $E0, $03, $01, $E0, $37, $11, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $11
-		dc.b	$11, $11, $11, $00, $11, $11, $11, $11, $05, $02, $11, $11, $02, $02, $11, $11
-		dc.b	$04, $01, $11, $03, $01, $11, $03, $07, $11, $11, $11, $00, $11, $11, $11, $05
-		dc.b	$02, $11, $11, $02, $02, $11, $11, $06, $02, $11, $11, $02, $02, $11, $11, $07
-		dc.b	$01, $01, $03, $01, $01, $0E, $08, $11, $11, $11, $00, $11, $11, $11, $11, $07
-		dc.b	$01, $11, $06, $19, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $00, $11, $0F, $11
-		dc.b	$11, $BB, $F0, $EE, $22, $99, $00, $FF, $CC, $33, $FF, $00, $FF, $19, $03, $FF
-		dc.b	$FF, $FF, $02, $04, $FF, $FF, $00, $FF, $80, $D5, $09, $A2, $A8, $A1, $A1, $05
-		dc.b	$A8, $A1, $A1, $A7, $24, $0B, $64, $65, $66, $67, $0C, $0C, $0C, $67, $68, $69
-		dc.b	$6A, $08, $11, $A0, $A1, $A1, $A1, $04, $03, $03, $03, $06, $07, $04, $07, $04
-		dc.b	$07, $04, $07, $04, $02, $02, $07, $04, $02, $02, $07, $04, $02, $0A, $07, $99
-		dc.b	$9E, $A2, $24, $B1, $3C, $00, $81, $8A, $25, $0C, $8B, $8C, $00, $48, $C2, $C6
-		dc.b	$4B, $04, $49, $4A, $4B, $4C, $0D, $21, $7B, $74, $75, $80, $FA, $F6, $0B, $FF
-		dc.b	$F1, $F6, $0B, $0A, $F0, $F4, $F4, $F7, $F0, $F4, $F4, $F7, $F0, $F4, $F4, $F7
-		dc.b	$2E, $2F, $81, $06, $24, $AF, $00, $84, $8A, $08, $18, $02, $03, $04, $05, $02
-		dc.b	$03, $04, $05, $02, $03, $04, $05, $02, $03, $04, $05, $02, $03, $04, $05, $02
-		dc.b	$03, $04, $05, $05, $0C, $8D, $8E, $8F, $90, $DC, $DC, $DC, $C4, $51, $52, $53
-		dc.b	$54, $05, $2A, $A9, $AA, $AB, $AC, $04, $AA, $AB, $AC, $D6, $7C, $7D, $83, $FF
-		dc.b	$FE, $FB, $04, $F4, $FE, $FB, $FA, $F3, $FF, $F9, $FF, $F3, $FF, $F9, $FF, $F3
-		dc.b	$FF, $F9, $FF, $2D, $2C, $84, $FB, $D6, $2A, $00, $79, $78, $85, $06, $1A, $09
-		dc.b	$0A, $0B, $0C, $04, $04, $0B, $0C, $04, $04, $0B, $0C, $04, $04, $0B, $0C, $04
-		dc.b	$04, $0B, $0C, $04, $04, $0B, $0C, $0D, $0E, $07, $09, $40, $41, $42, $43, $04
-		dc.b	$41, $42, $43, $44, $0D, $22, $7B, $71, $72, $88, $F2, $F3, $F4, $0F, $F9, $F3
-		dc.b	$F4, $F5, $F8, $F9, $FB, $F0, $F8, $F9, $FB, $F0, $F8, $F9, $FB, $F0, $26, $27
-		dc.b	$89, $02, $2F, $25, $00, $80, $81, $8A, $05, $1C, $10, $11, $12, $13, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $14, $15, $16, $17, $06, $09, $48, $49, $4A, $4B, $04, $49, $4A, $4B
-		dc.b	$4C, $02, $07, $60, $61, $62, $00, $60, $61, $62, $02, $24, $73, $6C, $79, $7A
-		dc.b	$05, $1B, $12, $16, $1B, $0F, $12, $16, $1B, $0F, $12, $16, $1B, $0F, $12, $16
-		dc.b	$1B, $0F, $12, $16, $0F, $CD, $C5, $C3, $79, $39, $2A, $25, $00, $83, $84, $8A
-		dc.b	$05, $1F, $18, $19, $1A, $1B, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $1B, $1A, $19, $1F, $07, $07
-		dc.b	$07, $03, $09, $50, $51, $52, $53, $04, $51, $52, $53, $54, $02, $07, $55, $5F
-		dc.b	$63, $00, $55, $5F, $63, $02, $25, $7B, $74, $81, $82, $05, $0B, $F1, $F6, $0B
-		dc.b	$FF, $F1, $F6, $0B, $FF, $F1, $F6, $0B, $FF, $F1, $F6, $0B, $FF, $F1, $F6, $FF
-		dc.b	$FD, $DE, $DB, $81, $FB, $D7, $D7, $85, $79, $79, $78, $85, $04, $1F, $20, $21
-		dc.b	$22, $23, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $44, $44, $44, $27, $60, $61, $62, $04, $0A, $59
-		dc.b	$5A, $5B, $00, $CC, $CC, $5B, $00, $95, $96, $09, $25, $7B, $7C, $84, $82, $FD
-		dc.b	$FB, $F4, $FE, $FB, $04, $F4, $FE, $FB, $04, $F4, $FE, $FB, $04, $F4, $FE, $FB
-		dc.b	$04, $F4, $FE, $02, $05, $DE, $D3, $84, $02, $2E, $2E, $8A, $80, $80, $81, $8A
-		dc.b	$04, $1F, $28, $29, $2A, $2B, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $79, $72, $4D, $2F, $55, $5F
-		dc.b	$63, $05, $09, $3F, $91, $92, $93, $AB, $91, $92, $93, $94, $09, $25, $7B, $71
-		dc.b	$89, $82, $FD, $F6, $F9, $F3, $F4, $0F, $F9, $F3, $F4, $0F, $F9, $F3, $F4, $0F
-		dc.b	$F9, $F3, $F4, $0F, $F9, $F3, $0F, $05, $C0, $C0, $89, $01, $33, $35, $8A, $83
-		dc.b	$83, $84, $8A, $07, $02, $01, $06, $02, $02, $01, $06, $02, $02, $30, $37, $02
-		dc.b	$02, $30, $37, $02, $02, $01, $06, $02, $02, $01, $06, $0A, $3A, $B9, $58, $44
-		dc.b	$00, $B9, $58, $44, $40, $4E, $4F, $44, $40, $4E, $4F, $44, $73, $6C, $6D, $78
-		dc.b	$0A, $16, $06, $14, $14, $02, $12, $16, $1B, $0F, $12, $16, $1B, $0F, $12, $16
-		dc.b	$1B, $0F, $12, $16, $1B, $1B, $F3, $F5, $F7, $CF, $3B, $A4, $9A, $1E, $1E, $80
-		dc.b	$BD, $01, $05, $BD, $BD, $BC, $B8, $05, $02, $08, $0F, $02, $02, $08, $0F, $02
-		dc.b	$02, $31, $36, $02, $02, $31, $36, $02, $02, $08, $0F, $02, $02, $08, $0F, $04
-		dc.b	$40, $40, $58, $44, $40, $18, $1C, $0C, $1C, $14, $44, $48, $5C, $4C, $48, $56
-		dc.b	$57, $4C, $48, $56, $57, $4C, $7B, $74, $75, $80, $FA, $F6, $05, $F4, $F4, $02
-		dc.b	$F1, $F6, $0B, $FF, $F1, $F6, $0B, $FF, $F1, $F6, $0B, $FF, $F1, $F6, $0B, $0A
-		dc.b	$EB, $74, $E8, $C7, $28, $B6, $9D, $C7, $C6, $36, $80, $F4, $FF, $80, $80, $81
-		dc.b	$8A, $04, $18, $32, $33, $34, $35, $32, $33, $34, $35, $32, $33, $34, $35, $32
-		dc.b	$33, $34, $35, $32, $33, $34, $35, $32, $33, $34, $35, $03, $44, $48, $5C, $4C
-		dc.b	$48, $14, $10, $1C, $76, $08, $4C, $50, $3E, $54, $45, $46, $47, $4D, $45, $46
-		dc.b	$47, $4D, $7B, $7C, $7D, $83, $FF, $FE, $0D, $FF, $F9, $01, $F4, $FE, $FB, $04
-		dc.b	$F4, $FE, $FB, $04, $F4, $FE, $FB, $04, $F4, $FE, $FB, $10, $EC, $7C, $E3, $23
-		dc.b	$29, $B6, $9E, $C9, $C8, $35, $83, $F9, $BF, $BB, $BA, $BD, $FB, $01, $00, $F9
-		dc.b	$F9, $02, $05, $F9, $F9, $00, $F9, $F9, $02, $02, $F9, $F9, $09, $13, $F9, $F9
-		dc.b	$00, $03, $C7, $C7, $3E, $6A, $39, $53, $57, $6E, $6A, $53, $6F, $39, $53, $00
-		dc.b	$38, $02, $02, $5A, $59, $02, $06, $5A, $66, $3E, $3E, $3E, $01, $19, $09, $D9
-		dc.b	$DD, $A6, $03, $E0, $DD, $A6, $03, $39, $1C, $04, $82, $82, $82, $82, $1C, $04
-		dc.b	$BB, $BB, $BB, $BB, $7A, $00, $0C, $D6, $0A, $00, $10, $00, $3D, $00, $11, $00
-		dc.b	$3D, $00, $01, $04, $64, $61, $0D, $61, $0E, $00, $10, $00, $10, $00, $12, $08
-		dc.b	$13, $00, $10, $00, $10, $00, $12, $08, $10, $00, $11, $08, $11, $00, $11, $08
-		dc.b	$35, $00, $35, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $16, $08
-		dc.b	$17, $00, $10, $00, $10, $00, $11, $08, $12, $00, $10, $00, $10, $08, $13, $08
-		dc.b	$13, $00, $10, $00, $10, $00, $15, $00, $17, $00, $10, $00, $10, $00, $12, $00
-		dc.b	$37, $00, $10, $00, $35, $08, $13, $08, $13, $00, $10, $08, $04, $08, $11, $00
-		dc.b	$05, $08, $04, $00, $10, $00, $22, $08, $37, $04, $04, $08, $EA, $08, $EA, $04
-		dc.b	$02, $08, $EA, $08, $02, $08, $EA, $09, $1F, $5B, $00, $5A, $00, $5B, $00, $5A
-		dc.b	$00, $55, $00, $54, $00, $55, $00, $54, $00, $57, $00, $56, $00, $57, $00, $56
-		dc.b	$00, $51, $00, $50, $08, $BB, $00, $50, $04, $04, $08, $EA, $00, $5D, $03, $25
-		dc.b	$30, $00, $5C, $00, $32, $00, $30, $00, $45, $00, $05, $00, $72, $00, $10, $00
-		dc.b	$10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $1E, $00, $1E, $00, $10, $00
-		dc.b	$10, $00, $6F, $00, $6E, $05, $0D, $7B, $00, $7A, $00, $10, $00, $10, $00, $71
-		dc.b	$00, $70, $00, $73, $03, $0D, $2D, $00, $2D, $00, $30, $00, $10, $00, $42, $08
-		dc.b	$3D, $00, $10, $03, $2D, $B5, $08, $88, $00, $89, $00, $10, $00, $8B, $00, $12
-		dc.b	$00, $10, $00, $10, $00, $1E, $00, $1E, $00, $10, $00, $10, $00, $12, $00, $8E
-		dc.b	$00, $10, $00, $8C, $00, $16, $00, $16, $00, $10, $00, $10, $00, $12, $00, $90
-		dc.b	$00, $10, $03, $03, $93, $00, $7D, $03, $1F, $F0, $00, $7C, $00, $F2, $00, $F0
-		dc.b	$00, $F0, $00, $25, $00, $27, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10
-		dc.b	$00, $10, $00, $1E, $00, $A0, $00, $10, $03, $15, $12, $00, $BC, $00, $10, $00
-		dc.b	$10, $00, $16, $00, $16, $00, $10, $00, $10, $00, $12, $00, $B0, $00, $10, $03
-		dc.b	$0D, $CD, $00, $59, $00, $F0, $08, $43, $00, $D6, $00, $1A, $08, $67, $02, $7E
-		dc.b	$08, $F6, $08, $C8, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10
-		dc.b	$00, $1E, $00, $1E, $00, $10, $00, $10, $00, $CF, $00, $12, $00, $CD, $00, $10
-		dc.b	$00, $16, $00, $16, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10
-		dc.b	$00, $FC, $00, $4F, $00, $10, $00, $30, $00, $A3, $00, $B7, $00, $30, $00, $B5
-		dc.b	$00, $45, $00, $47, $00, $E9, $00, $10, $00, $EB, $00, $12, $00, $10, $00, $10
-		dc.b	$00, $1E, $00, $1E, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $08, $13
-		dc.b	$00, $16, $08, $15, $08, $1B, $08, $1B, $08, $19, $08, $19, $08, $1B, $00, $E2
-		dc.b	$08, $66, $08, $1A, $00, $30, $00, $D7, $08, $0A, $00, $CD, $00, $10, $02, $04
-		dc.b	$08, $B4, $08, $67, $03, $0F, $10, $00, $66, $00, $24, $00, $10, $00, $30, $00
-		dc.b	$24, $00, $79, $00, $30, $03, $03, $78, $08, $48, $03, $0F, $30, $08, $49, $00
-		dc.b	$04, $00, $30, $00, $10, $00, $04, $08, $76, $00, $10, $02, $14, $08, $D3, $00
-		dc.b	$BD, $00, $10, $00, $70, $00, $08, $00, $72, $00, $70, $00, $70, $00, $CC, $00
-		dc.b	$32, $03, $27, $0B, $00, $FC, $00, $09, $00, $0D, $00, $0F, $00, $0F, $00, $09
-		dc.b	$00, $0D, $00, $0B, $08, $0A, $08, $0C, $00, $0B, $00, $0D, $00, $0D, $00, $0F
-		dc.b	$00, $0F, $00, $0D, $00, $0D, $08, $F1, $00, $0B, $02, $0E, $08, $48, $08, $DC
-		dc.b	$00, $70, $00, $30, $08, $13, $00, $EC, $00, $30, $02, $04, $08, $ED, $08, $72
-		dc.b	$03, $27, $98, $00, $82, $00, $78, $00, $68, $00, $78, $00, $48, $00, $58, $00
-		dc.b	$48, $00, $58, $08, $58, $08, $48, $08, $58, $08, $48, $08, $78, $08, $68, $08
-		dc.b	$78, $08, $68, $08, $98, $00, $EA, $08, $98, $03, $0B, $37, $00, $DC, $00, $30
-		dc.b	$00, $30, $00, $F7, $00, $F6, $04, $04, $08, $00, $08, $C4, $03, $07, $30, $00
-		dc.b	$C5, $00, $EE, $00, $30, $02, $04, $68, $E2, $68, $0D, $1C, $05, $01, $00, $01
-		dc.b	$00, $01, $03, $01, $01, $07, $03, $09, $00, $09, $1D, $03, $60, $00, $08, $05
-		dc.b	$03, $69, $00, $01, $15, $03, $09, $00, $09, $1D, $03, $60, $00, $60, $07, $01
-		dc.b	$68, $03, $09, $01, $00, $68, $00, $01, $00, $01, $00, $01, $09, $03, $09, $00
-		dc.b	$09, $1D, $03, $60, $00, $60, $07, $01, $68, $05, $03, $68, $00, $01, $05, $01
-		dc.b	$01, $07, $03, $69, $00, $69, $2D, $03, $68, $00, $68, $0D, $03, $68, $00, $68
-		dc.b	$2D, $03, $68, $00, $68, $0D, $03, $61, $00, $61, $0D, $05, $61, $00, $61, $00
-		dc.b	$61, $03, $01, $61, $03, $23, $61, $00, $61, $00, $61, $00, $61, $00, $61, $00
-		dc.b	$61, $00, $61, $00, $61, $00, $61, $00, $61, $00, $61, $00, $61, $00, $61, $00
-		dc.b	$61, $00, $61, $00, $61, $00, $61, $00, $61, $51, $01, $80, $07, $01, $80, $0F
-		dc.b	$03, $80, $00, $80, $15, $03, $80, $00, $80, $15, $03, $60, $00, $60, $05, $03
-		dc.b	$60, $00, $60, $19, $01, $60, $03, $01, $60, $2D, $01, $60, $03, $01, $60, $1D
-		dc.b	$03, $60, $00, $60, $81, $2D, $49, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0
-		dc.b	$00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0
-		dc.b	$00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0
-		dc.b	$00, $60, $00, $E0, $00, $60, $00, $E0, $00, $60, $00, $E0, $00, $60, $00, $E0
-		dc.b	$00, $20, $00, $E0, $00, $20, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0
-		dc.b	$03, $01, $E0, $03, $01, $60, $03, $01, $60, $0D, $01, $40, $03, $19, $40, $00
-		dc.b	$80, $00, $A0, $00, $80, $00, $A0, $00, $40, $00, $40, $00, $40, $00, $40, $00
-		dc.b	$A0, $00, $A0, $00, $A0, $00, $A0, $1B, $01, $E0, $03, $43, $E0, $00, $80, $00
-		dc.b	$E0, $00, $80, $00, $E0, $00, $C0, $00, $E0, $00, $C0, $00, $E0, $00, $C0, $00
-		dc.b	$E0, $00, $C0, $00, $E0, $00, $C0, $00, $E0, $00, $C0, $00, $E0, $00, $E0, $00
-		dc.b	$E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00, $E0, $00
-		dc.b	$40, $00, $E0, $00, $E0, $00, $60, $00, $80, $00, $E0, $00, $C0, $00, $20, $03
-		dc.b	$01, $60, $03, $07, $60, $00, $40, $00, $60, $00, $40, $03, $27, $C0, $00, $20
-		dc.b	$00, $C0, $00, $60, $00, $80, $00, $60, $00, $80, $00, $E0, $00, $20, $00, $E0
-		dc.b	$00, $E0, $00, $80, $00, $20, $00, $80, $00, $E0, $00, $C0, $00, $20, $00, $C0
-		dc.b	$00, $20, $00, $40, $03, $01, $40, $03, $01, $C0, $03, $01, $C0, $03, $15, $60
-		dc.b	$00, $80, $00, $60, $00, $80, $00, $C0, $00, $E0, $00, $C0, $00, $60, $00, $E0
-		dc.b	$00, $60, $00, $E0, $03, $01, $E0, $81, $3C, $04, $0D, $0D, $0D, $0D, $28, $04
-		dc.b	$0D, $0D, $0D, $0D, $0D, $0A, $0D, $0D, $04, $0B, $01, $07, $09, $06, $01, $07
-		dc.b	$02, $0E, $0E, $0C, $0F, $0E, $0E, $0C, $06, $08, $01, $07, $09, $06, $01, $07
-		dc.b	$08, $08, $0E, $0C, $0F, $0E, $0E, $0C, $0F, $0E, $02, $04, $0D, $0D, $0D, $0D
-		dc.b	$0D, $04, $0D, $0D, $0D, $0D, $06, $0C, $09, $08, $0B, $0A, $0C, $03, $0F, $0D
-		dc.b	$05, $0B, $04, $07, $0A, $10, $09, $08, $0B, $0A, $0C, $03, $0F, $0D, $05, $0B
-		dc.b	$04, $07, $0D, $0D, $0D, $0D, $0D, $10, $04, $0B, $0C, $0A, $09, $06, $01, $1A
-		dc.b	$1C, $1F, $1E, $04, $1C, $1F, $1E, $19, $0A, $08, $09, $06, $01, $07, $09, $06
-		dc.b	$01, $07, $04, $0A, $09, $06, $01, $07, $09, $06, $0C, $0A, $0D, $0D, $0D, $04
-		dc.b	$0D, $0D, $0D, $0D, $03, $0A, $15, $14, $17, $16, $04, $04, $17, $16, $11, $10
-		dc.b	$1B, $04, $0D, $0D, $0D, $0D, $0D, $04, $0D, $0D, $0D, $0D, $03, $0A, $2D, $2C
-		dc.b	$2F, $2E, $04, $04, $2F, $2E, $29, $28, $05, $10, $0E, $0C, $0F, $0E, $0E, $0C
-		dc.b	$0F, $0E, $09, $06, $01, $07, $09, $06, $01, $07, $06, $04, $0D, $0D, $0D, $0D
-		dc.b	$0D, $04, $0D, $0D, $0D, $0D, $03, $0A, $25, $24, $27, $26, $04, $04, $27, $26
-		dc.b	$21, $20, $03, $0C, $09, $08, $0B, $0A, $0C, $03, $0F, $0D, $05, $0B, $04, $07
-		dc.b	$0C, $04, $0D, $0D, $0D, $0D, $0D, $1A, $03, $01, $02, $03, $0E, $0C, $0F, $33
-		dc.b	$3C, $3F, $3E, $04, $04, $3F, $37, $3F, $39, $07, $12, $1C, $12, $15, $1B, $1A
-		dc.b	$13, $12, $0C, $0A, $0E, $0C, $0F, $0E, $0E, $0C, $02, $03, $0D, $0D, $0D, $1A
-		dc.b	$06, $07, $08, $06, $0F, $0D, $05, $3E, $30, $30, $36, $04, $04, $37, $36, $31
-		dc.b	$30, $00, $2B, $2A, $23, $22, $2B, $2A, $23, $22, $0A, $0C, $09, $08, $0B, $0A
-		dc.b	$0C, $03, $0F, $0D, $08, $06, $09, $0A, $0D, $04, $0D, $0D, $0D, $0D, $03, $19
-		dc.b	$4D, $4C, $4F, $4E, $04, $04, $4F, $4E, $49, $48, $00, $3B, $3A, $33, $32, $3B
-		dc.b	$3A, $3A, $34, $01, $07, $09, $06, $01, $07, $0C, $04, $0D, $0D, $0D, $0D, $0D
-		dc.b	$04, $0D, $0D, $0D, $0D, $03, $13, $45, $44, $47, $46, $04, $04, $47, $46, $41
-		dc.b	$40, $00, $4B, $4A, $43, $42, $4B, $4A, $43, $42, $12, $04, $0D, $0D, $0D, $0D
-		dc.b	$0D, $04, $0D, $0D, $0D, $0D, $03, $13, $5D, $5C, $5F, $5E, $04, $04, $5F, $5E
-		dc.b	$59, $58, $00, $5B, $5A, $55, $54, $5B, $5A, $55, $54, $12, $04, $0D, $0D, $0D
-		dc.b	$0D, $80, $C4, $00, $00, $00, $0A, $20, $06, $66, $08, $88, $0C, $AA, $0E, $CC
-		dc.b	$02, $46, $00, $08, $00, $0E, $04, $6A, $06, $8C, $08, $CE, $0E, $22, $0E, $62
-		dc.b	$00, $00, $0E, $EE, $00, $00, $06, $22, $06, $44, $08, $66, $0A, $88, $0C, $CC
-		dc.b	$02, $26, $04, $6E, $08, $AE, $00, $EE, $00, $0A, $02, $4C, $00, $6E, $00, $AE
-		dc.b	$00, $00, $0E, $EE, $00, $00, $00, $26, $02, $48, $0A, $40, $0E, $60, $04, $44
-		dc.b	$08, $66, $0A, $88, $00, $4E, $00, $CE, $00, $0A, $02, $82, $02, $C2, $04, $E2
-		dc.b	$00, $00, $0E, $EE, $00, $00, $04, $EE, $04, $CE, $04, $8C, $02, $68, $00, $46
-		dc.b	$02, $60, $0C, $88, $0C, $CA, $02, $28, $0E, $86, $02, $80, $00, $C0, $02, $E2
-		dc.b	$00, $00, $0E, $EE, $20, $00, $00, $20, $05, $33, $33, $33, $33, $10, $02, $05
-		dc.b	$01, $01, $07, $00, $10, $02, $01, $70, $05, $02, $01, $70, $02, $01, $10, $02
-		dc.b	$0C, $10, $07, $00, $07, $01, $07, $77, $00, $77, $11, $00, $70, $02, $02, $10
-		dc.b	$07, $02, $03, $01, $17, $77, $02, $01, $07, $03, $0E, $10, $11, $00, $11, $01
-		dc.b	$00, $11, $00, $10, $33, $77, $77, $61, $22, $02, $0B, $70, $01, $00, $07, $01
-		dc.b	$10, $00, $70, $10, $00, $70, $03, $08, $07, $01, $00, $03, $10, $00, $03, $30
-		dc.b	$02, $09, $30, $00, $10, $01, $25, $55, $11, $10, $07, $02, $03, $01, $10, $70
-		dc.b	$02, $01, $01, $05, $01, $33, $02, $03, $07, $00, $30, $04, $06, $01, $01, $55
-		dc.b	$56, $67, $76, $0C, $01, $77, $02, $07, $07, $00, $70, $00, $70, $11, $17, $05
-		dc.b	$05, $01, $66, $67, $00, $76, $05, $04, $77, $77, $70, $77, $02, $0A, $07, $00
-		dc.b	$01, $11, $10, $01, $10, $00, $01, $10, $05, $06, $33, $30, $66, $66, $55, $56
-		dc.b	$0C, $01, $77, $02, $07, $07, $00, $70, $00, $70, $11, $07, $03, $01, $10, $02
-		dc.b	$03, $66, $67, $07, $02, $06, $07, $70, $11, $00, $70, $11, $02, $03, $01, $00
-		dc.b	$03, $03, $03, $30, $70, $01, $07, $10, $70, $10, $30, $07, $70, $01, $12, $11
-		dc.b	$11, $11, $11, $03, $33, $33, $33, $30, $13, $06, $22, $22, $22, $22, $11, $10
-		dc.b	$02, $08, $30, $01, $11, $00, $03, $33, $30, $11, $02, $01, $03, $04, $01, $30
-		dc.b	$08, $05, $25, $55, $55, $56, $07, $04, $03, $77, $00, $07, $02, $07, $70, $70
-		dc.b	$10, $00, $07, $00, $01, $02, $01, $01, $08, $0B, $66, $70, $00, $01, $00, $07
-		dc.b	$00, $11, $77, $70, $70, $02, $0F, $07, $00, $10, $11, $00, $77, $01, $00, $10
-		dc.b	$07, $70, $33, $01, $00, $07, $04, $04, $33, $00, $11, $66, $09, $02, $03, $33
-		dc.b	$02, $13, $30, $80, $33, $10, $00, $08, $80, $01, $30, $80, $08, $00, $03, $08
-		dc.b	$00, $11, $00, $33, $BB, $04, $01, $03, $04, $01, $33, $02, $15, $03, $00, $33
-		dc.b	$33, $30, $33, $00, $03, $03, $00, $33, $31, $80, $30, $00, $10, $A2, $21, $11
-		dc.b	$00, $10, $02, $02, $07, $01, $02, $01, $07, $03, $17, $70, $01, $00, $77, $70
-		dc.b	$10, $77, $77, $11, $07, $07, $01, $33, $74, $00, $13, $00, $40, $40, $00, $88
-		dc.b	$00, $03, $04, $02, $10, $80, $02, $01, $03, $03, $01, $30, $03, $02, $01, $38
-		dc.b	$02, $02, $03, $13, $03, $0F, $31, $44, $45, $54, $47, $01, $10, $00, $07, $15
-		dc.b	$50, $10, $70, $50, $50, $04, $01, $07, $02, $03, $01, $00, $01, $02, $03, $70
-		dc.b	$10, $05, $02, $0B, $03, $46, $66, $12, $30, $70, $10, $30, $00, $01, $03, $06
-		dc.b	$02, $10, $30, $02, $01, $03, $03, $01, $30, $06, $07, $03, $33, $23, $00, $03
-		dc.b	$30, $10, $06, $03, $03, $00, $30, $07, $03, $03, $00, $03, $02, $09, $33, $30
-		dc.b	$00, $03, $33, $33, $30, $02, $33, $06, $01, $01, $02, $01, $30, $06, $01, $33
-		dc.b	$06, $09, $01, $33, $00, $01, $10, $33, $00, $17, $01, $06, $01, $07, $02, $03
-		dc.b	$01, $00, $01, $04, $05, $01, $01, $11, $00, $11, $02, $02, $11, $10, $04, $03
-		dc.b	$03, $33, $33, $09, $01, $03, $02, $01, $10, $05, $0E, $30, $00, $01, $10, $03
-		dc.b	$00, $10, $01, $10, $33, $01, $11, $06, $11, $06, $01, $07, $02, $01, $01, $06
-		dc.b	$09, $01, $01, $10, $00, $11, $00, $01, $00, $10, $02, $08, $10, $11, $61, $10
-		dc.b	$01, $00, $07, $01, $02, $0C, $70, $70, $10, $00, $07, $61, $11, $00, $11, $00
-		dc.b	$01, $01, $02, $04, $33, $10, $00, $33, $02, $01, $03, $02, $02, $33, $30, $02
-		dc.b	$01, $30, $03, $02, $03, $30, $03, $02, $03, $33, $02, $0A, $01, $00, $33, $33
-		dc.b	$01, $11, $11, $00, $33, $11, $03, $02, $30, $10, $02, $02, $03, $01, $06, $01
-		dc.b	$03, $02, $04, $33, $30, $00, $33, $02, $06, $11, $11, $11, $11, $00, $70, $03
-		dc.b	$08, $77, $77, $77, $77, $16, $77, $77, $77, $04, $01, $01, $03, $01, $10, $02
-		dc.b	$01, $70, $02, $0C, $07, $47, $00, $07, $74, $00, $07, $70, $40, $04, $74, $44
-		dc.b	$02, $13, $62, $23, $34, $40, $11, $17, $70, $00, $11, $07, $00, $40, $30, $10
-		dc.b	$70, $00, $33, $17, $70, $02, $04, $17, $04, $00, $13, $03, $03, $31, $17, $40
-		dc.b	$02, $0E, $06, $21, $11, $03, $01, $03, $33, $00, $70, $11, $03, $00, $47, $70
-		dc.b	$02, $03, $04, $43, $13, $03, $01, $31, $03, $01, $03, $04, $11, $12, $22, $22
-		dc.b	$34, $03, $30, $01, $00, $88, $03, $00, $70, $00, $80, $00, $04, $80, $03, $18
-		dc.b	$38, $80, $00, $40, $13, $03, $17, $00, $36, $21, $74, $00, $04, $70, $72, $11
-		dc.b	$00, $47, $01, $33, $00, $04, $77, $10, $02, $02, $44, $71, $03, $01, $40, $03
-		dc.b	$01, $07, $03, $01, $04, $05, $17, $05, $55, $44, $00, $50, $11, $77, $55, $11
-		dc.b	$77, $11, $01, $77, $11, $03, $00, $01, $03, $30, $17, $10, $30, $88, $02, $01
-		dc.b	$08, $02, $01, $03, $02, $08, $46, $65, $2B, $B8, $00, $07, $00, $03, $06, $01
-		dc.b	$01, $08, $05, $10, $00, $07, $00, $01, $02, $06, $70, $00, $14, $55, $52, $11
-		dc.b	$02, $01, $03, $04, $07, $01, $30, $00, $30, $11, $03, $33, $04, $01, $01, $02
-		dc.b	$13, $01, $17, $00, $11, $10, $77, $01, $01, $12, $52, $22, $10, $30, $08, $00
-		dc.b	$03, $08, $80, $80, $04, $04, $30, $80, $00, $80, $04, $01, $30, $02, $01, $80
-		dc.b	$04, $04, $30, $88, $8B, $A2, $02, $02, $03, $10, $03, $01, $31, $07, $01, $03
-		dc.b	$0C, $04, $33, $00, $03, $33, $02, $03, $03, $00, $10, $02, $06, $30, $10, $30
-		dc.b	$00, $03, $01, $04, $01, $03, $03, $01, $10, $04, $0C, $30, $00, $01, $01, $12
-		dc.b	$23, $00, $10, $00, $01, $00, $01, $05, $01, $01, $02, $03, $10, $00, $30, $07
-		dc.b	$01, $03, $02, $05, $01, $33, $33, $31, $10, $02, $03, $03, $01, $10, $02, $06
-		dc.b	$30, $10, $30, $00, $03, $01, $04, $01, $03, $03, $01, $10, $04, $05, $30, $00
-		dc.b	$11, $13, $30, $05, $01, $11, $03, $01, $01, $03, $02, $30, $03, $02, $01, $03
-		dc.b	$04, $02, $30, $30, $02, $02, $03, $03, $03, $02, $33, $03, $03, $01, $03, $17
-		dc.b	$0B, $03, $22, $55, $54, $12, $10, $70, $01, $50, $01, $07, $02, $04, $30, $10
-		dc.b	$00, $10, $02, $02, $70, $05, $04, $01, $30, $04, $12, $10, $70, $10, $66, $77
-		dc.b	$11, $55, $77, $77, $11, $50, $11, $10, $70, $15, $33, $01, $07, $02, $03, $30
-		dc.b	$10, $01, $03, $07, $70, $00, $30, $01, $00, $33, $33, $02, $18, $22, $14, $77
-		dc.b	$70, $00, $50, $11, $77, $05, $11, $77, $11, $51, $77, $11, $03, $00, $01, $03
-		dc.b	$30, $17, $10, $30, $88, $02, $01, $08, $02, $01, $03, $02, $14, $07, $65, $5D
-		dc.b	$DD, $77, $77, $77, $77, $11, $11, $11, $11, $33, $33, $33, $30, $88, $88, $00
-		dc.b	$03, $02, $01, $80, $07, $19, $80, $00, $DC, $C9, $14, $45, $71, $15, $50, $10
-		dc.b	$07, $71, $01, $77, $11, $07, $17, $11, $00, $10, $00, $03, $30, $00, $71, $02
-		dc.b	$04, $01, $00, $30, $03, $03, $13, $55, $66, $77, $41, $77, $77, $71, $15, $11
-		dc.b	$10, $07, $01, $33, $01, $10, $77, $00, $30, $01, $06, $05, $33, $30, $10, $33
-		dc.b	$30, $02, $04, $61, $30, $0B, $BA, $05, $01, $03, $04, $01, $08, $02, $01, $10
-		dc.b	$02, $48, $17, $00, $30, $80, $00, $01, $03, $08, $00, $70, $10, $33, $54, $17
-		dc.b	$76, $61, $00, $01, $00, $07, $00, $50, $10, $07, $00, $50, $17, $71, $05, $01
-		dc.b	$70, $10, $00, $10, $01, $03, $50, $07, $10, $30, $01, $00, $03, $08, $67, $77
-		dc.b	$65, $2A, $77, $70, $00, $70, $77, $77, $77, $77, $11, $00, $11, $07, $00, $11
-		dc.b	$00, $11, $33, $33, $33, $00, $88, $88, $00, $33, $02, $07, $88, $00, $B8, $80
-		dc.b	$00, $88, $03, $03, $02, $11, $38, $02, $19, $70, $03, $88, $00, $77, $10, $33
-		dc.b	$88, $17, $71, $10, $33, $01, $70, $01, $10, $30, $10, $00, $10, $03, $32, $22
-		dc.b	$30, $88, $02, $32, $31, $00, $80, $03, $01, $00, $80, $03, $33, $88, $00, $33
-		dc.b	$30, $33, $33, $03, $30, $00, $33, $30, $08, $33, $00, $88, $80, $22, $22, $BB
-		dc.b	$88, $11, $00, $10, $30, $00, $10, $01, $03, $30, $01, $00, $10, $03, $00, $07
-		dc.b	$01, $00, $30, $17, $70, $88, $02, $01, $07, $04, $05, $88, $30, $10, $07, $03
-		dc.b	$03, $15, $30, $01, $07, $07, $00, $10, $70, $00, $11, $07, $07, $77, $00, $07
-		dc.b	$70, $11, $70, $11, $01, $03, $71, $02, $1A, $30, $01, $11, $10, $00, $11, $00
-		dc.b	$10, $30, $00, $10, $01, $03, $33, $01, $00, $10, $00, $30, $07, $01, $00, $03
-		dc.b	$17, $70, $88, $02, $01, $07, $04, $04, $88, $00, $31, $65, $02, $02, $03, $03
-		dc.b	$04, $01, $33, $04, $07, $33, $33, $00, $11, $11, $10, $03, $02, $04, $10, $30
-		dc.b	$00, $01, $02, $12, $22, $23, $33, $33, $30, $00, $33, $01, $03, $33, $00, $01
-		dc.b	$00, $03, $33, $33, $33, $30, $03, $04, $88, $88, $00, $08, $03, $01, $80, $03
-		dc.b	$0E, $BA, $AD, $DC, $44, $10, $07, $01, $00, $11, $00, $70, $10, $00, $10, $02
-		dc.b	$01, $30, $0B, $01, $30, $03, $07, $03, $32, $26, $71, $30, $00, $30, $03, $01
-		dc.b	$01, $02, $17, $03, $00, $70, $00, $30, $10, $01, $33, $01, $07, $00, $11, $10
-		dc.b	$70, $15, $00, $77, $01, $00, $70, $65, $5C, $C9, $05, $01, $03, $04, $01, $08
-		dc.b	$02, $01, $10, $02, $10, $17, $00, $30, $80, $00, $01, $03, $08, $00, $70, $10
-		dc.b	$33, $CD, $D2, $23, $33, $05, $01, $08, $08, $01, $80, $03, $0E, $80, $03, $80
-		dc.b	$08, $00, $33, $08, $80, $33, $30, $00, $33, $10, $33, $02, $08, $01, $10, $03
-		dc.b	$01, $00, $13, $00, $10, $02, $0C, $30, $11, $10, $03, $03, $33, $01, $11, $30
-		dc.b	$00, $30, $10, $02, $07, $03, $01, $30, $00, $33, $01, $30, $04, $01, $03, $03
-		dc.b	$04, $30, $00, $10, $33, $02, $01, $07, $02, $2E, $11, $70, $11, $11, $07, $01
-		dc.b	$00, $77, $70, $10, $36, $07, $77, $77, $00, $07, $00, $11, $05, $10, $70, $00
-		dc.b	$05, $01, $07, $70, $50, $11, $77, $77, $01, $77, $00, $07, $17, $01, $11, $11
-		dc.b	$00, $10, $33, $33, $17, $11, $30, $88, $0C, $0C, $01, $70, $13, $80, $50, $07
-		dc.b	$01, $38, $05, $10, $70, $13, $02, $0E, $70, $10, $99, $45, $AA, $B3, $00, $80
-		dc.b	$88, $88, $00, $08, $03, $38, $02, $02, $83, $03, $04, $06, $80, $00, $08, $30
-		dc.b	$38, $80, $02, $03, $30, $08, $88, $02, $05, $32, $22, $33, $00, $01, $07, $0D
-		dc.b	$01, $70, $03, $33, $17, $00, $10, $11, $00, $07, $01, $00, $70, $02, $09, $10
-		dc.b	$70, $10, $70, $32, $AD, $CD, $DA, $08, $06, $24, $08, $08, $00, $08, $80, $30
-		dc.b	$88, $83, $33, $03, $33, $31, $11, $11, $11, $10, $11, $07, $70, $11, $3B, $AD
-		dc.b	$51, $01, $5D, $08, $30, $10, $00, $83, $01, $07, $00, $30, $10, $70, $02, $13
-		dc.b	$11, $77, $70, $00, $33, $10, $07, $3B, $80, $01, $00, $88, $83, $01, $00, $A3
-		dc.b	$30, $01, $22, $04, $01, $01, $02, $10, $30, $70, $10, $01, $13, $07, $01, $10
-		dc.b	$01, $00, $77, $00, $11, $00, $07, $01, $03, $08, $10, $00, $DD, $52, $01, $66
-		dc.b	$08, $03, $02, $24, $80, $30, $17, $00, $03, $11, $70, $00, $30, $11, $77, $70
-		dc.b	$00, $33, $10, $07, $3B, $80, $01, $00, $88, $83, $01, $00, $A2, $20, $01, $22
-		dc.b	$70, $01, $00, $30, $07, $00, $10, $03, $02, $06, $10, $00, $07, $01, $00, $03
-		dc.b	$02, $05, $03, $30, $00, $10, $30, $02, $01, $03, $02, $18, $DA, $B8, $80, $03
-		dc.b	$80, $00, $80, $30, $38, $88, $33, $00, $03, $33, $00, $11, $33, $00, $01, $07
-		dc.b	$00, $33, $01, $17, $08, $05, $33, $22, $66, $66, $01, $02, $15, $10, $10, $07
-		dc.b	$00, $05, $07, $70, $01, $50, $70, $01, $15, $00, $70, $01, $05, $00, $07, $00
-		dc.b	$10, $50, $02, $04, $01, $00, $10, $70, $02, $04, $01, $07, $00, $05, $03, $01
-		dc.b	$10, $02, $01, $70, $05, $01, $01, $05, $19, $70, $00, $10, $07, $00, $15, $66
-		dc.b	$77, $77, $72, $00, $07, $00, $11, $01, $00, $70, $00, $10, $77, $77, $00, $07
-		dc.b	$00, $07, $02, $04, $11, $11, $00, $71, $02, $05, $11, $10, $00, $33, $33, $04
-		dc.b	$02, $11, $03, $02, $01, $01, $04, $01, $30, $06, $02, $01, $30, $02, $02, $10
-		dc.b	$13, $02, $08, $31, $11, $33, $00, $03, $32, $33, $03, $0B, $01, $30, $06, $01
-		dc.b	$03, $02, $0F, $03, $30, $00, $03, $30, $00, $01, $31, $11, $66, $66, $01, $00
-		dc.b	$70, $01, $02, $01, $07, $09, $01, $01, $07, $0C, $10, $00, $07, $07, $70, $12
-		dc.b	$25, $52, $00, $30, $08, $88, $05, $01, $30, $06, $03, $17, $13, $08, $03, $0A
-		dc.b	$30, $80, $01, $71, $03, $08, $50, $00, $10, $30, $03, $01, $38, $04, $04, $05
-		dc.b	$17, $00, $08, $02, $0A, $01, $30, $00, $51, $70, $13, $00, $05, $17, $01, $02
-		dc.b	$08, $51, $67, $99, $91, $14, $46, $00, $08, $05, $03, $30, $00, $08, $02, $14
-		dc.b	$88, $80, $03, $01, $30, $03, $30, $17, $03, $30, $11, $70, $11, $11, $77, $01
-		dc.b	$10, $07, $11, $01, $02, $04, $05, $10, $10, $70, $03, $05, $01, $50, $51, $07
-		dc.b	$05, $02, $06, $70, $10, $00, $05, $01, $50, $02, $01, $15, $03, $08, $14, $32
-		dc.b	$21, $99, $07, $10, $38, $8B, $02, $08, $3B, $33, $00, $11, $03, $B8, $07, $70
-		dc.b	$02, $1C, $10, $00, $13, $88, $51, $07, $01, $22, $05, $11, $77, $77, $12, $76
-		dc.b	$77, $70, $31, $10, $07, $70, $31, $11, $07, $00, $03, $00, $10, $70, $02, $12
-		dc.b	$10, $00, $03, $01, $00, $70, $21, $10, $77, $14, $77, $77, $11, $50, $00, $07
-		dc.b	$77, $22, $04, $01, $01, $08, $1D, $17, $10, $01, $15, $00, $01, $10, $50, $51
-		dc.b	$70, $07, $00, $05, $17, $70, $12, $22, $67, $00, $30, $11, $77, $00, $30, $10
-		dc.b	$70, $00, $03, $01, $02, $24, $03, $01, $70, $07, $31, $17, $07, $71, $17, $70
-		dc.b	$70, $13, $70, $07, $01, $30, $07, $61, $23, $00, $07, $10, $33, $33, $00, $01
-		dc.b	$01, $11, $77, $11, $01, $10, $12, $33, $30, $01, $02, $03, $03, $30, $30, $02
-		dc.b	$23, $03, $08, $88, $80, $00, $08, $BB, $B3, $22, $33, $01, $11, $07, $11, $10
-		dc.b	$07, $77, $07, $77, $70, $70, $17, $00, $07, $01, $00, $70, $00, $10, $01, $07
-		dc.b	$00, $03, $00, $10, $02, $0F, $16, $67, $07, $71, $77, $70, $00, $15, $70, $07
-		dc.b	$70, $00, $11, $11, $07, $03, $03, $10, $00, $33, $05, $01, $10, $05, $0E, $25
-		dc.b	$66, $66, $15, $07, $00, $10, $00, $10, $70, $01, $00, $01, $07, $02, $04, $30
-		dc.b	$10, $70, $15, $04, $01, $30, $04, $07, $10, $00, $15, $00, $22, $25, $41, $02
-		dc.b	$02, $08, $88, $02, $03, $80, $00, $10, $04, $04, $30, $80, $00, $01, $03, $1C
-		dc.b	$70, $03, $08, $80, $00, $10, $30, $08, $52, $20, $12, $33, $00, $03, $10, $10
-		dc.b	$80, $00, $31, $10, $08, $00, $03, $30, $00, $88, $00, $03, $06, $03, $88, $00
-		dc.b	$80, $02, $05, $88, $3B, $BB, $AA, $AA, $02, $07, $11, $11, $00, $33, $33, $00
-		dc.b	$03, $02, $17, $33, $00, $08, $88, $00, $33, $38, $80, $88, $03, $33, $38, $80
-		dc.b	$80, $03, $03, $38, $A2, $22, $66, $13, $00, $77, $02, $02, $10, $70, $02, $0A
-		dc.b	$01, $07, $00, $01, $30, $10, $70, $70, $03, $01, $02, $05, $80, $00, $07, $07
-		dc.b	$80, $03, $1A, $44, $76, $00, $66, $00, $10, $77, $11, $01, $00, $77, $00, $10
-		dc.b	$77, $11, $11, $07, $01, $00, $33, $00, $10, $33, $00, $70, $03, $02, $13, $01
-		dc.b	$30, $00, $08, $32, $11, $11, $19, $00, $54, $44, $45, $05, $17, $77, $71, $51
-		dc.b	$70, $11, $02, $05, $01, $30, $77, $00, $03, $08, $16, $30, $00, $01, $75, $66
-		dc.b	$06, $11, $76, $66, $71, $76, $13, $33, $17, $10, $38, $80, $01, $03, $80, $08
-		dc.b	$30, $0C, $10, $71, $9C, $CD, $56, $15, $41, $17, $77, $01, $00, $70, $11, $70
-		dc.b	$07, $01, $33, $02, $02, $13, $08, $03, $02, $80, $07, $07, $15, $66, $07, $65
-		dc.b	$DC, $11, $76, $66, $71, $76, $13, $33, $17, $10, $38, $80, $01, $33, $80, $08
-		dc.b	$30, $80, $0B, $06, $83, $BA, $AA, $33, $00, $01, $02, $01, $03, $02, $01, $03
-		dc.b	$06, $02, $07, $10, $03, $01, $01, $03, $02, $70, $03, $02, $07, $07, $03, $3B
-		dc.b	$AD, $DD, $00, $80, $04, $07, $88, $80, $30, $88, $00, $08, $03, $04, $01, $30
-		dc.b	$02, $01, $10, $03, $02, $01, $03, $02, $03, $67, $61, $33, $02, $05, $70, $03
-		dc.b	$08, $00, $01, $05, $01, $80, $10, $04, $CD, $AB, $B8, $88, $03, $01, $80, $13
-		dc.b	$01, $80, $04, $06, $8B, $BA, $AA, $30, $00, $01, $05, $01, $03, $06, $02, $07
-		dc.b	$10, $03, $02, $01, $30, $02, $01, $70, $03, $05, $07, $30, $01, $00, $11, $06
-		dc.b	$08, $70, $05, $30, $00, $01, $50, $00, $17, $02, $0F, $11, $70, $10, $00, $07
-		dc.b	$00, $10, $00, $07, $70, $01, $50, $00, $07, $01, $02, $0E, $77, $01, $05, $00
-		dc.b	$77, $77, $10, $11, $11, $00, $71, $33, $30, $10, $02, $02, $03, $01, $07, $19
-		dc.b	$01, $00, $55, $22, $11, $15, $00, $70, $01, $03, $07, $70, $00, $11, $70, $01
-		dc.b	$11, $11, $01, $10, $03, $33, $10, $03, $30, $02, $01, $30, $02, $01, $03, $02
-		dc.b	$19, $08, $30, $08, $88, $80, $30, $08, $80, $00, $13, $33, $08, $88, $11, $11
-		dc.b	$33, $00, $01, $11, $00, $33, $33, $33, $33, $33, $04, $02, $88, $80, $04, $06
-		dc.b	$03, $23, $00, $08, $83, $11, $02, $06, $80, $00, $88, $88, $03, $11, $03, $01
-		dc.b	$13, $02, $05, $30, $30, $00, $03, $33, $02, $01, $03, $02, $06, $33, $32, $22
-		dc.b	$25, $11, $10, $02, $02, $11, $11, $02, $07, $03, $30, $10, $07, $30, $03, $01
-		dc.b	$04, $01, $01, $06, $06, $01, $10, $23, $00, $32, $BB, $02, $01, $08, $0B, $12
-		dc.b	$08, $00, $01, $30, $00, $80, $00, $03, $00, $08, $70, $11, $33, $00, $17, $01
-		dc.b	$00, $52, $07, $01, $77, $02, $04, $01, $00, $51, $71, $04, $05, $10, $70, $05
-		dc.b	$17, $77, $02, $0E, $51, $10, $01, $21, $9C, $C5, $67, $03, $80, $00, $01, $10
-		dc.b	$00, $83, $02, $21, $08, $00, $10, $71, $30, $30, $00, $07, $13, $01, $07, $11
-		dc.b	$71, $10, $71, $55, $17, $77, $15, $32, $60, $66, $49, $00, $10, $10, $00, $03
-		dc.b	$07, $71, $38, $10, $31, $04, $32, $77, $12, $10, $31, $71, $77, $73, $17, $15
-		dc.b	$11, $16, $71, $50, $55, $45, $DC, $91, $22, $03, $80, $00, $01, $30, $00, $83
-		dc.b	$00, $10, $08, $00, $10, $71, $30, $30, $00, $07, $13, $01, $07, $11, $71, $10
-		dc.b	$71, $55, $17, $77, $15, $12, $77, $00, $14, $03, $04, $77, $30, $00, $07, $02
-		dc.b	$12, $10, $70, $11, $01, $00, $01, $00, $10, $00, $10, $03, $00, $01, $00, $30
-		dc.b	$00, $10, $03, $03, $01, $30, $02, $02, $10, $30, $02, $12, $01, $03, $30, $11
-		dc.b	$00, $10, $03, $00, $10, $01, $10, $33, $01, $00, $01, $00, $30, $10, $02, $07
-		dc.b	$03, $01, $00, $45, $22, $03, $AA, $03, $01, $80, $05, $02, $70, $03, $05, $01
-		dc.b	$51, $05, $01, $10, $02, $07, $07, $00, $08, $9C, $DD, $AB, $03, $02, $01, $08
-		dc.b	$10, $01, $30, $02, $01, $80, $05, $04, $BB, $BA, $55, $61, $02, $02, $07, $70
-		dc.b	$03, $05, $01, $00, $10, $70, $10, $02, $01, $01, $04, $05, $03, $01, $00, $10
-		dc.b	$30, $04, $04, $10, $00, $66, $41, $02, $03, $70, $15, $11, $04, $03, $10, $07
-		dc.b	$01, $04, $04, $30, $01, $00, $70, $04, $03, $03, $00, $10, $02, $03, $30, $00
-		dc.b	$71, $02, $0F, $17, $10, $00, $31, $07, $11, $03, $01, $10, $70, $30, $33, $01
-		dc.b	$00, $33, $04, $0B, $03, $01, $01, $00, $30, $10, $70, $30, $33, $22, $DC, $02
-		dc.b	$01, $08, $05, $01, $03, $05, $12, $08, $00, $10, $30, $00, $80, $01, $03, $00
-		dc.b	$08, $70, $10, $33, $00, $DA, $AB, $33, $03, $06, $02, $80, $03, $06, $01, $08
-		dc.b	$04, $01, $80, $03, $02, $08, $88, $04, $04, $88, $88, $88, $30, $03, $01, $03
-		dc.b	$04, $01, $30, $02, $02, $30, $03, $02, $0F, $03, $00, $33, $33, $00, $30, $00
-		dc.b	$03, $80, $03, $00, $03, $80, $03, $01, $03, $01, $01, $02, $09, $30, $03, $00
-		dc.b	$03, $00, $30, $01, $30, $33, $02, $03, $33, $00, $03, $07, $19, $30, $10, $11
-		dc.b	$44, $76, $77, $05, $11, $17, $76, $51, $07, $61, $23, $00, $71, $33, $08, $17
-		dc.b	$13, $08, $80, $01, $00, $80, $09, $10, $06, $65, $DD, $CC, $66, $67, $77, $11
-		dc.b	$33, $32, $11, $77, $88, $00, $33, $10, $03, $02, $31, $08, $02, $02, $03, $80
-		dc.b	$07, $17, $11, $14, $44, $55, $50, $51, $16, $77, $15, $17, $70, $11, $71, $70
-		dc.b	$11, $BB, $00, $01, $3B, $00, $17, $00, $08, $07, $18, $30, $80, $67, $76, $74
-		dc.b	$19, $77, $77, $11, $55, $11, $10, $77, $11, $33, $01, $10, $70, $80, $30, $01
-		dc.b	$07, $00, $03, $02, $01, $08, $02, $01, $10, $04, $0A, $CC, $45, $11, $02, $10
-		dc.b	$00, $70, $00, $01, $01, $02, $0E, $70, $10, $00, $03, $00, $01, $00, $10, $00
-		dc.b	$70, $07, $01, $00, $07, $03, $08, $01, $70, $70, $15, $20, $25, $52, $30, $07
-		dc.b	$17, $30, $03, $30, $00, $03, $00, $30, $03, $60, $30, $00, $31, $76, $13, $32
-		dc.b	$01, $00, $71, $11, $03, $26, $60, $01, $03, $01, $70, $05, $0E, $30, $17, $00
-		dc.b	$03, $01, $70, $00, $10, $10, $70, $07, $01, $11, $07, $02, $0C, $30, $10, $00
-		dc.b	$70, $17, $67, $76, $62, $00, $07, $00, $03, $06, $01, $01, $08, $05, $10, $00
-		dc.b	$07, $00, $01, $02, $06, $70, $00, $50, $11, $16, $77, $02, $12, $11, $77, $00
-		dc.b	$11, $77, $11, $01, $77, $11, $03, $00, $01, $03, $30, $17, $10, $30, $88, $02
-		dc.b	$01, $08, $02, $01, $03, $02, $17, $06, $74, $4C, $CD, $71, $10, $00, $10, $07
-		dc.b	$71, $01, $77, $11, $07, $17, $11, $00, $10, $00, $03, $30, $00, $71, $02, $04
-		dc.b	$01, $00, $30, $03, $03, $13, $55, $66, $77, $44, $77, $77, $71, $10, $11, $10
-		dc.b	$07, $01, $33, $01, $10, $77, $00, $30, $01, $06, $05, $33, $30, $10, $33, $30
-		dc.b	$02, $17, $22, $14, $47, $67, $50, $51, $16, $77, $15, $17, $70, $11, $71, $70
-		dc.b	$11, $BB, $00, $01, $3B, $00, $17, $00, $08, $07, $18, $30, $80, $67, $76, $74
-		dc.b	$19, $77, $77, $11, $55, $11, $10, $77, $11, $33, $01, $10, $70, $80, $30, $01
-		dc.b	$07, $00, $03, $02, $01, $08, $02, $01, $10, $04, $14, $9C, $44, $66, $10, $51
-		dc.b	$16, $77, $11, $17, $70, $11, $03, $70, $11, $03, $38, $01, $03, $38, $80, $02
-		dc.b	$1A, $80, $00, $10, $30, $00, $08, $00, $08, $00, $80, $66, $5D, $DD, $44, $66
-		dc.b	$67, $77, $11, $33, $32, $11, $77, $88, $00, $33, $10, $03, $02, $31, $08, $02
-		dc.b	$02, $03, $80, $07, $10, $22, $55, $54, $11, $11, $67, $71, $50, $33, $32, $17
-		dc.b	$15, $88, $00, $31, $70, $04, $01, $08, $03, $01, $80, $07, $07, $52, $30, $0B
-		dc.b	$AC, $17, $03, $08, $02, $25, $10, $30, $88, $00, $71, $03, $30, $01, $07, $11
-		dc.b	$03, $50, $10, $77, $61, $05, $01, $07, $71, $00, $01, $70, $10, $99, $45, $22
-		dc.b	$30, $00, $80, $03, $31, $00, $08, $03, $32, $88, $88, $02, $29, $33, $33, $33
-		dc.b	$00, $10, $00, $33, $00, $10, $33, $00, $08, $33, $00, $88, $80, $22, $23, $B8
-		dc.b	$80, $11, $01, $03, $08, $00, $10, $10, $00, $33, $01, $01, $30, $00, $30, $10
-		dc.b	$03, $00, $03, $00, $10, $88, $02, $01, $01, $06, $02, $31, $10, $08, $03, $88
-		dc.b	$00, $30, $02, $13, $03, $00, $10, $33, $30, $01, $11, $10, $00, $01, $00, $10
-		dc.b	$30, $03, $33, $16, $20, $15, $55, $02, $02, $10, $10, $04, $07, $70, $10, $10
-		dc.b	$01, $07, $11, $70, $02, $0F, $77, $01, $55, $07, $01, $15, $00, $41, $15, $50
-		dc.b	$00, $41, $14, $32, $19, $07, $11, $08, $00, $10, $71, $30, $01, $51, $07, $13
-		dc.b	$15, $05, $10, $71, $50, $00, $51, $17, $02, $06, $05, $01, $11, $23, $34, $11
-		dc.b	$03, $01, $10, $02, $08, $70, $00, $03, $10, $00, $01, $31, $07, $02, $14, $10
-		dc.b	$70, $01, $05, $77, $01, $15, $50, $41, $15, $50, $00, $41, $62, $21, $99, $77
-		dc.b	$10, $38, $8B, $02, $07, $3B, $33, $10, $11, $03, $B8, $01, $03, $10, $30, $10
-		dc.b	$13, $88, $03, $01, $01, $22, $00, $30, $00, $77, $33, $30, $11, $66, $09, $02
-		dc.b	$03, $33, $02, $13, $30, $80, $33, $10, $00, $08, $80, $01, $30, $80, $08, $00
-		dc.b	$03, $08, $00, $11, $00, $33, $BB, $04, $01, $03, $04, $01, $33, $02, $15, $03
-		dc.b	$00, $33, $33, $30, $33, $00, $03, $03, $00, $33, $31, $80, $30, $00, $10, $A2
-		dc.b	$21, $11, $00, $10, $02, $02, $07, $01, $02, $01, $07, $03, $1C, $70, $01, $00
-		dc.b	$77, $70, $10, $77, $77, $11, $07, $07, $01, $33, $71, $00, $13, $00, $01, $00
-		dc.b	$12, $22, $00, $07, $00, $11, $77, $70, $70, $02, $0F, $07, $00, $10, $11, $00
-		dc.b	$77, $01, $00, $10, $07, $70, $33, $01, $00, $07, $04, $04, $88, $33, $21, $67
-		dc.b	$08, $03, $88, $00, $30, $02, $14, $03, $00, $10, $33, $30, $01, $11, $10, $00
-		dc.b	$01, $00, $10, $00, $33, $33, $03, $3B, $88, $88, $03, $03, $02, $11, $38, $02
-		dc.b	$19, $70, $03, $88, $00, $77, $10, $33, $88, $17, $71, $10, $33, $01, $70, $01
-		dc.b	$10, $30, $10, $00, $10, $03, $32, $22, $30, $88, $02, $07, $31, $00, $80, $03
-		dc.b	$01, $00, $80, $02, $10, $88, $00, $30, $00, $33, $33, $03, $33, $00, $33, $30
-		dc.b	$00, $33, $00, $88, $88, $02, $05, $8B, $AC, $88, $00, $01, $02, $09, $80, $37
-		dc.b	$65, $00, $80, $10, $00, $88, $03, $02, $12, $33, $30, $17, $15, $00, $33, $01
-		dc.b	$00, $33, $08, $30, $00, $03, $3A, $21, $64, $00, $01, $05, $01, $03, $06, $02
-		dc.b	$07, $10, $03, $02, $01, $30, $02, $01, $70, $03, $07, $07, $33, $3B, $AD, $DD
-		dc.b	$00, $80, $04, $07, $88, $80, $30, $88, $00, $08, $03, $04, $01, $30, $02, $01
-		dc.b	$10, $03, $02, $01, $03, $02, $04, $AA, $33, $32, $23, $02, $01, $01, $02, $02
-		dc.b	$80, $30, $05, $05, $80, $08, $03, $11, $08, $04, $01, $80, $03, $01, $08, $02
-		dc.b	$01, $30, $02, $02, $32, $30, $04, $01, $08, $02, $06, $30, $00, $80, $00, $03
-		dc.b	$08, $03, $09, $30, $08, $00, $10, $00, $80, $88, $01, $03, $02, $06, $21, $01
-		dc.b	$2A, $B8, $00, $01, $02, $01, $03, $02, $01, $03, $06, $02, $07, $10, $03, $01
-		dc.b	$01, $03, $02, $70, $03, $02, $14, $07, $52, $77, $64, $44, $74, $61, $15, $00
-		dc.b	$17, $77, $71, $50, $31, $71, $07, $15, $83, $06, $10, $0D, $09, $C5, $07, $02
-		dc.b	$5C, $17, $01, $30, $80, $70, $0B, $01, $10, $05, $09, $30, $80, $00, $01, $03
-		dc.b	$08, $BA, $AA, $33, $02, $05, $08, $00, $03, $00, $80, $02, $01, $08, $02, $01
-		dc.b	$30, $03, $1C, $01, $80, $00, $03, $00, $80, $00, $30, $10, $80, $03, $01, $00
-		dc.b	$42, $20, $02, $22, $06, $01, $03, $33, $00, $70, $11, $03, $50, $17, $70, $02
-		dc.b	$03, $01, $16, $13, $03, $01, $61, $03, $01, $06, $02, $13, $11, $10, $17, $77
-		dc.b	$66, $71, $03, $30, $01, $00, $88, $03, $00, $70, $00, $80, $00, $01, $80, $03
-		dc.b	$2D, $38, $80, $00, $10, $13, $03, $17, $01, $66, $21, $71, $10, $01, $70, $77
-		dc.b	$55, $00, $17, $01, $33, $01, $01, $77, $10, $00, $10, $11, $71, $10, $01, $10
-		dc.b	$10, $07, $70, $01, $07, $00, $07, $00, $01, $70, $10, $70, $11, $11, $02, $10
-		dc.b	$01, $11, $17, $70, $00, $11, $07, $00, $10, $30, $10, $70, $01, $33, $17, $70
-		dc.b	$02, $04, $17, $01, $00, $13, $02, $09, $10, $61, $17, $11, $07, $71, $16, $76
-		dc.b	$61, $04, $01, $03, $04, $01, $33, $02, $06, $03, $00, $33, $33, $30, $33, $02
-		dc.b	$01, $03, $03, $08, $80, $00, $30, $00, $B3, $00, $03, $33, $10, $01, $33, $04
-		dc.b	$01, $33, $04, $06, $33, $00, $33, $33, $33, $11, $03, $01, $11, $04, $01, $01
-		dc.b	$03, $02, $01, $11, $03, $06, $10, $11, $11, $00, $01, $10, $03, $06, $01, $00
-		dc.b	$33, $BB, $30, $06, $08, $02, $30, $88, $02, $01, $03, $04, $01, $30, $02, $01
-		dc.b	$10, $03, $02, $01, $03, $02, $04, $11, $01, $56, $71, $03, $01, $77, $02, $01
-		dc.b	$07, $02, $03, $10, $70, $11, $02, $01, $01, $03, $0D, $10, $03, $01, $01, $00
-		dc.b	$30, $00, $10, $03, $00, $10, $00, $30, $02, $02, $10, $30, $02, $12, $01, $03
-		dc.b	$30, $11, $00, $10, $03, $00, $10, $01, $10, $33, $01, $00, $01, $00, $30, $10
-		dc.b	$02, $02, $03, $01, $03, $02, $30, $10, $02, $09, $30, $11, $00, $03, $01, $13
-		dc.b	$33, $30, $10, $02, $01, $11, $02, $01, $11, $02, $1D, $13, $01, $11, $11, $01
-		dc.b	$10, $33, $00, $11, $11, $33, $33, $BB, $11, $10, $30, $88, $30, $11, $03, $30
-		dc.b	$03, $01, $10, $03, $00, $30, $01, $10, $02, $04, $10, $01, $30, $03, $02, $02
-		dc.b	$13, $33, $02, $04, $20, $01, $67, $77, $03, $04, $77, $30, $00, $07, $02, $18
-		dc.b	$10, $70, $11, $01, $00, $01, $00, $10, $00, $10, $03, $00, $01, $00, $30, $00
-		dc.b	$10, $03, $00, $A2, $16, $02, $54, $83, $04, $01, $07, $02, $13, $31, $71, $07
-		dc.b	$15, $17, $70, $10, $00, $70, $01, $71, $50, $41, $77, $15, $00, $05, $11, $50
-		dc.b	$02, $0B, $50, $55, $54, $00, $05, $01, $10, $00, $05, $10, $11, $02, $05, $01
-		dc.b	$BB, $00, $51, $1B, $02, $07, $10, $00, $0A, $05, $07, $1A, $A7, $02, $0E, $AA
-		dc.b	$07, $41, $16, $EE, $44, $77, $11, $55, $00, $70, $77, $11, $50, $02, $0D, $70
-		dc.b	$15, $00, $77, $77, $00, $77, $11, $17, $00, $71, $0B, $B0, $02, $01, $B0, $02
-		dc.b	$1C, $16, $DC, $C5, $54, $06, $01, $03, $33, $10, $70, $11, $03, $00, $17, $70
-		dc.b	$00, $01, $01, $16, $13, $70, $11, $10, $61, $07, $77, $01, $16, $02, $0E, $77
-		dc.b	$01, $76, $66, $77, $77, $71, $11, $77, $01, $07, $77, $00, $10, $02, $0A, $11
-		dc.b	$01, $00, $11, $00, $11, $01, $00, $01, $11, $02, $37, $11, $11, $00, $01, $11
-		dc.b	$11, $00, $01, $10, $17, $10, $00, $11, $07, $10, $10, $10, $11, $11, $11, $11
-		dc.b	$00, $11, $11, $11, $10, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11
-		dc.b	$11, $66, $76, $67, $10, $71, $11, $07, $00, $07, $77, $70, $00, $11, $11, $11
-		dc.b	$11, $10, $03, $37, $11, $01, $01, $01, $11, $11, $11, $11, $11, $11, $11, $11
-		dc.b	$31, $01, $01, $32, $01, $10, $00, $33, $82, $76, $10, $00, $08, $57, $71, $00
-		dc.b	$80, $82, $67, $10, $38, $80, $07, $01, $13, $03, $17, $30, $36, $21, $74, $03
-		dc.b	$15, $22, $51, $12, $33, $33, $00, $03, $33, $00, $33, $02, $17, $33, $30, $33
-		dc.b	$08, $88, $03, $00, $38, $80, $80, $30, $03, $08, $B3, $30, $10, $30, $33, $00
-		dc.b	$10, $03, $33, $16, $04, $01, $30, $03, $01, $03, $03, $2A, $33, $00, $01, $00
-		dc.b	$01, $00, $10, $74, $01, $11, $07, $00, $11, $07, $70, $40, $00, $16, $56, $35
-		dc.b	$00, $10, $31, $70, $00, $01, $10, $00, $11, $00, $07, $15, $00, $10, $01, $50
-		dc.b	$33, $01, $01, $50, $00, $30, $04, $0A, $17, $10, $11, $46, $60, $73, $05, $17
-		dc.b	$71, $11, $02, $02, $2B, $33, $02, $0A, $38, $88, $05, $10, $13, $88, $00, $53
-		dc.b	$71, $33, $02, $02, $43, $61, $03, $06, $43, $34, $44, $44, $44, $17, $02, $07
-		dc.b	$07, $01, $70, $00, $70, $00, $07, $03, $02, $10, $70, $02, $1B, $01, $07, $70
-		dc.b	$30, $00, $10, $70, $03, $00, $01, $10, $55, $66, $66, $67, $77, $77, $77, $77
-		dc.b	$01, $11, $11, $00, $10, $33, $00, $11, $02, $01, $33, $04, $01, $33, $04, $02
-		dc.b	$10, $30, $02, $04, $32, $21, $11, $11, $0D, $05, $53, $50, $00, $43, $16, $02
-		dc.b	$02, $17, $71, $02, $03, $54, $67, $15, $02, $03, $07, $77, $22, $02, $01, $01
-		dc.b	$02, $03, $51, $70, $10, $02, $01, $07, $02, $03, $05, $10, $71, $02, $02, $51
-		dc.b	$07, $03, $01, $11, $04, $04, $19, $99, $14, $47, $02, $20, $80, $03, $38, $00
-		dc.b	$08, $00, $03, $80, $00, $80, $00, $38, $00, $08, $11, $03, $88, $00, $77, $11
-		dc.b	$33, $88, $11, $77, $11, $23, $50, $11, $77, $76, $00, $01, $05, $02, $07, $05
-		dc.b	$06, $01, $70, $06, $01, $07, $05, $04, $32, $76, $60, $10, $02, $02, $01, $11
-		dc.b	$02, $02, $01, $11, $02, $02, $11, $11, $02, $02, $11, $11, $02, $0E, $11, $11
-		dc.b	$00, $01, $11, $11, $00, $01, $11, $11, $32, $22, $32, $66, $1C, $04, $43, $32
-		dc.b	$22, $66, $02, $02, $01, $11, $02, $02, $01, $11, $03, $01, $11, $03, $01, $11
-		dc.b	$03, $01, $11, $03, $01, $11, $03, $25, $11, $71, $00, $10, $11, $11, $11, $11
-		dc.b	$11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11
-		dc.b	$11, $11, $11, $11, $11, $11, $11, $11, $11, $23, $26, $67, $10, $0D, $01, $50
-		dc.b	$03, $01, $01, $04, $01, $07, $05, $2C, $22, $66, $71, $01, $00, $11, $11, $11
-		dc.b	$00, $11, $11, $11, $00, $11, $11, $11, $00, $01, $11, $11, $00, $01, $11, $11
-		dc.b	$00, $01, $11, $11, $00, $01, $11, $11, $21, $02, $BA, $32, $00, $03, $80, $88
-		dc.b	$03, $10, $0B, $88, $02, $02, $03, $33, $03, $05, $30, $00, $30, $08, $03, $03
-		dc.b	$0B, $80, $00, $01, $38, $08, $22, $30, $65, $99, $30, $10, $02, $05, $83, $00
-		dc.b	$70, $00, $80, $03, $05, $23, $10, $04, $00, $11, $03, $01, $31, $03, $02, $83
-		dc.b	$10, $02, $04, $80, $32, $13, $45, $03, $01, $70, $02, $01, $01, $03, $01, $30
-		dc.b	$11, $04, $52, $23, $33, $24, $04, $01, $17, $03, $02, $50, $01, $05, $08, $08
-		dc.b	$01, $00, $03, $00, $05, $70, $10, $04, $07, $38, $11, $61, $10, $03, $00, $30
-		dc.b	$03, $01, $03, $02, $01, $88, $04, $02, $80, $30, $06, $02, $08, $03, $04, $15
-		dc.b	$30, $AD, $BB, $00, $03, $17, $10, $33, $00, $01, $01, $10, $33, $00, $10, $01
-		dc.b	$10, $00, $01, $00, $01, $02, $01, $11, $04, $01, $10, $03, $05, $01, $33, $30
-		dc.b	$01, $16, $05, $05, $30, $10, $00, $33, $01, $02, $14, $11, $10, $00, $70, $70
-		dc.b	$00, $07, $01, $77, $77, $70, $15, $07, $01, $01, $50, $33, $45, $40, $54, $03
-		dc.b	$01, $17, $02, $01, $05, $04, $01, $10, $03, $01, $57, $03, $01, $04, $08, $20
-		dc.b	$33, $44, $44, $33, $11, $67, $70, $77, $03, $31, $17, $70, $03, $8B, $31, $17
-		dc.b	$10, $B8, $8B, $31, $71, $03, $B8, $83, $47, $61, $03, $B3, $04, $17, $11, $11
-		dc.b	$02, $01, $70, $07, $01, $07, $02, $01, $01, $03, $01, $50, $0E, $24, $22, $27
-		dc.b	$76, $01, $00, $01, $11, $11, $00, $01, $11, $11, $00, $01, $11, $11, $00, $11
-		dc.b	$11, $11, $00, $11, $11, $11, $00, $11, $11, $11, $00, $11, $11, $11, $22, $23
-		dc.b	$23, $26, $1C, $04, $44, $33, $22, $27, $03, $01, $01, $03, $01, $01, $03, $01
-		dc.b	$01, $03, $01, $01, $03, $01, $01, $03, $01, $01, $04, $24, $66, $11, $10, $10
-		dc.b	$00, $01, $11, $11, $00, $01, $11, $11, $00, $01, $11, $11, $00, $11, $11, $11
-		dc.b	$00, $11, $11, $11, $00, $11, $11, $11, $00, $11, $11, $11, $22, $77, $60, $10
-		dc.b	$06, $01, $07, $08, $02, $70, $05, $06, $03, $07, $00, $01, $02, $04, $37, $77
-		dc.b	$76, $76, $02, $02, $11, $11, $02, $03, $01, $11, $01, $02, $05, $11, $00, $11
-		dc.b	$00, $01, $02, $12, $11, $00, $07, $77, $00, $10, $71, $11, $77, $01, $DC, $CC
-		dc.b	$DD, $AA, $33, $33, $33, $33, $08, $19, $03, $03, $03, $03, $33, $33, $33, $33
-		dc.b	$33, $33, $33, $33, $33, $33, $33, $33, $03, $33, $03, $33, $00, $30, $00, $30
-		dc.b	$30, $03, $03, $30, $00, $30, $03, $01, $30, $0D, $05, $88, $88, $8B, $AC, $88
-		dc.b	$04, $01, $80, $03, $01, $80, $02, $06, $88, $00, $30, $00, $33, $33, $03, $01
-		dc.b	$33, $02, $13, $33, $00, $30, $00, $11, $45, $21, $17, $00, $50, $00, $10, $00
-		dc.b	$01, $70, $01, $00, $05, $17, $03, $02, $01, $77, $02, $2A, $01, $77, $00, $05
-		dc.b	$17, $01, $00, $01, $70, $10, $19, $9D, $A2, $33, $08, $00, $08, $00, $30, $80
-		dc.b	$00, $88, $13, $38, $80, $00, $01, $03, $38, $88, $77, $11, $13, $33, $66, $10
-		dc.b	$01, $10, $00, $01, $11, $10, $04, $01, $33, $04, $01, $30, $02, $02, $80, $03
-		dc.b	$02, $08, $80, $33, $00, $01, $33, $00, $01, $10, $02, $02, $01, $11, $04, $04
-		dc.b	$01, $16, $72, $22, $02, $01, $15, $05, $01, $10, $04, $0E, $70, $15, $00, $77
-		dc.b	$00, $50, $00, $77, $70, $40, $00, $11, $07, $04, $02, $03, $11, $67, $34, $02
-		dc.b	$20, $01, $17, $30, $01, $00, $01, $03, $01, $11, $00, $80, $30, $10, $61, $08
-		dc.b	$03, $31, $77, $00, $88, $00, $17, $88, $88, $00, $01, $55, $41, $12, $22, $70
-		dc.b	$15, $02, $01, $07, $07, $02, $07, $15, $02, $01, $71, $03, $01, $01, $03, $01
-		dc.b	$70, $03, $04, $34, $50, $54, $43, $1C, $0C, $32, $22, $66, $71, $00, $01, $11
-		dc.b	$11, $00, $01, $11, $11, $02, $02, $11, $11, $02, $02, $11, $11, $02, $02, $11
-		dc.b	$11, $02, $02, $01, $11, $02, $06, $01, $11, $32, $76, $60, $11, $1C, $04, $54
-		dc.b	$17, $71, $10, $1C, $24, $66, $71, $00, $10, $11, $11, $11, $11, $01, $11, $11
-		dc.b	$11, $01, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $11, $01, $11, $11
-		dc.b	$11, $01, $11, $11, $11, $23, $23, $23, $23, $1C, $04, $32, $22, $22, $32, $02
-		dc.b	$02, $01, $11, $02, $02, $11, $11, $02, $02, $11, $11, $02, $21, $11, $11, $00
-		dc.b	$01, $11, $11, $00, $01, $11, $11, $00, $01, $11, $11, $32, $26, $76, $67, $00
-		dc.b	$51, $16, $77, $05, $17, $70, $11, $00, $70, $11, $BB, $51, $01, $3B, $03, $01
-		dc.b	$08, $07, $18, $30, $80, $10, $76, $74, $19, $77, $77, $11, $55, $11, $10, $77
-		dc.b	$11, $33, $01, $10, $70, $80, $30, $01, $07, $00, $03, $02, $01, $08, $02, $01
-		dc.b	$10, $04, $05, $88, $88, $30, $16, $08, $02, $01, $70, $04, $0E, $08, $00, $01
-		dc.b	$00, $30, $88, $30, $00, $03, $33, $17, $15, $11, $11, $02, $10, $07, $70, $17
-		dc.b	$15, $34, $17, $10, $67, $00, $07, $01, $03, $00, $10, $00, $38, $0F, $01, $38
-		dc.b	$04, $05, $11, $51, $10, $00, $88, $04, $03, $03, $00, $03, $03, $01, $10, $03
-		dc.b	$05, $11, $00, $80, $30, $01, $06, $14, $03, $00, $88, $83, $33, $00, $88, $03
-		dc.b	$33, $30, $80, $88, $80, $03, $38, $00, $08, $80, $13, $80, $02, $0C, $01, $3B
-		dc.b	$88, $83, $10, $11, $33, $31, $01, $10, $11, $10, $02, $02, $07, $33, $09, $02
-		dc.b	$10, $70, $03, $13, $01, $00, $01, $07, $05, $00, $10, $70, $10, $00, $77, $11
-		dc.b	$50, $00, $66, $77, $22, $23, $11, $02, $11, $10, $77, $61, $11, $07, $70, $06
-		dc.b	$67, $70, $17, $71, $01, $11, $01, $07, $10, $55, $02, $0B, $01, $00, $11, $07
-		dc.b	$01, $00, $07, $64, $45, $00, $70, $03, $02, $01, $50, $02, $01, $15, $03, $01
-		dc.b	$50, $11, $02, $05, $44, $1C, $04, $33, $22, $37, $76, $02, $02, $11, $11, $02
-		dc.b	$02, $01, $11, $02, $02, $01, $11, $02, $02, $11, $11, $02, $02, $11, $11, $02
-		dc.b	$02, $01, $11, $02, $06, $01, $11, $33, $27, $67, $10, $1C, $04, $05, $41, $77
-		dc.b	$11, $1C, $24, $27, $76, $01, $10, $00, $11, $11, $11, $00, $11, $11, $11, $01
-		dc.b	$11, $11, $11, $01, $11, $11, $11, $00, $11, $11, $11, $00, $11, $11, $11, $00
-		dc.b	$11, $11, $11, $22, $23, $23, $23, $3C, $07, $54, $32, $21, $11, $00, $01, $03
-		dc.b	$03, $01, $10, $02, $17, $70, $00, $30, $51, $00, $01, $03, $00, $07, $00, $10
-		dc.b	$05, $10, $00, $13, $05, $17, $01, $30, $9C, $52, $20, $32, $08, $0C, $88, $00
-		dc.b	$30, $10, $30, $00, $30, $11, $30, $00, $03, $30, $03, $0C, $03, $08, $88, $80
-		dc.b	$00, $5D, $AB, $B0, $24, $07, $10, $38, $03, $01, $3B, $02, $05, $11, $03, $00
-		dc.b	$07, $70, $02, $0C, $10, $00, $13, $00, $51, $07, $01, $65, $05, $11, $66, $50
-		dc.b	$11, $06, $0A, $00, $10, $00, $80, $00, $11, $60, $80, $60, $01, $05, $81, $D3
-		dc.b	$2C, $00, $2D, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $80
-		dc.b	$33, $80, $93, $00, $10, $00, $10, $00, $B0, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$70, $00, $70, $00, $DD, $08, $DE, $80, $90, $88, $91, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $80, $9D, $80, $9F, $00, $10, $00, $10, $80
-		dc.b	$53, $80, $51, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$1E, $00, $12, $00, $10, $00, $10, $00, $1E, $00, $16, $00, $10, $00, $10, $00
-		dc.b	$3F, $00, $39, $00, $10, $00, $10, $00, $12, $00, $16, $00, $10, $00, $10, $00
-		dc.b	$F7, $00, $30, $00, $10, $00, $10, $80, $99, $80, $5A, $00, $10, $00, $10, $80
-		dc.b	$71, $80, $73, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$1E, $00, $12, $00, $10, $00, $10, $00, $1E, $00, $16, $00, $10, $00, $10, $00
-		dc.b	$DA, $00, $D4, $00, $10, $00, $10, $00, $97, $00, $70, $00, $10, $00, $10, $00
-		dc.b	$70, $00, $30, $00, $10, $00, $10, $80, $52, $80, $FD, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $16, $00, $10, $00, $10, $00, $16, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $1E, $00, $10, $00, $10, $00, $1E, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $16, $00, $10, $00, $10, $80, $7C, $80, $74, $00, $10, $00, $10, $00
-		dc.b	$1E, $00, $12, $00, $10, $00, $10, $00, $58, $00, $58, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $16, $00, $10, $00, $10, $00, $16, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $1E, $00, $10, $00, $10, $00, $1E, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$B2, $00, $B6, $00, $BE, $00, $10, $00, $B8, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$10, $00, $11, $00, $10, $00, $10, $00, $DC, $00, $DD, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $16, $00, $10, $00, $10, $00, $16, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$16, $00, $12, $00, $10, $00, $10, $00, $14, $00, $1C, $00, $10, $00, $10, $00
-		dc.b	$1E, $00, $12, $00, $10, $00, $10, $00, $3A, $00, $FF, $00, $10, $00, $10, $00
-		dc.b	$9E, $00, $5B, $00, $10, $00, $10, $00, $5D, $00, $5F, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $00, $D7, $00, $D5, $00, $10, $00, $10, $00
-		dc.b	$D1, $00, $32, $00, $10, $00, $D3, $00, $12, $00, $30, $00, $93, $00, $91, $00
-		dc.b	$38, $00, $F7, $00, $DD, $00, $10, $00, $12, $00, $DD, $00, $10, $00, $DF, $00
-		dc.b	$16, $00, $16, $00, $10, $00, $10, $00, $34, $00, $34, $00, $10, $00, $10, $00
-		dc.b	$12, $00, $12, $00, $10, $00, $10, $00, $16, $00, $16, $00, $10, $00, $10, $00
-		dc.b	$F4, $00, $35, $03, $03, $C0, $08, $C0, $02, $02, $08, $C0, $03, $01, $C3, $03
-		dc.b	$57, $75, $00, $B7, $20, $6B, $20, $6A, $00, $03, $00, $03, $20, $46, $20, $47
-		dc.b	$00, $20, $00, $30, $80, $30, $80, $84, $00, $B4, $00, $10, $00, $B5, $00, $B7
-		dc.b	$00, $B7, $00, $B5, $80, $A6, $80, $A6, $00, $30, $00, $30, $00, $32, $00, $32
-		dc.b	$00, $30, $00, $30, $00, $6C, $00, $12, $00, $10, $00, $6E, $00, $6C, $00, $6C
-		dc.b	$00, $70, $00, $71, $00, $2C, $00, $2D, $00, $10, $00, $10, $00, $3E, $00, $3E
-		dc.b	$00, $10, $00, $10, $00, $D8, $00, $30, $03, $07, $10, $00, $EA, $00, $33, $00
-		dc.b	$10, $03, $03, $FA, $00, $22, $03, $05, $10, $00, $DA, $00, $32, $05, $03, $DA
-		dc.b	$00, $32, $03, $05, $10, $00, $DA, $00, $22, $04, $04, $61, $DA, $00, $33, $03
-		dc.b	$07, $10, $61, $FA, $00, $23, $00, $10, $03, $1B, $32, $00, $13, $00, $10, $00
-		dc.b	$10, $00, $3E, $00, $3E, $00, $10, $00, $1B, $00, $2D, $00, $20, $00, $10, $00
-		dc.b	$10, $00, $11, $00, $16, $04, $04, $01, $9D, $01, $9D, $0B, $01, $0F, $03, $03
-		dc.b	$0F, $08, $0F, $02, $02, $08, $F8, $03, $80, $A7, $10, $00, $C7, $00, $D3, $00
-		dc.b	$F4, $00, $10, $00, $10, $00, $24, $00, $23, $00, $22, $00, $21, $00, $12, $00
-		dc.b	$1E, $00, $10, $00, $10, $08, $1F, $08, $1F, $08, $11, $00, $10, $00, $2E, $08
-		dc.b	$20, $08, $21, $08, $22, $00, $12, $00, $16, $00, $10, $00, $10, $08, $F7, $08
-		dc.b	$F7, $00, $10, $00, $10, $00, $16, $00, $12, $00, $10, $00, $10, $00, $12, $00
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Oil Ocean Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_OOZ1:	plrlistheader
+		plreq $0000, ArtNem_OOZ
+		plreq $0300, ArtNem_OOZElevator
+		plreq $030C, ArtNem_SpikedRing
+		plreq $032C, ArtNem_BurnerLid
+		plreq $0332, ArtNem_HrzntStripedBooster
+		plreq $0336, ArtNem_Oilfall
+		plreq $0346, ArtNem_Oilfall2
+PlrList_OOZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Oil Ocean Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_OOZ2:	plrlistheader
+		plreq $0354, ArtNem_OOZBall
+		plreq $0368, ArtNem_LaunchBall
+		plreq $039D, ArtNem_OOZPlatform
+		plreq $03C5, ArtNem_PushSpring
+		plreq $03E3, ArtNem_OOZSwingPlatform
+		plreq $0424, ArtNem_Button
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_DignlSprng
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_OOZ2_End:
+
+;----------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Dust Hill Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_DHZ1:	plrlistheader
+		plreq $0000, ArtNem_DHZ
+		plreq $03D4, ArtNem_Crate
+		plreq $03F4, ArtNem_DHZCollapsingPlatform
+		plreq $040E, ArtNem_VineSwitch
+		plreq $041E, ArtNem_VinePulley
+PlrList_DHZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Dust Hill Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_DHZ2:	plrlistheader
+		plreq $042C, ArtNem_HorizSpike
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_DHZGateLog
+		plreq $0440, ArtNem_LeverSpring
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_DHZ2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Casino Night Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_CNZ1:	plrlistheader
+		plreq $0000, ArtNem_CNZ
+		plreq $03D0, ArtNem_CNZCards
+PlrList_CNZ1_End:
+
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Casino Night Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_CNZ2:	plrlistheader
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_DignlSprng
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_CNZ2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Chemical Plant Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_CPZ1:	plrlistheader
+		plreq $0000, ArtNem_CPZ
+		plreq $0373, ArtNem_CPZPillars
+		plreq $0394, ArtNem_CPZ_Door
+		plreq $039C, ArtNem_CPZBooster
+		plreq $03A0, ArtNem_CPZElevator
+		plreq $03B0, ArtNem_CPZFlippingPlatform
+		plreq $03E0, ArtNem_CPZTubeSpring
+		plreq $0400, Water_Surface
+		plreq $0418, ArtNem_CPZPlatforms
+		plreq $0430, ArtNem_CPZTubePlug
+PlrList_CPZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Chemical Plant Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_CPZ2:	plrlistheader
+		plreq $0500, Air_Bubbles_Numbers
+		plreq $0434, ArtNem_Spikes
+		plreq $043C, ArtNem_CPZWorm
+		plreq $0440, ArtNem_LeverSpring
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_CPZ2_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Aquatic Ruin Zone primary
+;---------------------------------------------------------------------------------------
+PlrList_ARZ1:	plrlistheader
+		plreq $0000, ArtNem_NGHZ
+		plreq $0400, Nghz_Water_Surface
+		plreq $0410, Nghz_Leaves
+		plreq $0417, ArtNem_ArrowAndShooter
+		plreq $0428, Nghz_Water_Splash
+PlrList_ARZ1_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Aquatic Ruin Zone secondary
+;---------------------------------------------------------------------------------------
+PlrList_ARZ2:	plrlistheader
+		plreq $0500, Air_Bubbles_Numbers
+		plreq $0434, ArtNem_Spikes
+		plreq $0440, ArtNem_LeverSpring
+		plreq $045C, ArtNem_VrtclSprng
+		plreq $0470, ArtNem_HrzntlSprng
+PlrList_ARZ2_End:
+;---------------------------------------------------------------------------------------
+; Pattern load queue
+; Sonic end of level results screen
+;---------------------------------------------------------------------------------------
+PlrList_Results:	plrlistheader
+		plreq $0580, Title_Cards
+PlrList_Results_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; End of level signpost
+;---------------------------------------------------------------------------------------
+PlrList_EOL:	plrlistheader
+		plreq $0434, ArtNem_Signpost
+;		plreq $0410, Hidden_Points
+PlrList_EOL_End:
+		; Not all sprites are loaded in to VRam
+		plreq $04B6, Hidden_Points
+		plreq $0462, Big_Ring_Flash
+
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Emerald Hill Boss primary
+;---------------------------------------------------------------------------------------
+PlrList_EHZB:	plrlistheader
+		plreq $0460, Robotnik_Ship
+		plreq $04C0, ArtNem_EHZBoss
+		plreq $0540, ArtNem_EHZBossBlades
+PlrList_EHZB_End:
+		; Not all sprites are loaded in to VRam
+		plreq $0400, Robotnik_Ship
+		plreq $0460, Cpz_Boss
+		plreq $04D0, Ship_Boost
+		plreq $04D8, Boss_Smoke
+		plreq $04E8, ArtNem_EHZBoss
+		plreq $0568, ArtNem_EHZBossBlades
+;PlrList_EHZB_End:
+;---------------------------------------------------------------------------------------
+; PATTERN LOAD REQUEST LIST
+; Special Stage
+;---------------------------------------------------------------------------------------
+PlrList_SS:	plrlistheader
+		plreq $0000, Nem_SSBgCloud
+		plreq $0051, Nem_SSBgFish
+		plreq $0142, Nem_SSWalls
+		plreq $023B, Nem_Bumper
+		plreq $0251, Nem_SSGOAL
+		plreq $0263, Nem_SSUpDown
+		plreq $02F0, Nem_SSRBlock
+		plreq $0370, Nem_SS1UpBlock
+		plreq $03F0, Nem_SSEmStars
+		plreq $0470, Nem_SSRedWhite
+		plreq $04F0, Nem_SSGhost
+		plreq $0570, Nem_SSWBlock
+		plreq $05F0, Nem_SSGlass
+		plreq $0770, Nem_SSEmerald
+		plreq $07B2, ArtNem_Ring
+PlrList_SS_End:
 ;---------------------------------------------------------------------------------------
 ; Uncompressed art
 ; Animated flowers in GHZ and HTZ ; ArtUnc_28000: ArtUnc_28080: ArtUnc_21800: ArtUnc_28180:
@@ -42887,7 +42558,6 @@ ArtUnc_Flowers4:	BINCLUDE	"art/uncompressed/GHZ and HTZ flowers - 4.bin"
 ; Uncompressed art
 ; Pulsing thing against checkered backing from GHZ ; ArtUnc_28200: Ghz_Dyn_Wall:
 ArtUnc_GHZPulseBall:	BINCLUDE	"art/uncompressed/Pulsing ball against checkered background (GHZ).bin"
-
 
 
 Hill_Top_Background:	 ; loc_28300:
@@ -43173,151 +42843,6 @@ Null_Layout_6:	   ; loc_40CFC:
 ;===============================================================================
 loc_40D00: ; Big Ring - Left Over from Sonic 1
 		BINCLUDE  "data\sprites\bigring.dat"
-loc_41940: ; Neo Green Hill Foreground Act 2 overwrite by Big Ring- Left Over from previous build ???
-		BINCLUDE  "data\nghz\fgunused.dat"
-loc_41B72: ; Neo Green Hill Background Act 1 - Left Over from previous build ???
-		BINCLUDE  "data\nghz\backact1.dat"
-loc_42374: ; Neo Green Hill Background Act 2 - Left Over from previous build ???
-		BINCLUDE  "data\nghz\bgunused.dat"
-loc_42B76: ; Filler for Null Level Layout - Left Over from previous build ???
-		dc.b	$00, $00, $00, $00
-loc_42B7A: ; Another Big Ring - Left Over from Sonic 1
-		BINCLUDE  "data\sprites\bigring.dat"
-Unknow_Pallete_0x0437BA: ; loc_437BA:
-		dc.w	$0000, $0262, $02A4, $04E8, $0000, $0EEE
-Unknow_Data_0x0437C6: ; loc_437C6:
-		dc.b	$20, $00, $00, $2D, $01, $20, $02, $02, $02, $12, $03, $02, $C6, $20, $02, $03
-		dc.b	$0B, $72, $20, $02, $06, $AD, $62, $02, $FF, $DC, $61, $02, $02, $01, $66, $02
-		dc.b	$06, $07, $B1, $00, $02, $6A, $A0, $02, $01, $10, $02, $01, $21, $06, $09, $20
-		dc.b	$00, $1A, $00, $12, $66, $1A, $AB, $16, $03, $01, $10, $03, $02, $10, $01, $03
-		dc.b	$01, $01, $02, $52, $07, $01, $6D, $DD, $10, $67, $77, $DD, $01, $66, $BA, $00
-		dc.b	$76, $06, $CD, $DD, $BB, $BC, $CD, $DD, $DD, $CB, $BA, $AA, $66, $06, $67, $77
-		dc.b	$BB, $66, $66, $61, $00, $A1, $00, $70, $00, $B1, $07, $07, $0A, $01, $16, $60
-		dc.b	$C1, $B0, $67, $76, $CB, $B6, $11, $67, $BC, $61, $17, $BA, $61, $16, $71, $00
-		dc.b	$11, $00, $67, $DD, $00, $06, $66, $D6, $70, $16, $1B, $0B, $01, $11, $A0, $00
-		dc.b	$60, $35, $FF, $FF, $76, $32, $02, $03, $AB, $66, $20, $02, $09, $A1, $10, $00
-		dc.b	$B0, $A0, $02, $00, $6D, $77, $02, $06, $06, $76, $11, $20, $66, $AB, $02, $04
-		dc.b	$42, $FF, $23, $02, $02, $06, $22, $16, $00, $02, $16, $6B, $02, $05, $7B, $A0
-		dc.b	$00, $21, $10, $02, $05, $07, $A0, $00, $02, $11, $06, $16, $20, $16, $A0, $BC
-		dc.b	$66, $11, $6B, $BC, $BB, $76, $16, $CB, $00, $B0, $61, $16, $00, $01, $17, $11
-		dc.b	$00, $0A, $05, $01, $70, $02, $26, $01, $00, $DD, $DC, $61, $07, $DD, $DC, $CB
-		dc.b	$BB, $BA, $AB, $BC, $DD, $67, $76, $60, $66, $11, $66, $66, $BB, $70, $70, $1A
-		dc.b	$00, $77, $07, $1B, $00, $70, $76, $10, $A0, $44, $45, $56, $7D, $02, $02, $02
-		dc.b	$20, $03, $01, $02, $16, $0A, $22, $33, $00, $02, $16, $66, $00, $21, $70, $10
-		dc.b	$03, $05, $10, $02, $17, $00, $10, $03, $05, $11, $21, $70, $00, $11, $03, $0B
-		dc.b	$11, $67, $00, $11, $0B, $BB, $BB, $AA, $A0, $A0, $A0, $02, $02, $0A, $AA, $03
-		dc.b	$01, $AA, $03, $01, $AA, $03, $01, $AA, $03, $01, $AA, $02, $05, $01, $A0, $A0
-		dc.b	$00, $11, $03, $01, $11, $03, $01, $11, $03, $01, $11, $03, $01, $11, $03, $01
-		dc.b	$11, $03, $01, $11, $03, $0E, $FE, $FC, $F5, $54, $11, $31, $30, $01, $03, $00
-		dc.b	$03, $01, $00, $10, $06, $06, $01, $00, $10, $00, $10, $F0, $02, $14, $01, $00
-		dc.b	$01, $00, $03, $FF, $F0, $20, $B1, $2E, $F0, $10, $0B, $A2, $33, $20, $00, $0B
-		dc.b	$BB, $BB, $10, $04, $22, $22, $22, $22, $04, $01, $20, $03, $01, $02, $04, $01
-		dc.b	$20, $05, $05, $01, $00, $02, $00, $11, $03, $05, $11, $02, $FF, $DD, $DC, $02
-		dc.b	$01, $A0, $02, $3D, $A0, $AA, $A0, $00, $10, $00, $0A, $00, $70, $00, $11, $02
-		dc.b	$0A, $00, $07, $00, $11, $00, $70, $00, $27, $0A, $01, $32, $20, $CB, $71, $C6
-		dc.b	$01, $07, $71, $0B, $70, $10, $16, $A0, $A1, $01, $11, $1A, $07, $10, $60, $66
-		dc.b	$B0, $01, $10, $01, $70, $71, $71, $01, $17, $00, $16, $17, $7C, $BD, $DD, $71
-		dc.b	$A0, $02, $01, $1A, $03, $03, $A0, $0A, $AA, $02, $73, $0A, $07, $A0, $A0, $00
-		dc.b	$A6, $70, $1B, $BA, $01, $0A, $66, $67, $C1, $06, $DD, $D0, $16, $76, $00, $D1
-		dc.b	$DD, $71, $00, $0C, $00, $76, $00, $0A, $0B, $70, $00, $06, $A6, $D6, $00, $D1
-		dc.b	$10, $AB, $00, $07, $61, $7B, $00, $0A, $61, $16, $CD, $B0, $B0, $C7, $11, $00
-		dc.b	$A0, $B1, $00, $0A, $10, $07, $10, $01, $00, $61, $17, $70, $70, $D6, $11, $77
-		dc.b	$00, $A7, $1A, $B7, $01, $11, $60, $01, $10, $61, $0D, $0A, $01, $03, $76, $0A
-		dc.b	$01, $10, $1B, $A1, $07, $72, $0B, $17, $0B, $10, $06, $61, $70, $00, $0D, $60
-		dc.b	$AA, $10, $0A, $70, $B1, $70, $01, $11, $67, $12, $26, $66, $DC, $DF, $05, $02
-		dc.b	$01, $A0, $06, $02, $01, $0A, $02, $07, $10, $A0, $BA, $21, $0A, $0A, $11, $03
-		dc.b	$08, $01, $DC, $A0, $AA, $16, $00, $0A, $01, $04, $01, $77, $02, $01, $10, $02
-		dc.b	$15, $A1, $07, $00, $AB, $10, $61, $10, $10, $06, $67, $16, $00, $66, $BA, $10
-		dc.b	$01, $71, $00, $DD, $00, $0A, $0E, $02, $07, $7D, $02, $06, $67, $61, $D0, $00
-		dc.b	$7A, $B7, $02, $04, $5F, $F4, $2F, $FD, $03, $01, $21, $02, $1E, $02, $17, $02
-		dc.b	$22, $30, $16, $20, $11, $16, $67, $06, $70, $60, $10, $06, $77, $06, $77, $00
-		dc.b	$10, $61, $16, $16, $60, $66, $71, $70, $00, $01, $10, $02, $1A, $10, $10, $66
-		dc.b	$00, $11, $77, $76, $77, $07, $06, $01, $11, $61, $6B, $71, $60, $06, $AB, $66
-		dc.b	$10, $0A, $B6, $17, $0D, $D0, $BD, $02, $01, $A0, $02, $1B, $AA, $A0, $00, $77
-		dc.b	$D7, $DC, $00, $DD, $DD, $77, $D0, $AA, $AA, $AB, $1D, $77, $77, $BA, $60, $7D
-		dc.b	$77, $61, $A0, $0A, $00, $60, $B7, $02, $03, $11, $10, $10, $03, $0C, $10, $11
-		dc.b	$11, $10, $01, $75, $57, $71, $17, $20, $02, $27, $04, $0C, $10, $20, $00, $20
-		dc.b	$12, $05, $44, $67, $00, $01, $01, $67, $02, $06, $67, $02, $10, $01, $02, $20
-		dc.b	$02, $04, $20, $00, $02, $20, $06, $0F, $17, $07, $52, $22, $00, $46, $13, $33
-		dc.b	$70, $11, $15, $00, $25, $77, $71, $02, $03, $22, $07, $50, $02, $01, $22, $07
-		dc.b	$01, $02, $02, $07, $02, $56, $50, $11, $13, $66, $33, $02, $01, $01, $03, $01
-		dc.b	$01, $04, $01, $07, $03, $01, $07, $03, $01, $07, $07, $09, $70, $00, $02, $7C
-		dc.b	$16, $00, $02, $7A, $A6, $02, $02, $27, $A1, $03, $01, $6A, $02, $02, $02, $1B
-		dc.b	$03, $01, $26, $03, $01, $02, $04, $05, $33, $32, $32, $24, $17, $04, $3B, $70
-		dc.b	$11, $06, $66, $00, $17, $66, $B6, $10, $71, $B1, $CB, $A1, $0A, $0A, $1D, $C7
-		dc.b	$BA, $DC, $22, $1B, $A7, $17, $5F, $DB, $70, $06, $A0, $01, $10, $10, $B0, $01
-		dc.b	$10, $17, $6D, $D6, $01, $7A, $66, $11, $17, $B0, $B1, $71, $01, $00, $C1, $11
-		dc.b	$17, $BA, $66, $67, $61, $67, $AD, $CB, $11, $6D, $02, $02, $A0, $7A, $02, $02
-		dc.b	$01, $11, $02, $02, $07, $07, $02, $02, $01, $11, $03, $01, $71, $02, $02, $A0
-		dc.b	$07, $05, $03, $0A, $17, $07, $03, $07, $07, $00, $01, $70, $01, $AA, $A7, $02
-		dc.b	$08, $66, $60, $11, $01, $11, $11, $10, $76, $02, $14, $11, $12, $10, $00, $22
-		dc.b	$20, $10, $17, $42, $00, $10, $61, $62, $00, $70, $76, $20, $00, $01, $02, $02
-		dc.b	$02, $71, $20, $02, $01, $12, $03, $01, $20, $07, $04, $24, $FF, $FF, $55, $02
-		dc.b	$10, $0A, $16, $00, $0A, $B6, $77, $00, $B1, $06, $61, $07, $01, $BA, $AA, $00
-		dc.b	$1A, $02, $01, $07, $04, $01, $A0, $02, $0E, $60, $DA, $0B, $DB, $76, $6A, $00
-		dc.b	$61, $16, $10, $0B, $BA, $10, $A0, $02, $01, $70, $03, $1A, $10, $A0, $00, $AB
-		dc.b	$00, $1A, $AA, $10, $00, $01, $11, $00, $0B, $B0, $66, $BB, $A0, $A0, $06, $D0
-		dc.b	$00, $16, $D1, $00, $0B, $6D, $02, $14, $B0, $D0, $A1, $00, $0B, $00, $16, $7D
-		dc.b	$0A, $00, $6D, $A0, $01, $AB, $D0, $A0, $67, $70, $DC, $16, $03, $01, $01, $03
-		dc.b	$01, $01, $03, $01, $01, $03, $01, $01, $03, $01, $01, $03, $01, $01, $03, $06
-		dc.b	$01, $71, $76, $0C, $60, $10, $03, $01, $10, $03, $01, $10, $03, $01, $10, $03
-		dc.b	$01, $10, $03, $01, $10, $03, $01, $10, $03, $04, $1D, $0D, $DD, $D7, $1C, $0D
-		dc.b	$0B, $6C, $C1, $C6, $01, $77, $77, $71, $10, $11, $11, $10, $51, $03, $18, $25
-		dc.b	$10, $00, $01, $62, $51, $00, $17, $07, $47, $46, $12, $57, $66, $22, $62, $57
-		dc.b	$24, $75, $77, $01, $20, $01, $10, $03, $01, $01, $04, $02, $10, $70, $02, $16
-		dc.b	$70, $00, $11, $16, $20, $00, $05, $52, $20, $00, $02, $22, $06, $75, $03, $33
-		dc.b	$77, $71, $50, $00, $11, $10, $04, $16, $50, $00, $01, $11, $15, $00, $67, $77
-		dc.b	$71, $00, $22, $20, $71, $00, $22, $56, $15, $00, $33, $45, $73, $34, $03, $01
-		dc.b	$70, $03, $01, $70, $03, $01, $70, $03, $01, $70, $03, $01, $70, $03, $01, $70
-		dc.b	$03, $05, $70, $22, $22, $01, $66, $06, $0F, $01, $01, $00, $10, $11, $11, $11
-		dc.b	$11, $11, $11, $10, $10, $10, $10, $10, $02, $11, $70, $00, $07, $07, $77, $33
-		dc.b	$01, $06, $6B, $02, $60, $10, $A0, $00, $A1, $00, $A0, $03, $01, $10, $03, $1C
-		dc.b	$7A, $00, $A1, $10, $11, $02, $6A, $70, $06, $00, $1A, $B1, $00, $42, $06, $C7
-		dc.b	$66, $70, $07, $C6, $77, $10, $07, $00, $11, $00, $01, $A0, $03, $01, $10, $03
-		dc.b	$01, $60, $02, $01, $07, $03, $01, $0A, $02, $10, $DD, $DA, $76, $61, $BB, $B1
-		dc.b	$17, $70, $BB, $BB, $B6, $67, $B0, $BB, $06, $61, $03, $13, $01, $B0, $BB, $A6
-		dc.b	$61, $BB, $BB, $16, $66, $BB, $11, $17, $77, $CC, $67, $54, $44, $11, $10, $02
-		dc.b	$02, $76, $60, $02, $01, $67, $07, $01, $77, $03, $02, $66, $60, $02, $02, $66
-		dc.b	$10, $02, $06, $77, $71, $44, $44, $70, $07, $02, $07, $77, $00, $01, $11, $70
-		dc.b	$01, $10, $02, $01, $10, $02, $01, $01, $02, $06, $AA, $11, $00, $0A, $00, $11
-		dc.b	$03, $17, $61, $AA, $A0, $0A, $07, $A0, $0A, $A0, $21, $1A, $A0, $11, $00, $71
-		dc.b	$11, $00, $02, $17, $00, $77, $00, $21, $77, $02, $02, $02, $11, $03, $08, $22
-		dc.b	$11, $44, $34, $44, $66, $00, $17, $02, $08, $07, $00, $77, $00, $70, $11, $10
-		dc.b	$77, $02, $02, $01, $11, $04, $02, $01, $10, $02, $08, $12, $22, $01, $16, $64
-		dc.b	$44, $76, $76, $02, $1E, $16, $76, $00, $07, $71, $1B, $77, $70, $10, $1B, $11
-		dc.b	$11, $01, $60, $00, $01, $17, $AB, $11, $10, $07, $CB, $77, $76, $66, $CB, $67
-		dc.b	$61, $76, $BB, $03, $01, $01, $03, $02, $01, $01, $02, $16, $70, $00, $10, $61
-		dc.b	$16, $16, $77, $66, $67, $17, $71, $06, $01, $21, $10, $10, $66, $50, $70, $1D
-		dc.b	$07, $10, $03, $01, $10, $02, $02, $01, $10, $02, $15, $66, $66, $10, $0A, $B6
-		dc.b	$71, $70, $01, $AB, $16, $11, $16, $6B, $61, $01, $10, $16, $7D, $7D, $D0, $D0
-		dc.b	$06, $01, $A0, $02, $0B, $0A, $76, $00, $7D, $77, $61, $A0, $DD, $DD, $BA, $60
-		dc.b	$02, $16, $BC, $11, $DD, $DD, $61, $01, $27, $31, $71, $37, $00, $22, $16, $26
-		dc.b	$05, $65, $71, $62, $00, $54, $61, $02, $02, $02, $55, $56, $03, $01, $05, $08
-		dc.b	$04, $55, $31, $54, $33, $03, $0E, $66, $61, $20, $01, $05, $20, $00, $05, $50
-		dc.b	$07, $02, $50, $00, $42, $04, $01, $50, $02, $02, $04, $07, $02, $02, $60, $14
-		dc.b	$02, $02, $65, $50, $02, $01, $50, $17, $0A, $0B, $BA, $88, $89, $B1, $32, $FF
-		dc.b	$01, $02, $0F, $02, $04, $10, $F0, $00, $F0, $04, $01, $3F, $07, $01, $10, $02
-		dc.b	$0B, $0F, $2D, $DE, $F0, $00, $30, $31, $F0, $00, $10, $1F, $06, $02, $03, $0F
-		dc.b	$03, $0E, $10, $FF, $FF, $01, $33, $00, $01, $00, $31, $21, $23, $FF, $ED, $30
-		dc.b	$02, $06, $FE, $31, $DD, $0F, $00, $30, $03, $0F, $01, $F0, $F0, $11, $10, $1F
-		dc.b	$00, $1F, $F1, $01, $1F, $F0, $0F, $E0, $E0, $02, $0D, $0E, $FF, $FE, $DD, $77
-		dc.b	$FF, $01, $22, $9A, $00, $FF, $00, $13, $02, $02, $F0, $01, $04, $03, $F0, $00
-		dc.b	$0F, $05, $01, $1F, $03, $07, $93, $DD, $EE, $22, $0B, $11, $23, $02, $03, $BB
-		dc.b	$01, $11, $02, $02, $BB, $BB, $10, $04, $AA, $AA, $AA, $AA, $04, $0C, $11, $10
-		dc.b	$01, $11, $00, $01, $11, $23, $BB, $B0, $13, $10, $02, $01, $31, $03, $01, $10
-		dc.b	$05, $0A, $AA, $B0, $23, $33, $11, $01, $01, $10, $01, $23, $02, $07, $32, $00
-		dc.b	$30, $01, $0F, $10, $03, $04, $02, $30, $F0, $07, $04, $CC, $32, $22, $21, $02
-		dc.b	$08, $12, $22, $01, $23, $21, $10, $03, $10, $02, $01, $01, $06, $03, $01, $00
-		dc.b	$0F, $02, $16, $01, $00, $F0, $00, $02, $3D, $E1, $12, $11, $01, $23, $30, $33
-		dc.b	$11, $01, $11, $00, $30, $11, $11, $00, $03, $04, $01, $33, $04, $02, $33, $10
-		dc.b	$03, $04, $23, $33, $33, $32, $03, $04, $10, $11, $11, $11, $04, $02, $01, $11
-		dc.b	$02, $01, $10, $03, $04, $03, $30, $00, $01, $04, $0B, $30, $21, $00, $01, $22
-		dc.b	$00, $01, $11, $11, $01, $10, $02, $09, $10, $33, $33, $33, $33, $11, $11, $11
-		dc.b	$01, $02, $01, $01, $03, $08, $12, $01, $00, $01, $20, $22, $33, $32, $05, $01
-		dc.b	$11, $04, $01, $10, $02, $15, $30, $10, $00, $11, $21, $00, $11, $03, $00, $11
-		dc.b	$33, $30, $11, $33, $01, $10, $10, $11, $11, $10, $03, $03, $01, $11, $03, $05
-		dc.b	$3F, $00, $01, $00, $10, $03, $01, $10, $02, $01, $10, $03, $01, $01, $04, $06
-		dc.b	$EF, $11, $00, $01, $00, $11, $02, $01, $0F, $04
 ;===============================================================================
 ; Level Object Layout
 ; [ Begin ]
@@ -43409,471 +42934,10 @@ Null_Objects_Layout:
 ; Level Object Layout
 ; [ End ]
 ;===============================================================================
-Unknow_Data_0x04634E: ; loc_4634E:
-		dc.b	$00, $00, $77, $07, $70, $01, $11, $17, $07, $70, $70, $11, $00, $07, $07, $11
-		dc.b	$11, $01, $11, $01, $01, $10, $11, $00, $01, $16, $77, $00, $16, $61, $11, $77
-		dc.b	$61, $01, $16, $01, $11, $17, $70, $10, $77, $71, $11, $76, $11, $11, $11, $11
-		dc.b	$11, $10, $00, $67, $70, $70, $02, $21, $07, $07, $00, $10, $00, $07, $00, $60
-		dc.b	$07, $71, $07, $07, $70, $11, $71, $11, $11, $17, $00, $11, $10, $70, $10, $00
-		dc.b	$11, $01, $0A, $01, $17, $10, $A0, $00, $70, $02, $07, $11, $00, $0A, $00, $7C
-		dc.b	$BB, $A0, $05, $01, $A0, $13, $01, $0A, $03, $01, $0A, $02, $01, $AA, $12, $01
-		dc.b	$0A, $08, $05, $01, $AB, $BB, $C6, $66, $08, $01, $10, $04, $03, $07, $00, $10
-		dc.b	$0C, $24, $66, $70, $77, $76, $00, $07, $70, $11, $00, $17, $77, $10, $00, $11
-		dc.b	$07, $01, $00, $01, $70, $11, $00, $10, $77, $01, $00, $10, $70, $77, $00, $11
-		dc.b	$11, $11, $DD, $DD, $76, $11, $0A, $01, $01, $03, $02, $A0, $70, $04, $01, $A0
-		dc.b	$03, $01, $A0, $03, $03, $DD, $CC, $C1, $02, $02, $10, $77, $02, $02, $10, $07
-		dc.b	$03, $0A, $70, $01, $00, $01, $07, $00, $10, $11, $07, $70, $02, $35, $17, $10
-		dc.b	$00, $01, $01, $00, $06, $76, $77, $7D, $01, $11, $00, $0A, $01, $10, $00, $1A
-		dc.b	$01, $00, $A0, $BA, $01, $0A, $AA, $AA, $17, $1A, $0B, $0A, $00, $76, $67, $66
-		dc.b	$01, $11, $11, $11, $DD, $DD, $71, $6D, $00, $0A, $00, $7A, $00, $0A, $07, $0A
-		dc.b	$00, $0A, $01, $02, $01, $A0, $02, $08, $AA, $A0, $00, $70, $00, $A0, $01, $0A
-		dc.b	$02, $06, $01, $00, $66, $66, $10, $BA, $02, $03, $70, $00, $70, $03, $01, $07
-		dc.b	$04, $01, $70, $06, $02, $01, $07, $02, $01, $10, $03, $04, $AA, $BB, $77, $DD
-		dc.b	$07, $02, $01, $0A, $02, $02, $01, $0A, $02, $04, $01, $00, $0A, $70, $04, $09
-		dc.b	$01, $A0, $00, $10, $01, $5D, $C1, $77, $7C, $03, $01, $A0, $03, $01, $AA, $03
-		dc.b	$02, $0A, $20, $02, $02, $0A, $01, $09, $06, $10, $00, $DC, $CB, $BA, $AA, $03
-		dc.b	$01, $0A, $02, $01, $0A, $03, $01, $0A, $04, $09, $A1, $A0, $00, $0A, $17, $0A
-		dc.b	$AA, $A1, $71, $02, $06, $17, $11, $01, $66, $61, $01, $03, $13, $16, $10, $01
-		dc.b	$01, $71, $07, $10, $17, $1A, $71, $16, $6B, $AA, $11, $71, $A0, $0A, $17, $1A
-		dc.b	$02, $02, $71, $AA, $02, $0D, $71, $A0, $00, $0A, $61, $AA, $A0, $0A, $AA, $00
-		dc.b	$A0, $00, $A0, $03, $01, $A0, $0F, $06, $AA, $AB, $BB, $CD, $00, $01, $02, $04
-		dc.b	$A0, $01, $07, $11, $04, $04, $0A, $01, $01, $17, $02, $01, $70, $02, $03, $01
-		dc.b	$00, $70, $02, $06, $10, $00, $CB, $11, $7D, $BB, $04, $05, $70, $10, $A0, $00
-		dc.b	$01, $11, $05, $A0, $00, $BA, $AA, $A0, $05, $01, $A0, $03, $01, $A0, $05, $01
-		dc.b	$0A, $03, $01, $01, $03, $01, $0B, $07, $02, $AA, $AB, $05, $01, $AA, $03, $03
-		dc.b	$A0, $00, $10, $04, $02, $A0, $A0, $02, $05, $A0, $00, $01, $00, $0A, $03, $06
-		dc.b	$B1, $16, $67, $66, $00, $70, $0C, $03, $01, $00, $07, $0B, $07, $61, $10, $06
-		dc.b	$67, $00, $10, $77, $02, $02, $10, $77, $02, $02, $10, $77, $02, $02, $01, $77
-		dc.b	$02, $03, $11, $70, $11, $02, $0A, $70, $11, $00, $10, $77, $00, $DD, $CC, $B6
-		dc.b	$06, $11, $01, $0A, $03, $01, $0A, $06, $04, $CD, $DC, $C1, $77, $02, $06, $17
-		dc.b	$70, $00, $01, $10, $07, $02, $02, $10, $77, $02, $03, $10, $00, $01, $02, $01
-		dc.b	$70, $02, $02, $10, $70, $02, $26, $10, $70, $76, $77, $66, $11, $11, $00, $A0
-		dc.b	$00, $11, $0A, $AA, $00, $01, $0A, $AA, $00, $01, $00, $AA, $00, $01, $00, $AA
-		dc.b	$A0, $00, $10, $AA, $A0, $00, $10, $0A, $00, $11, $00, $10, $11, $02, $0D, $11
-		dc.b	$00, $11, $01, $11, $00, $01, $11, $11, $00, $01, $01, $10, $05, $01, $70, $02
-		dc.b	$01, $07, $04, $04, $61, $10, $01, $BC, $09, $09, $10, $0A, $A0, $00, $10, $10
-		dc.b	$A0, $10, $10, $02, $01, $10, $03, $01, $01, $02, $05, $0A, $AB, $B0, $7D, $D7
-		dc.b	$05, $03, $07, $00, $01, $05, $03, $A1, $00, $01, $03, $1A, $01, $00, $10, $00
-		dc.b	$11, $00, $70, $00, $12, $DC, $06, $76, $75, $00, $07, $10, $10, $00, $07, $00
-		dc.b	$11, $00, $07, $00, $10, $01, $03, $04, $20, $00, $70, $07, $02, $1C, $07, $71
-		dc.b	$00, $10, $00, $11, $57, $77, $01, $17, $00, $17, $11, $71, $01, $71, $17, $1A
-		dc.b	$17, $11, $71, $00, $71, $17, $10, $A0, $11, $71, $02, $02, $17, $10, $02, $09
-		dc.b	$71, $00, $10, $A0, $1A, $AA, $BA, $A0, $A0, $1F, $01, $A0, $03, $01, $A0, $16
-		dc.b	$09, $0A, $00, $AB, $DC, $B1, $00, $07, $00, $70, $03, $02, $70, $0A, $02, $03
-		dc.b	$70, $00, $10, $02, $01, $A0, $06, $01, $07, $04, $04, $10, $16, $7C, $CC, $02
-		dc.b	$01, $0A, $04, $01, $AA, $04, $01, $01, $04, $01, $01, $03, $01, $11, $03, $07
-		dc.b	$01, $10, $00, $BB, $BB, $BA, $AA, $03, $01, $0A, $02, $05, $0A, $A0, $AA, $AA
-		dc.b	$A0, $0C, $08, $10, $00, $01, $01, $01, $00, $01, $10, $06, $01, $01, $05, $09
-		dc.b	$77, $00, $10, $00, $70, $11, $00, $07, $70, $02, $01, $07, $03, $07, $77, $00
-		dc.b	$07, $77, $01, $11, $70, $05, $01, $10, $0E, $01, $01, $06, $24, $11, $11, $16
-		dc.b	$66, $00, $10, $07, $01, $00, $10, $07, $01, $00, $11, $77, $01, $00, $01, $77
-		dc.b	$71, $00, $10, $07, $77, $00, $11, $00, $70, $00, $10, $11, $11, $DD, $DD, $D7
-		dc.b	$61, $12, $01, $A0, $03, $01, $01, $04, $05, $70, $CC, $DD, $77, $07, $03, $01
-		dc.b	$77, $03, $01, $77, $07, $01, $77, $03, $02, $77, $01, $02, $01, $07, $02, $09
-		dc.b	$01, $11, $77, $67, $7D, $77, $01, $10, $AA, $02, $02, $10, $AA, $02, $17, $10
-		dc.b	$0A, $00, $01, $10, $01, $01, $01, $01, $10, $10, $77, $77, $77, $77, $11, $11
-		dc.b	$11, $11, $16, $66, $66, $61, $0C, $01, $10, $02, $01, $77, $04, $01, $07, $02
-		dc.b	$01, $01, $02, $0A, $70, $00, $23, $66, $10, $6A, $00, $01, $06, $1A, $02, $06
-		dc.b	$61, $66, $02, $17, $17, $11, $02, $06, $01, $71, $00, $01, $0A, $B7, $03, $07
-		dc.b	$0B, $00, $70, $A0, $00, $FD, $BA, $06, $01, $A0, $03, $01, $6A, $03, $14, $16
-		dc.b	$A0, $0A, $00, $11, $6A, $0A, $00, $71, $16, $A0, $0A, $B7, $11, $1A, $0A, $F4
-		dc.b	$10, $67, $CB, $02, $06, $01, $70, $00, $20, $17, $06, $02, $1C, $70, $66, $00
-		dc.b	$21, $06, $61, $02, $17, $66, $10, $00, $77, $11, $0A, $21, $01, $70, $0A, $67
-		dc.b	$77, $BA, $A0, $70, $6A, $00, $0A, $71, $A0, $02, $01, $1A, $03, $01, $A0, $04
-		dc.b	$01, $A0, $03, $01, $A0, $04, $01, $0A, $03, $01, $0A, $05, $01, $A0, $03, $01
-		dc.b	$A0, $02, $01, $AA, $02, $01, $AA, $02, $14, $0A, $00, $11, $00, $A0, $11, $07
-		dc.b	$0A, $01, $07, $71, $0A, $AB, $B6, $67, $00, $AA, $A0, $00, $AA, $02, $12, $10
-		dc.b	$00, $10, $11, $01, $11, $01, $00, $07, $07, $77, $77, $61, $70, $11, $11, $00
-		dc.b	$11, $03, $09, $77, $61, $01, $11, $01, $00, $01, $00, $10, $04, $01, $70, $02
-		dc.b	$05, $77, $11, $00, $10, $11, $05, $01, $11, $02, $09, $16, $77, $01, $16, $70
-		dc.b	$00, $66, $00, $70, $02, $02, $07, $70, $03, $01, $77, $03, $01, $07, $03, $03
-		dc.b	$07, $70, $70, $02, $02, $07, $77, $03, $06, $70, $67, $77, $77, $77, $10, $0D
-		dc.b	$0B, $70, $77, $77, $07, $77, $70, $70, $70, $70, $70, $70, $03, $01, $77, $04
-		dc.b	$01, $70, $02, $02, $07, $70, $02, $01, $77, $03, $01, $07, $02, $01, $01, $03
-		dc.b	$01, $01, $09, $05, $01, $11, $11, $00, $10, $0A, $01, $01, $07, $01, $10, $06
-		dc.b	$1B, $01, $01, $01, $11, $60, $01, $11, $01, $70, $00, $11, $10, $11, $01, $01
-		dc.b	$01, $67, $11, $01, $6C, $BA, $10, $66, $B0, $00, $16, $BA, $02, $01, $6B, $03
-		dc.b	$06, $AA, $00, $AB, $CC, $0A, $0A, $04, $01, $10, $03, $01, $07, $0A, $01, $A0
-		dc.b	$03, $07, $01, $00, $01, $CD, $76, $70, $01, $02, $02, $10, $70, $02, $02, $10
-		dc.b	$70, $04, $04, $10, $00, $10, $70, $02, $06, $10, $70, $00, $01, $10, $70, $02
-		dc.b	$0A, $10, $70, $16, $66, $6C, $6C, $00, $10, $0A, $AA, $02, $1C, $0A, $AA, $00
-		dc.b	$10, $0A, $AA, $00, $10, $0A, $AA, $00, $10, $0A, $AA, $00, $10, $0A, $AA, $01
-		dc.b	$10, $0A, $AA, $16, $71, $66, $BA, $00, $07, $05, $01, $10, $02, $02, $07, $A0
-		dc.b	$02, $01, $01, $03, $01, $7A, $03, $01, $10, $02, $0A, $07, $A0, $0A, $00, $71
-		dc.b	$0A, $0A, $00, $10, $0A, $06, $01, $0A, $05, $01, $A0, $03, $01, $A0, $03, $03
-		dc.b	$0A, $00, $10, $02, $08, $D6, $0D, $CB, $0A, $00, $01, $17, $A0, $02, $03, $01
-		dc.b	$10, $01, $02, $0A, $7B, $A0, $70, $02, $17, $00, $01, $20, $00, $07, $02, $0F
-		dc.b	$21, $10, $12, $00, $02, $67, $13, $45, $5F, $10, $17, $00, $0A, $77, $10, $02
-		dc.b	$02, $71, $70, $04, $03, $01, $00, $11, $02, $01, $11, $05, $01, $70, $02, $05
-		dc.b	$DC, $CB, $BB, $B1, $A0, $02, $09, $A0, $AA, $00, $AA, $01, $A0, $AA, $00, $17
-		dc.b	$02, $20, $11, $71, $10, $11, $07, $11, $01, $00, $71, $17, $00, $07, $11, $71
-		dc.b	$11, $00, $01, $67, $16, $61, $01, $10, $71, $01, $10, $01, $11, $10, $77, $77
-		dc.b	$10, $77, $02, $02, $76, $11, $02, $03, $10, $00, $11, $04, $06, $10, $77, $77
-		dc.b	$77, $76, $10, $03, $10, $01, $01, $00, $01, $70, $11, $00, $17, $07, $01, $01
-		dc.b	$71, $00, $01, $07, $10, $02, $02, $11, $0A, $02, $0F, $70, $00, $67, $76, $10
-		dc.b	$1D, $17, $1B, $AA, $10, $61, $A0, $00, $A6, $0A, $02, $02, $01, $A0, $02, $01
-		dc.b	$0A, $07, $01, $A0, $03, $06, $A0, $CC, $CC, $CC, $CC, $10, $03, $01, $01, $03
-		dc.b	$02, $60, $10, $02, $13, $16, $01, $00, $10, $AB, $71, $11, $11, $00, $A6, $11
-		dc.b	$10, $00, $0A, $C6, $11, $CC, $CC, $C6, $11, $09, $10, $10, $01, $00, $01, $01
-		dc.b	$10, $11, $11, $04, $03, $11, $11, $10, $03, $0B, $10, $00, $01, $01, $00, $01
-		dc.b	$01, $10, $00, $01, $11, $02, $01, $11, $0A, $01, $01, $03, $01, $66, $02, $02
-		dc.b	$06, $1A, $02, $05, $61, $A0, $00, $06, $1A, $02, $13, $61, $A0, $00, $01, $1A
-		dc.b	$00, $0B, $16, $AA, $0A, $B6, $7A, $0A, $A1, $60, $B0, $00, $AB, $DD, $05, $14
-		dc.b	$0A, $AB, $BB, $0A, $B1, $67, $77, $A1, $77, $11, $11, $66, $11, $01, $11, $10
-		dc.b	$11, $10, $00, $11, $03, $06, $C6, $67, $00, $01, $00, $10, $02, $05, $A0, $07
-		dc.b	$00, $10, $01, $04, $04, $70, $01, $00, $10, $03, $03, $07, $00, $10, $05, $06
-		dc.b	$61, $11, $11, $11, $00, $01, $03, $3D, $11, $00, $70, $00, $11, $07, $71, $00
-		dc.b	$10, $07, $70, $01, $10, $70, $70, $01, $10, $70, $10, $00, $11, $11, $00, $16
-		dc.b	$77, $7D, $7D, $01, $00, $AA, $AA, $01, $00, $AA, $BA, $01, $00, $AA, $BA, $01
-		dc.b	$0A, $AA, $AA, $17, $1A, $0B, $0A, $00, $76, $67, $66, $01, $11, $11, $11, $01
-		dc.b	$17, $DD, $DD, $10, $7A, $02, $02, $07, $10, $02, $02, $01, $A0, $02, $01, $7A
-		dc.b	$03, $02, $10, $0A, $02, $02, $A0, $0A, $06, $08, $DC, $B0, $00, $0A, $21, $0A
-		dc.b	$00, $A0, $03, $03, $01, $00, $70, $05, $01, $07, $02, $10, $A0, $10, $02, $11
-		dc.b	$00, $01, $00, $07, $00, $70, $43, $03, $5F, $32, $71, $20, $06, $01, $12, $0B
-		dc.b	$01, $20, $07, $0F, $23, $33, $34, $44, $01, $00, $07, $77, $00, $10, $00, $11
-		dc.b	$00, $01, $11, $03, $02, $01, $16, $02, $02, $10, $70, $02, $17, $10, $70, $10
-		dc.b	$00, $10, $70, $71, $10, $07, $11, $71, $11, $71, $AA, $10, $17, $1A, $00, $16
-		dc.b	$61, $A0, $00, $71, $03, $02, $10, $0A, $02, $01, $10, $03, $02, $10, $0A, $02
-		dc.b	$08, $AA, $00, $AA, $AB, $00, $AA, $00, $01, $02, $01, $A0, $07, $01, $0A, $06
-		dc.b	$01, $A0, $03, $09, $A0, $0A, $01, $BB, $DC, $B0, $AB, $00, $07, $06, $0D, $17
-		dc.b	$00, $0A, $00, $01, $10, $0A, $00, $10, $70, $1A, $00, $70, $03, $01, $11, $03
-		dc.b	$03, $21, $71, $A0, $06, $06, $01, $A0, $00, $02, $17, $1A, $02, $07, $21, $66
-		dc.b	$BA, $00, $02, $21, $66, $02, $02, $02, $21, $03, $05, $02, $FF, $FF, $FF, $FF
-		dc.b	$04, $07, $A0, $00, $0A, $00, $A0, $00, $0A, $05, $01, $BA, $03, $02, $66, $BA
-		dc.b	$02, $17, $21, $66, $BA, $00, $41, $10, $76, $DD, $B6, $77, $70, $11, $0A, $11
-		dc.b	$07, $70, $00, $A0, $10, $07, $00, $0A, $01, $03, $02, $A0, $10, $02, $02, $0A
-		dc.b	$01, $03, $06, $A0, $DD, $DD, $DD, $D1, $10, $02, $02, $11, $01, $02, $08, $6A
-		dc.b	$00, $10, $01, $A0, $70, $00, $07, $03, $05, $11, $00, $07, $00, $7A, $03, $1B
-		dc.b	$10, $0A, $BB, $C7, $6D, $D6, $00, $A1, $10, $10, $0A, $16, $01, $00, $01, $60
-		dc.b	$10, $77, $A7, $00, $07, $00, $01, $01, $70, $01, $10, $02, $0E, $10, $70, $17
-		dc.b	$10, $11, $01, $07, $67, $77, $00, $77, $77, $70, $77, $02, $01, $07, $04, $05
-		dc.b	$01, $11, $11, $01, $11, $02, $02, $10, $01, $03, $01, $10, $03, $06, $76, $67
-		dc.b	$77, $77, $00, $10, $02, $01, $01, $02, $02, $01, $10, $02, $01, $01, $02, $02
-		dc.b	$01, $01, $02, $02, $01, $10, $02, $01, $01, $02, $0D, $01, $00, $07, $10, $10
-		dc.b	$60, $70, $11, $70, $77, $01, $00, $77, $02, $16, $10, $77, $70, $10, $00, $77
-		dc.b	$01, $00, $07, $00, $01, $00, $07, $70, $01, $00, $07, $01, $10, $00, $61, $10
-		dc.b	$03, $02, $A0, $A0, $02, $25, $AA, $AA, $00, $0A, $0A, $AA, $00, $0A, $0A, $AA
-		dc.b	$00, $0A, $AA, $AA, $A0, $AA, $AA, $AA, $A0, $A0, $AA, $AA, $00, $AA, $0A, $00
-		dc.b	$AA, $0A, $00, $AA, $00, $0A, $0A, $A0, $00, $0A, $A0, $02, $02, $A0, $0A, $03
-		dc.b	$01, $A0, $02, $01, $1A, $02, $02, $A0, $B0, $02, $08, $A0, $FF, $DC, $B0, $CD
-		dc.b	$00, $21, $0A, $03, $01, $70, $02, $03, $02, $11, $12, $02, $01, $07, $03, $02
-		dc.b	$21, $20, $02, $01, $02, $08, $01, $20, $02, $01, $02, $03, $01, $27, $02, $02
-		dc.b	$02, $6A, $03, $01, $10, $02, $05, $26, $A0, $72, $00, $01, $02, $08, $02, $1A
-		dc.b	$00, $A0, $02, $3F, $FF, $F2, $0F, $01, $02, $07, $01, $20, $03, $25, $01, $45
-		dc.b	$5F, $5F, $DC, $10, $0A, $A0, $00, $10, $10, $AA, $00, $01, $10, $00, $AA, $70
-		dc.b	$10, $10, $00, $16, $71, $01, $16, $60, $16, $66, $61, $17, $76, $66, $66, $AA
-		dc.b	$AB, $B1, $07, $02, $1F, $A1, $71, $00, $0A, $17, $16, $AA, $A1, $71, $10, $01
-		dc.b	$66, $11, $70, $76, $11, $17, $00, $11, $67, $70, $01, $77, $00, $11, $10, $60
-		dc.b	$01, $0A, $AA, $60, $02, $05, $0A, $00, $10, $A0, $0A, $04, $02, $01, $0A, $02
-		dc.b	$02, $10, $A0, $03, $01, $A0, $02, $02, $AA, $A0, $02, $1C, $0A, $DD, $DD, $DF
-		dc.b	$01, $00, $01, $02, $07, $00, $01, $10, $A1, $00, $01, $00, $10, $00, $01, $00
-		dc.b	$70, $00, $01, $00, $10, $00, $10, $10, $02, $05, $10, $10, $00, $01, $10, $02
-		dc.b	$1F, $01, $00, $12, $00, $01, $01, $12, $00, $11, $01, $10, $00, $11, $10, $02
-		dc.b	$00, $10, $01, $20, $01, $11, $02, $00, $01, $02, $20, $00, $22, $20, $00, $02
-		dc.b	$13, $01, $02, $08, $0C, $44, $23, $5F, $F4, $10, $07, $A0, $A0, $00, $01, $A0
-		dc.b	$17, $02, $04, $A0, $01, $01, $1A, $04, $0D, $0A, $70, $00, $70, $00, $10, $A0
-		dc.b	$10, $01, $00, $D7, $1A, $C6, $02, $02, $77, $10, $02, $01, $10, $05, $01, $11
-		dc.b	$02, $01, $11, $02, $01, $01, $03, $0D, $10, $00, $07, $01, $00, $07, $70, $00
-		dc.b	$76, $61, $11, $01, $71, $03, $06, $16, $10, $00, $11, $10, $61, $02, $03, $01
-		dc.b	$06, $10, $02, $08, $10, $70, $77, $00, $01, $01, $00, $77, $02, $10, $66, $66
-		dc.b	$00, $07, $00, $10, $00, $70, $01, $11, $07, $77, $01, $10, $07, $70, $02, $06
-		dc.b	$07, $70, $01, $00, $77, $77, $02, $35, $70, $70, $01, $11, $11, $11, $66, $76
-		dc.b	$77, $77, $00, $11, $00, $0A, $00, $11, $00, $0A, $01, $11, $00, $0A, $01, $10
-		dc.b	$00, $0A, $00, $11, $11, $11, $77, $77, $77, $77, $11, $11, $11, $11, $DD, $7D
-		dc.b	$7D, $77, $A0, $AA, $AA, $00, $AA, $AA, $AA, $00, $A0, $AA, $0A, $02, $13, $A0
-		dc.b	$01, $01, $11, $11, $10, $10, $77, $77, $77, $77, $11, $11, $11, $11, $DD, $DD
-		dc.b	$DD, $DD, $0D, $07, $0A, $00, $0A, $00, $0A, $00, $A0, $02, $02, $0A, $01, $02
-		dc.b	$01, $A0, $03, $02, $A0, $67, $02, $03, $0A, $70, $A0, $02, $02, $10, $A0, $02
-		dc.b	$01, $A7, $02, $02, $0A, $01, $02, $02, $0A, $0A, $08, $02, $CD, $B0, $02, $02
-		dc.b	$71, $7B, $02, $03, $77, $77, $A0, $02, $10, $07, $6A, $A0, $77, $00, $76, $1A
-		dc.b	$10, $07, $07, $71, $00, $77, $00, $70, $A6, $03, $04, $0A, $CB, $BB, $BB, $10
-		dc.b	$01, $AA, $03, $02, $61, $A0, $02, $02, $70, $0A, $02, $05, $46, $77, $DD, $DC
-		dc.b	$02, $02, $03, $01, $00, $20, $03, $01, $02, $04, $01, $20, $03, $02, $02, $20
-		dc.b	$03, $01, $02, $04, $05, $23, $33, $44, $45, $10, $02, $01, $01, $02, $07, $70
-		dc.b	$00, $10, $00, $07, $00, $01, $02, $16, $70, $00, $11, $00, $07, $22, $00, $11
-		dc.b	$10, $00, $22, $22, $01, $45, $55, $FF, $DD, $10, $00, $A0, $00, $10, $04, $05
-		dc.b	$10, $0A, $00, $01, $01, $02, $16, $70, $00, $10, $A0, $07, $70, $01, $0A, $11
-		dc.b	$16, $66, $66, $DD, $DD, $DD, $C6, $00, $0A, $00, $0A, $00, $0A, $0E, $01, $A0
-		dc.b	$03, $08, $6C, $CB, $BB, $BB, $C6, $CB, $BB, $BB, $04, $01, $0A, $09, $01, $A0
-		dc.b	$03, $01, $A0, $05, $08, $BB, $BB, $BB, $BB, $BB, $BB, $BB, $BB, $02, $01, $0A
-		dc.b	$03, $01, $0A, $02, $01, $A0, $03, $03, $A0, $00, $0A, $02, $0E, $0A, $A0, $00
-		dc.b	$AA, $A0, $11, $BC, $66, $77, $66, $43, $33, $22, $20, $0B, $01, $21, $06, $02
-		dc.b	$02, $17, $03, $01, $01, $02, $11, $21, $6A, $23, $4F, $DC, $A0, $21, $70, $00
-		dc.b	$A0, $00, $0B, $00, $A0, $02, $17, $A0, $02, $07, $01, $1A, $0A, $00, $20, $70
-		dc.b	$AA, $02, $0A, $11, $0A, $00, $02, $07, $10, $FF, $FF, $DC, $BA, $04, $01, $A0
-		dc.b	$02, $02, $A0, $A0, $02, $05, $10, $A0, $00, $0A, $0A, $0C, $14, $5D, $BA, $A0
-		dc.b	$BA, $00, $71, $10, $AA, $02, $17, $71, $10, $00, $21, $17, $76, $00, $02, $21
-		dc.b	$11, $02, $02, $02, $20, $03, $01, $02, $04, $04, $FF, $FF, $FF, $FF, $04, $02
-		dc.b	$AA, $A0, $02, $0C, $11, $1B, $AA, $AA, $66, $77, $66, $66, $00, $11, $11, $11
-		dc.b	$03, $02, $01, $20, $03, $04, $FD, $DD, $DD, $DC, $09, $01, $0A, $03, $01, $0A
-		dc.b	$05, $01, $0A, $03, $01, $A0, $02, $06, $0A, $01, $00, $0A, $A0, $10, $02, $01
-		dc.b	$01, $02, $1B, $A0, $10, $07, $0A, $01, $00, $70, $A0, $10, $07, $01, $01, $00
-		dc.b	$70, $10, $10, $77, $01, $00, $07, $00, $10, $00, $BC, $CC, $DD, $DD, $04, $01
-		dc.b	$0A, $03, $01, $0A, $03, $09, $A0, $00, $0A, $00, $10, $00, $0A, $00, $7B, $03
-		dc.b	$01, $17, $03, $12, $D6, $CC, $BA, $BA, $00, $70, $01, $11, $0A, $10, $01, $11
-		dc.b	$00, $07, $71, $10, $00, $A1, $04, $01, $07, $02, $02, $0A, $70, $04, $0D, $10
-		dc.b	$AB, $BB, $06, $BA, $01, $01, $01, $BA, $00, $10, $11, $01, $03, $0F, $11, $00
-		dc.b	$A0, $00, $0A, $0A, $AA, $0A, $AA, $0A, $AA, $A0, $0A, $A0, $AA, $02, $02, $0A
-		dc.b	$A0, $06, $01, $AA, $03, $02, $11, $A0, $02, $03, $BB, $0B, $A0, $02, $02, $AB
-		dc.b	$A0, $09, $06, $CC, $CD, $DD, $DD, $00, $01, $02, $02, $10, $01, $02, $02, $10
-		dc.b	$11, $03, $02, $11, $10, $02, $05, $11, $10, $00, $11, $11, $03, $07, $10, $02
-		dc.b	$02, $DD, $DD, $74, $DF, $02, $01, $01, $06, $02, $0A, $0A, $07, $01, $A0, $02
-		dc.b	$01, $A0, $03, $01, $0A, $02, $04, $FF, $5F, $FF, $FF, $09, $0F, $02, $22, $20
-		dc.b	$00, $21, $11, $12, $02, $17, $66, $61, $00, $71, $AA, $A6, $03, $05, $0A, $00
-		dc.b	$0A, $00, $0B, $03, $01, $01, $03, $04, $A0, $00, $0A, $A0, $02, $13, $71, $0A
-		dc.b	$01, $20, $17, $11, $17, $61, $01, $66, $61, $BC, $77, $77, $77, $DF, $55, $55
-		dc.b	$55, $04, $01, $12, $03, $02, $71, $20, $03, $12, $12, $02, $22, $61, $10, $21
-		dc.b	$66, $11, $17, $7C, $BB, $6C, $CA, $A0, $00, $5F, $FF, $DA, $02, $02, $02, $6A
-		dc.b	$02, $09, $26, $10, $00, $22, $61, $A0, $00, $16, $BA, $02, $01, $6B, $02, $02
-		dc.b	$0A, $A0, $02, $01, $A1, $02, $05, $AB, $11, $FF, $FF, $76, $04, $01, $71, $02
-		dc.b	$01, $20, $04, $01, $17, $06, $01, $02, $04, $01, $01, $04, $04, $5F, $FF, $F5
-		dc.b	$67, $07, $01, $0A, $02, $04, $01, $10, $00, $0A, $02, $02, $A0, $0A, $04, $02
-		dc.b	$A0, $A0, $06, $01, $A1, $03, $13, $0A, $0A, $00, $0A, $AB, $B6, $AB, $B6, $66
-		dc.b	$60, $67, $61, $11, $17, $11, $11, $67, $70, $11, $02, $1D, $01, $00, $07, $00
-		dc.b	$01, $CC, $60, $70, $1B, $BC, $67, $71, $A0, $70, $07, $1A, $00, $07, $61, $00
-		dc.b	$0A, $71, $00, $A0, $0A, $10, $00, $A0, $A0, $02, $02, $A0, $A0, $02, $1C, $A0
-		dc.b	$00, $AA, $AA, $0A, $BB, $00, $0A, $01, $07, $00, $A0, $10, $70, $0A, $01, $07
-		dc.b	$01, $A0, $17, $70, $10, $11, $70, $11, $00, $77, $01, $02, $02, $11, $10, $02
-		dc.b	$02, $11, $10, $03, $01, $10, $02, $01, $11, $0D, $01, $01, $02, $0C, $01, $01
-		dc.b	$10, $00, $01, $00, $10, $D0, $17, $DD, $DD, $A0, $03, $14, $10, $01, $A0, $00
-		dc.b	$06, $17, $1A, $00, $77, $11, $66, $BA, $00, $01, $11, $66, $11, $11, $10, $01
-		dc.b	$04, $04, $DD, $DD, $DD, $DD, $04, $07, $A0, $00, $0A, $00, $A0, $00, $0A, $05
-		dc.b	$01, $BA, $03, $02, $66, $BA, $02, $03, $01, $66, $BA, $02, $03, $0A, $DF, $55
-		dc.b	$02, $04, $03, $33, $11, $1B, $03, $12, $01, $AB, $BB, $77, $77, $10, $16, $00
-		dc.b	$06, $16, $6B, $11, $61, $71, $A0, $AA, $07, $1A, $02, $0A, $DB, $A0, $00, $02
-		dc.b	$22, $22, $20, $00, $11, $11, $02, $02, $0D, $D0, $06, $02, $0D, $D0, $02, $07
-		dc.b	$11, $11, $00, $02, $22, $22, $20, $04, $07, $02, $22, $22, $20, $00, $11, $11
-		dc.b	$02, $02, $0D, $D0, $06, $02, $0D, $D0, $02, $07, $11, $11, $00, $02, $22, $22
-		dc.b	$20, $04, $07, $02, $22, $22, $20, $00, $11, $11, $02, $02, $0D, $D0, $06, $02
-		dc.b	$0D, $D0, $02, $17, $11, $11, $00, $02, $22, $22, $20, $DD, $DD, $DD, $DD, $06
-		dc.b	$11, $11, $11, $07, $C7, $77, $77, $00, $B1, $11, $11, $02, $02, $0A, $AA, $02
-		dc.b	$02, $AA, $AA, $08, $38, $01, $67, $D7, $77, $11, $11, $11, $11, $77, $77, $77
-		dc.b	$77, $11, $11, $11, $11, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $04, $44, $40
-		dc.b	$00, $40, $00, $04, $00, $33, $33, $33, $77, $11, $11, $11, $11, $77, $77, $77
-		dc.b	$77, $11, $11, $11, $11, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $AA, $03, $01, $44
-		dc.b	$02, $0B, $04, $00, $77, $77, $73, $33, $01, $11, $11, $11, $10, $03, $05, $07
-		dc.b	$77, $77, $77, $70, $03, $04, $01, $11, $11, $11, $04, $0C, $0A, $AA, $AA, $AA
-		dc.b	$6D, $DD, $DD, $DD, $11, $11, $11, $11, $04, $04, $77, $77, $77, $77, $04, $04
-		dc.b	$11, $11, $11, $11, $04, $04, $AA, $AA, $AA, $AA, $04, $07, $02, $22, $22, $20
-		dc.b	$00, $11, $11, $02, $02, $0D, $D0, $06, $02, $0D, $D0, $02, $07, $11, $11, $00
-		dc.b	$02, $22, $22, $20, $07, $01, $A0, $03, $01, $A0, $03, $01, $A0, $03, $01, $A0
-		dc.b	$0E, $01, $A0, $03, $01, $A0, $13, $01, $A0, $03, $39, $A0, $00, $AB, $AB, $CD
-		dc.b	$DF, $01, $10, $71, $12, $01, $10, $77, $10, $11, $10, $76, $10, $11, $10, $71
-		dc.b	$10, $01, $10, $01, $00, $01, $07, $71, $02, $10, $00, $70, $02, $66, $61, $13
-		dc.b	$22, $11, $10, $12, $00, $70, $71, $10, $20, $67, $77, $01, $00, $70, $77, $11
-		dc.b	$00, $10, $00, $11, $02, $0B, $71, $11, $12, $07, $71, $11, $10, $43, $43, $23
-		dc.b	$22, $07, $01, $02, $02, $02, $02, $2B, $02, $23, $2B, $B3, $00, $02, $B3, $35
-		dc.b	$00, $0B, $30, $55, $00, $20, $00, $50, $00, $2B, $88, $89, $02, $2B, $BB, $00
-		dc.b	$2B, $B3, $33, $B1, $B6, $65, $50, $3B, $60, $55, $50, $03, $05, $03, $24, $50
-		dc.b	$00, $33, $30, $00, $03, $0B, $B3, $99, $8B, $A1, $1D, $07, $00, $10, $70, $07
-		dc.b	$10, $00, $70, $10, $76, $01, $07, $B1, $70, $60, $11, $3B, $17, $06, $60, $03
-		dc.b	$B1, $70, $17, $02, $06, $17, $11, $AA, $BB, $B9, $EE, $02, $04, $03, $33, $00
-		dc.b	$2B, $03, $03, $02, $BB, $BB, $03, $13, $16, $00, $02, $16, $6B, $00, $21, $71
-		dc.b	$A0, $00, $07, $1A, $00, $A9, $BD, $7D, $D6, $30, $0B, $02, $10, $0B, $B0, $00
-		dc.b	$B0, $B1, $66, $11, $B0, $7C, $BB, $67, $1B, $A0, $00, $AB, $C7, $03, $01, $0A
-		dc.b	$04, $05, $56, $6D, $DD, $CA, $30, $02, $15, $17, $00, $B0, $10, $11, $0B, $01
-		dc.b	$71, $10, $B0, $17, $07, $11, $11, $71, $10, $71, $CC, $BA, $01, $07, $02, $06
-		dc.b	$AA, $B1, $DC, $BA, $0A, $A0, $0A, $01, $A0, $06, $0F, $B1, $11, $11, $00, $C7
-		dc.b	$77, $77, $01, $11, $11, $11, $33, $33, $33, $77, $04, $07, $40, $00, $04, $00
-		dc.b	$04, $44, $40, $05, $10, $11, $11, $11, $11, $77, $77, $77, $77, $11, $11, $11
-		dc.b	$11, $77, $77, $73, $33, $06, $01, $04, $04, $01, $44, $04, $14, $11, $11, $11
-		dc.b	$11, $77, $77, $77, $77, $11, $11, $11, $11, $6D, $DD, $DD, $DD, $0A, $AA, $AA
-		dc.b	$AA, $04, $05, $01, $11, $11, $11, $70, $03, $05, $07, $77, $77, $77, $10, $03
-		dc.b	$0C, $01, $11, $11, $11, $DD, $DD, $DD, $DD, $AA, $AA, $AA, $AA, $04, $04, $11
-		dc.b	$11, $11, $11, $04, $04, $77, $77, $77, $77, $04, $0F, $11, $11, $11, $11, $DD
-		dc.b	$DD, $DD, $DD, $02, $22, $22, $20, $00, $11, $11, $02, $02, $0D, $D0, $06, $02
-		dc.b	$0D, $D0, $02, $07, $11, $11, $00, $02, $22, $22, $20, $10, $01, $B0, $03, $01
-		dc.b	$B0, $18, $01, $0A, $03, $01, $0A, $08, $01, $0A, $03, $41, $0A, $00, $AB, $BB
-		dc.b	$CD, $CD, $01, $07, $71, $00, $01, $07, $70, $10, $01, $07, $70, $10, $01, $07
-		dc.b	$71, $00, $10, $07, $00, $12, $77, $71, $10, $20, $11, $10, $00, $22, $66, $11
-		dc.b	$10, $10, $00, $01, $01, $10, $07, $71, $01, $10, $07, $77, $01, $10, $70, $77
-		dc.b	$10, $00, $77, $70, $11, $02, $70, $11, $12, $20, $11, $02, $20, $01
-Unknow_Pallete_0x0474AC:
-loc_474AC:
-		dc.w	$0000, $0A20, $0666, $0888, $0CAA, $0ECC, $0246, $0008
-		dc.w	$000E, $046A, $068C, $08CE, $0E22, $0E62, $0000, $0EEE
-		dc.w	$0000, $0A42, $0C64, $0E86, $048A, $08CE, $0046, $0068
-		dc.w	$008A, $00EE, $000A, $024C, $006E, $00AE, $0000, $0EEE
-		dc.w	$0000, $044C, $066E, $0AAE, $048A, $08CE, $0E46, $0E68
-		dc.w	$0E8A, $04CE, $0A24, $0282, $02C2, $04E2, $0000, $0EEE
-		dc.w	$0000, $0E22, $0E42, $0E62, $0E82, $0C68, $0848, $0628
-		dc.w	$0E88, $0E66, $0E44, $0C22, $0A02, $0602, $0000, $0EEE
-		dc.w	$0664, $0444, $0666, $0888, $0444, $0666, $0888, $0444
-		dc.w	$0888, $0666, $0222, $0262, $02A4, $04E8, $0000, $0EEE
-		dc.w	$0664, $0EEE, $0EEE, $0EEE, $0EEE, $0EEE, $0EEE, $0EEE
-		dc.w	$0EEE, $0EEE, $0EEE, $0262, $02A4, $04E8, $0000, $0EEE
-		dc.w	$0664, $0C4C, $0C8C, $0CCC, $026A, $048C, $04CC, $0A84
-		dc.w	$0EA6, $0AAA, $0222, $0262, $02A4, $04E8, $0000, $0EEE
-		dc.w	$0664, $0A2C, $0E4E, $0EAE, $006C, $048C, $00CE, $0E62
-		dc.w	$0E84, $0888, $0222, $0262, $02A4, $04E8, $0000, $0EEE
-		dc.w	$0664, $080A, $0C4C, $0C8E, $004A, $046C, $00AE, $0C40
-		dc.w	$0E84, $0666, $0000, $0262, $02A4, $04E8, $0000, $0EEE
-		dc.w	$0622, $0262, $02A4, $04E8, $0400, $0620, $0840, $0A40
-		dc.w	$0A40, $00EE, $000A, $024C, $006E, $00AE, $0000, $0EEE
-		dc.w	$0622, $0262, $02A4, $04E8, $0600, $0820, $0A60, $0C82
-		dc.w	$0EA4, $00EE, $000A, $024C, $006E, $00AE, $0000, $0EEE
-Unknow_Data_0x04760C:
-loc_4760C:
-		dc.b	$40, $00, $00, $2D, $01, $20, $02, $02, $02, $12, $03, $02, $C6, $20, $02, $03
-		dc.b	$0B, $72, $20, $02, $06, $AD, $62, $02, $FF, $DC, $61, $02, $02, $01, $66, $02
-		dc.b	$06, $07, $B1, $00, $02, $6A, $A0, $02, $01, $10, $02, $01, $21, $06, $09, $20
-		dc.b	$00, $1A, $00, $12, $66, $1A, $AB, $16, $03, $01, $10, $03, $02, $10, $01, $03
-		dc.b	$01, $01, $02, $52, $07, $01, $6D, $DD, $10, $67, $77, $DD, $01, $66, $BA, $00
-		dc.b	$76, $06, $CD, $DD, $BB, $BC, $CD, $DD, $DD, $CB, $BA, $AA, $66, $06, $67, $77
-		dc.b	$BB, $66, $66, $61, $00, $A1, $00, $70, $00, $B1, $07, $07, $0A, $01, $16, $60
-		dc.b	$C1, $B0, $67, $76, $CB, $B6, $11, $67, $BC, $61, $17, $BA, $61, $16, $71, $00
-		dc.b	$11, $00, $67, $DD, $00, $06, $66, $D6, $70, $16, $1B, $0B, $01, $11, $A0, $00
-		dc.b	$60, $35, $FF, $FF, $76, $32, $02, $03, $AB, $66, $20, $02, $09, $A1, $10, $00
-		dc.b	$B0, $A0, $02, $00, $6D, $77, $02, $06, $06, $76, $11, $20, $66, $AB, $02, $04
-		dc.b	$42, $FF, $23, $02, $02, $06, $22, $16, $00, $02, $16, $6B, $02, $05, $7B, $A0
-		dc.b	$00, $21, $10, $02, $05, $07, $A0, $00, $02, $11, $06, $16, $20, $16, $A0, $BC
-		dc.b	$66, $11, $6B, $BC, $BB, $76, $16, $CB, $00, $B0, $61, $16, $00, $01, $17, $11
-		dc.b	$00, $0A, $05, $01, $70, $02, $26, $01, $00, $DD, $DC, $61, $07, $DD, $DC, $CB
-		dc.b	$BB, $BA, $AB, $BC, $DD, $67, $76, $60, $66, $11, $66, $66, $BB, $70, $70, $1A
-		dc.b	$00, $77, $07, $1B, $00, $70, $76, $10, $A0, $44, $45, $56, $7D, $02, $02, $02
-		dc.b	$20, $03, $01, $02, $16, $0A, $22, $33, $00, $02, $16, $66, $00, $21, $70, $10
-		dc.b	$03, $05, $10, $02, $17, $00, $10, $03, $05, $11, $21, $70, $00, $11, $03, $0B
-		dc.b	$11, $67, $00, $11, $0B, $BB, $BB, $AA, $A0, $A0, $A0, $02, $02, $0A, $AA, $03
-		dc.b	$01, $AA, $03, $01, $AA, $03, $01, $AA, $03, $01, $AA, $02, $05, $01, $A0, $A0
-		dc.b	$00, $11, $03, $01, $11, $03, $01, $11, $03, $01, $11, $03, $01, $11, $03, $01
-		dc.b	$11, $03, $01, $11, $03, $0D, $76, $66, $6C, $CC, $0C, $66, $67, $77, $1B, $AA
-		dc.b	$AB, $BB, $07, $0A, $01, $0A, $03, $01, $A0, $02, $13, $0A, $00, $10, $CC, $C6
-		dc.b	$66, $77, $77, $77, $76, $BB, $BB, $B1, $16, $00, $AA, $A0, $10, $AA, $04, $05
-		dc.b	$01, $10, $00, $01, $10, $02, $01, $10, $03, $04, $66, $66, $67, $61, $04, $01
-		dc.b	$20, $03, $01, $02, $04, $01, $20, $05, $05, $01, $00, $02, $00, $11, $03, $05
-		dc.b	$11, $02, $FF, $DD, $DC, $02, $01, $A0, $02, $3D, $A0, $AA, $A0, $00, $10, $00
-		dc.b	$0A, $00, $70, $00, $11, $02, $0A, $00, $07, $00, $11, $00, $70, $00, $27, $0A
-		dc.b	$01, $32, $20, $CB, $71, $C6, $01, $07, $71, $0B, $70, $10, $16, $A0, $A1, $01
-		dc.b	$11, $1A, $07, $10, $60, $66, $B0, $01, $10, $01, $70, $71, $71, $01, $17, $00
-		dc.b	$16, $17, $7C, $BD, $DD, $71, $A0, $02, $01, $1A, $03, $03, $A0, $0A, $AA, $02
-		dc.b	$73, $0A, $07, $A0, $A0, $00, $A6, $70, $1B, $BA, $01, $0A, $66, $67, $C1, $06
-		dc.b	$DD, $D0, $16, $76, $00, $D1, $DD, $71, $00, $0C, $00, $76, $00, $0A, $0B, $70
-		dc.b	$00, $06, $A6, $D6, $00, $D1, $10, $AB, $00, $07, $61, $7B, $00, $0A, $61, $16
-		dc.b	$CD, $B0, $B0, $C7, $11, $00, $A0, $B1, $00, $0A, $10, $07, $10, $01, $00, $61
-		dc.b	$17, $70, $70, $D6, $11, $77, $00, $A7, $1A, $B7, $01, $11, $60, $01, $10, $61
-		dc.b	$0D, $0A, $01, $03, $76, $0A, $01, $10, $1B, $A1, $07, $72, $0B, $17, $0B, $10
-		dc.b	$06, $61, $70, $00, $0D, $60, $AA, $10, $0A, $70, $B1, $70, $01, $11, $67, $12
-		dc.b	$26, $66, $DC, $DF, $05, $02, $01, $A0, $06, $02, $01, $0A, $02, $07, $10, $A0
-		dc.b	$BA, $21, $0A, $0A, $11, $03, $08, $01, $DC, $A0, $AA, $16, $00, $0A, $01, $04
-		dc.b	$01, $77, $02, $01, $10, $02, $15, $A1, $07, $00, $AB, $10, $61, $10, $10, $06
-		dc.b	$67, $16, $00, $66, $BA, $10, $01, $71, $00, $DD, $00, $0A, $0E, $02, $07, $7D
-		dc.b	$02, $06, $67, $61, $D0, $00, $7A, $B7, $02, $04, $5F, $F4, $2F, $FD, $03, $01
-		dc.b	$21, $02, $1E, $02, $17, $02, $22, $30, $16, $20, $11, $16, $67, $06, $70, $60
-		dc.b	$10, $06, $77, $06, $77, $00, $10, $61, $16, $16, $60, $66, $71, $70, $00, $01
-		dc.b	$10, $02, $1A, $10, $10, $66, $00, $11, $77, $76, $77, $07, $06, $01, $11, $61
-		dc.b	$6B, $71, $60, $06, $AB, $66, $10, $0A, $B6, $17, $0D, $D0, $BD, $02, $01, $A0
-		dc.b	$02, $28, $AA, $A0, $00, $77, $D7, $DC, $00, $DD, $DD, $77, $D0, $AA, $AA, $AB
-		dc.b	$1D, $77, $77, $BA, $60, $7D, $77, $61, $A0, $6C, $67, $06, $C1, $00, $76, $01
-		dc.b	$77, $77, $11, $07, $10, $11, $A0, $01, $01, $AA, $02, $11, $AA, $00, $A1, $01
-		dc.b	$A0, $AA, $16, $16, $6A, $77, $61, $01, $17, $01, $DC, $66, $76, $03, $05, $10
-		dc.b	$00, $0A, $00, $07, $02, $02, $01, $07, $03, $0B, $07, $07, $B0, $10, $70, $01
-		dc.b	$76, $66, $11, $16, $11, $02, $0A, $77, $61, $61, $61, $70, $77, $70, $00, $77
-		dc.b	$07, $02, $01, $77, $03, $01, $07, $05, $06, $07, $00, $11, $11, $16, $77, $03
-		dc.b	$05, $17, $22, $22, $01, $10, $02, $01, $01, $03, $01, $01, $04, $01, $07, $03
-		dc.b	$01, $07, $03, $01, $07, $07, $09, $70, $00, $02, $7C, $16, $00, $02, $7A, $A6
-		dc.b	$02, $02, $27, $A1, $03, $01, $6A, $02, $02, $02, $1B, $03, $01, $26, $03, $01
-		dc.b	$02, $04, $05, $33, $32, $32, $24, $17, $04, $3B, $70, $11, $06, $66, $00, $17
-		dc.b	$66, $B6, $10, $71, $B1, $CB, $A1, $0A, $0A, $1D, $C7, $BA, $DC, $22, $1B, $A7
-		dc.b	$17, $5F, $DB, $70, $06, $A0, $01, $10, $10, $B0, $01, $10, $17, $6D, $D6, $01
-		dc.b	$7A, $66, $11, $17, $B0, $B1, $71, $01, $00, $C1, $11, $17, $BA, $66, $67, $61
-		dc.b	$67, $AD, $CB, $11, $6D, $02, $02, $A0, $7A, $02, $02, $01, $11, $02, $02, $07
-		dc.b	$07, $02, $02, $01, $11, $03, $01, $71, $02, $02, $A0, $07, $05, $03, $0A, $17
-		dc.b	$07, $03, $07, $07, $00, $01, $70, $01, $AA, $A7, $02, $08, $66, $60, $11, $01
-		dc.b	$11, $11, $10, $76, $02, $14, $11, $12, $10, $00, $22, $20, $10, $17, $42, $00
-		dc.b	$10, $61, $62, $00, $70, $76, $20, $00, $01, $02, $02, $02, $71, $20, $02, $01
-		dc.b	$12, $03, $01, $20, $07, $04, $24, $FF, $FF, $55, $02, $10, $0A, $16, $00, $0A
-		dc.b	$B6, $77, $00, $B1, $06, $61, $07, $01, $BA, $AA, $00, $1A, $02, $01, $07, $04
-		dc.b	$01, $A0, $02, $0E, $60, $DA, $0B, $DB, $76, $6A, $00, $61, $16, $10, $0B, $BA
-		dc.b	$10, $A0, $02, $01, $70, $03, $1A, $10, $A0, $00, $AB, $00, $1A, $AA, $10, $00
-		dc.b	$01, $11, $00, $0B, $B0, $66, $BB, $A0, $A0, $06, $D0, $00, $16, $D1, $00, $0B
-		dc.b	$6D, $02, $14, $B0, $D0, $A1, $00, $0B, $00, $16, $7D, $0A, $00, $6D, $A0, $01
-		dc.b	$AB, $D0, $A0, $67, $70, $DC, $16, $03, $01, $01, $03, $01, $01, $03, $01, $01
-		dc.b	$03, $01, $01, $03, $01, $01, $03, $01, $01, $03, $06, $01, $71, $76, $0C, $60
-		dc.b	$10, $03, $01, $10, $03, $01, $10, $03, $01, $10, $03, $01, $10, $03, $01, $10
-		dc.b	$03, $01, $10, $03, $04, $1D, $0D, $DD, $D7, $1C, $14, $7C, $1C, $C1, $C1, $07
-		dc.b	$B7, $00, $76, $01, $00, $77, $1A, $0A, $01, $11, $00, $0A, $0A, $0A, $A0, $02
-		dc.b	$30, $A0, $0A, $17, $A0, $00, $A6, $01, $7B, $BB, $71, $10, $67, $77, $11, $06
-		dc.b	$07, $00, $76, $0A, $10, $77, $1A, $0A, $A1, $11, $A0, $01, $0A, $AA, $0A, $07
-		dc.b	$AA, $00, $A1, $01, $66, $CC, $76, $01, $77, $66, $77, $07, $77, $61, $66, $01
-		dc.b	$70, $02, $1C, $0A, $17, $70, $01, $00, $A1, $11, $00, $0A, $0A, $A0, $11, $01
-		dc.b	$A0, $A6, $00, $06, $7C, $60, $00, $61, $01, $11, $10, $43, $22, $01, $07, $03
-		dc.b	$01, $70, $03, $01, $70, $03, $01, $70, $03, $01, $70, $03, $01, $70, $03, $01
-		dc.b	$70, $03, $05, $70, $22, $22, $01, $66, $06, $0F, $01, $01, $00, $10, $11, $11
-		dc.b	$11, $11, $11, $11, $10, $10, $10, $10, $10, $02, $11, $70, $00, $07, $07, $77
-		dc.b	$33, $01, $06, $6B, $02, $60, $10, $A0, $00, $A1, $00, $A0, $03, $01, $10, $03
-		dc.b	$1C, $7A, $00, $A1, $10, $11, $02, $6A, $70, $06, $00, $1A, $B1, $00, $42, $06
-		dc.b	$C7, $66, $70, $07, $C6, $77, $10, $07, $00, $11, $00, $01, $A0, $03, $01, $10
-		dc.b	$03, $01, $60, $02, $01, $07, $03, $01, $0A, $02, $10, $DD, $DA, $76, $61, $BB
-		dc.b	$B1, $17, $70, $BB, $BB, $B6, $67, $B0, $BB, $06, $61, $03, $13, $01, $B0, $BB
-		dc.b	$A6, $61, $BB, $BB, $16, $66, $BB, $11, $17, $77, $CC, $67, $54, $44, $11, $10
-		dc.b	$02, $02, $76, $60, $02, $01, $67, $07, $01, $77, $03, $02, $66, $60, $02, $02
-		dc.b	$66, $10, $02, $06, $77, $71, $44, $44, $70, $07, $02, $07, $77, $00, $01, $11
-		dc.b	$70, $01, $10, $02, $01, $10, $02, $01, $01, $02, $06, $AA, $11, $00, $0A, $00
-		dc.b	$11, $03, $17, $61, $AA, $A0, $0A, $07, $A0, $0A, $A0, $21, $1A, $A0, $11, $00
-		dc.b	$71, $11, $00, $02, $17, $00, $77, $00, $21, $77, $02, $02, $02, $11, $03, $08
-		dc.b	$22, $11, $44, $34, $44, $66, $00, $17, $02, $08, $07, $00, $77, $00, $70, $11
-		dc.b	$10, $77, $02, $02, $01, $11, $04, $02, $01, $10, $02, $08, $12, $22, $01, $16
-		dc.b	$64, $44, $76, $76, $02, $1E, $16, $76, $00, $07, $71, $1B, $77, $70, $10, $1B
-		dc.b	$11, $11, $01, $60, $00, $01, $17, $AB, $11, $10, $07, $CB, $77, $76, $66, $CB
-		dc.b	$67, $61, $76, $BB, $03, $01, $01, $03, $02, $01, $01, $02, $16, $70, $00, $10
-		dc.b	$61, $16, $16, $77, $66, $67, $17, $71, $06, $01, $21, $10, $10, $66, $50, $70
-		dc.b	$1D, $07, $10, $03, $01, $10, $02, $02, $01, $10, $02, $15, $66, $66, $10, $0A
-		dc.b	$B6, $71, $70, $01, $AB, $16, $11, $16, $6B, $61, $01, $10, $16, $7D, $7D, $D0
-		dc.b	$D0, $06, $01, $A0, $02, $0B, $0A, $76, $00, $7D, $77, $61, $A0, $DD, $DD, $BA
-		dc.b	$60, $02, $0E, $BC, $11, $DD, $DD, $61, $01, $61, $10, $10, $01, $07, $00, $10
-		dc.b	$67, $02, $06, $06, $1B, $07, $10, $11, $A0, $02, $07, $7A, $00, $70, $01, $10
-		dc.b	$00, $01, $02, $0A, $0A, $10, $07, $A0, $A0, $6D, $DB, $00, $AA, $B0, $09, $04
-		dc.b	$AA, $AA, $0A, $AA, $02, $01, $A0, $0B, $08, $AA, $01, $67, $76, $00, $AB, $66
-		dc.b	$01, $02, $0A, $A1, $60, $AA, $A0, $0A, $11, $00, $0A, $A0, $07, $02, $02, $0A
-		dc.b	$A0, $03, $01, $A1, $04, $04, $77, $77, $77, $77, $0F, $01, $01, $03, $01, $10
-		dc.b	$02, $01, $01, $03, $01, $10, $03, $02, $11, $11, $02, $08, $01, $11, $00, $01
-		dc.b	$10, $00, $01, $10, $02, $01, $10, $05, $08, $07, $77, $00, $07, $70, $00, $07
-		dc.b	$70, $02, $04, $16, $66, $66, $44, $02, $01, $01, $03, $02, $07, $20, $02, $01
-		dc.b	$11, $03, $02, $7A, $10, $05, $1F, $60, $00, $72, $00, $10, $00, $01, $22, $52
-		dc.b	$6D, $61, $00, $02, $11, $60, $00, $21, $76, $72, $02, $17, $B1, $10, $00, $71
-		dc.b	$07, $20, $21, $1A, $01, $02, $02, $0A, $A0, $00, $07, $A0, $00, $21, $24, $FF
-		dc.b	$52, $23, $02, $1E, $22, $22, $00, $22, $16, $60, $02, $11, $6B, $72, $21, $06
-		dc.b	$AA, $10, $10, $6A, $A6, $20, $07, $00, $11, $00, $71, $AA, $02, $00, $45, $F5
-		dc.b	$63, $44, $03, $01, $10, $02, $01, $07, $02, $03, $02, $10, $01, $06, $01, $07
-		dc.b	$09, $04, $24, $5D, $CC, $AA, $04, $01, $07, $08, $01, $10, $05, $02, $0A, $11
-		dc.b	$04, $01, $7A, $02, $04, $67, $61, $CD, $C6, $06, $01, $11, $02, $03, $07, $00
-		dc.b	$07, $05, $01, $10, $03, $05, $01, $10, $70, $01, $70, $02, $05, $77, $6D, $CC
-		dc.b	$B1, $11, $10, $04, $10, $00, $01, $70, $04, $07, $0A, $00, $A7, $00, $76, $CD
-		dc.b	$73, $02, $01, $01, $02, $09, $07, $00, $02, $70, $00, $70, $10, $00, $01, $04
-		dc.b	$07, $10, $00, $10, $70, $07, $00, $01, $03, $04, $23, $45, $76, $01, $06, $04
-		dc.b	$01, $07, $00, $02, $04, $01, $10, $04, $01, $70, $02, $02, $17, $06, $02, $0B
-		dc.b	$07, $60, $24, $46, $10, $16, $00, $B0, $77, $71, $01, $02, $09, $1A, $0A, $01
-		dc.b	$11, $00, $0A, $0A, $0A, $A0, $02, $1F, $A0, $0A, $17, $A0, $00, $A7, $01, $7B
-		dc.b	$BB, $71, $17, $67, $77, $17, $01, $07, $77, $71, $0A, $10, $00, $1A, $00, $A1
-		dc.b	$11, $A0, $00, $0A, $AA, $00, $0A, $02, $15, $0A, $17, $A0, $00, $A7, $01, $7B
-		dc.b	$BB, $71, $10, $60, $67, $11, $00, $01, $00, $76, $07, $10, $07, $1B, $03, $36
-		dc.b	$1A, $01, $01, $07, $01, $01, $06, $00, $77, $06, $10, $01, $10, $11, $60, $16
-		dc.b	$11, $11, $00, $17, $01, $61, $10, $01, $11, $BC, $C7, $77, $77, $A0, $0A, $AA
-		dc.b	$AA, $1A, $AA, $00, $0A, $01, $11, $BA, $A0, $77, $77, $01, $11, $11, $00, $77
-		dc.b	$77, $11, $11, $11, $13, $11, $02, $0C, $02, $66, $66, $61, $00, $BB, $11, $07
-		dc.b	$10, $AA, $00, $07, $02, $13, $11, $70, $00, $11, $77, $00, $10, $77, $00, $11
-		dc.b	$02, $11, $10, $11, $14, $00, $10, $07, $70, $02, $04, $70, $00, $01, $07, $05
-		dc.b	$05, $01, $00, $70, $01, $10, $02, $04, $10, $00, $07, $01, $02, $04, $60, $01
-		dc.b	$11, $11, $03, $01, $01, $02, $04, $11, $10, $01, $11, $02, $01, $10, $0F, $0E
-		dc.b	$77, $A7, $6A, $A6, $06, $01, $0A, $00, $01, $00, $10, $01, $00, $06, $04, $06
-		dc.b	$01, $A0, $00, $0A, $00, $10, $02, $01, $07, $03, $07, $61, $70, $01, $00, $10
-		dc.b	$01, $01, $02, $02, $07, $10, $07, $03, $70, $00, $A0, $03, $05, $06, $17, $01
-		dc.b	$A0, $01, $03, $06, $0A, $61, $01, $AA, $CF, $42, $04, $03, $10, $00, $02, $03
-		dc.b	$01, $70, $02, $01, $0A, $02, $09, $10, $00, $16, $20, $00, $A0, $A1, $00, $71
-		dc.b	$02, $05, $62, $34, $5D, $C6, $07, $06, $01, $10, $02, $03, $02, $00, $71, $02
-		dc.b	$02, $01, $07, $06, $02, $20, $10, $03, $05, $01, $42, $35, $FD, $77, $02, $05
-		dc.b	$A0, $00, $01, $11, $0A, $04, $1A, $01, $01, $07, $10, $10, $70, $00, $01, $00
-		dc.b	$10, $11, $70, $07, $01, $71, $16, $61, $77, $71, $11, $66, $10, $11, $07, $00
-		dc.b	$07, $07, $01, $71, $04, $15, $01, $07, $07, $10, $11, $10, $70, $01, $00, $11
-		dc.b	$11, $61, $06, $CD, $71, $70, $00, $AA, $10, $00, $01, $03, $17, $10, $11, $00
-		dc.b	$10, $07, $00, $71, $01, $00, $77, $00, $10, $11, $00, $10, $00, $01, $11, $01
-		dc.b	$10, $76, $76, $11, $02, $01, $10, $03, $01, $07, $02, $07, $01, $70, $10, $01
-		dc.b	$77, $00, $02, $02, $0E, $01, $00, $10, $00, $10, $20, $00, $11, $00, $20, $32
-		dc.b	$00, $10, $03, $03, $01, $17, $03, $05, $70, $02, $01, $00, $01, $07, $3A, $71
-		dc.b	$20, $11, $11, $17, $00, $01, $10, $11, $11, $01, $11, $01, $77, $01, $06, $77
-		dc.b	$00, $60, $00, $10, $11, $A7, $01, $A1, $AA, $07, $01, $0A, $00, $B1, $00, $A0
-		dc.b	$0B, $61, $16, $1A, $D6, $10, $01, $67, $11, $01, $11, $11, $00, $76, $01, $77
-		dc.b	$77, $11, $07, $10
+		BINCLUDE	"art/palettes/Unknown palette.bin"
+		BINCLUDE	"art/palettes/Unknown palette 2.bin"
+		BINCLUDE	"art/palettes/Unknown palette 3.bin"
+		BINCLUDE	"art/palettes/Unknown partial palette.bin"
 ;===============================================================================
 ; Level Rings Layout
 ; [ Begin ]
@@ -43966,677 +43030,6 @@ DEz_2_Rings_Layout:   ; loc_48DB2:
 ; Level Rings Layout
 ; [ End ]
 ;===============================================================================
-Unknow_Data_0x048DB4: ; loc_48DB4:
-		dc.b	$71, $90, $76, $61, $89, $00, $AB, $AA, $33, $33, $00, $10, $02, $02, $20, $01
-		dc.b	$04, $0C, $10, $00, $02, $00, $01, $10, $00, $20, $00, $01, $00, $02, $04, $06
-		dc.b	$22, $00, $33, $33, $32, $17, $03, $01, $70, $0C, $01, $11, $02, $04, $70, $00
-		dc.b	$11, $10, $04, $05, $01, $DD, $76, $11, $16, $06, $01, $01, $04, $08, $01, $00
-		dc.b	$07, $00, $10, $0A, $10, $10, $02, $05, $70, $01, $00, $01, $01, $02, $04, $D0
-		dc.b	$CD, $DC, $CC, $04, $01, $07, $07, $02, $11, $A0, $03, $01, $10, $02, $02, $01
-		dc.b	$60, $03, $01, $0B, $02, $04, $CC, $70, $CC, $DD, $06, $01, $01, $02, $03, $07
-		dc.b	$00, $01, $03, $04, $10, $0A, $10, $10, $02, $05, $70, $01, $00, $01, $01, $02
-		dc.b	$06, $01, $71, $01, $33, $A1, $70, $02, $10, $67, $01, $02, $00, $11, $10, $02
-		dc.b	$22, $00, $16, $61, $11, $11, $16, $77, $77, $02, $0A, $17, $77, $11, $11, $11
-		dc.b	$10, $22, $33, $32, $23, $04, $03, $22, $22, $22, $02, $2A, $11, $11, $22, $00
-		dc.b	$11, $00, $11, $66, $11, $11, $01, $07, $11, $11, $10, $71, $11, $77, $11, $BB
-		dc.b	$99, $FB, $9B, $00, $01, $10, $00, $23, $11, $57, $01, $00, $25, $71, $02, $55
-		dc.b	$67, $13, $11, $00, $07, $13, $02, $43, $63, $41, $11, $05, $50, $70, $30, $FA
-		dc.b	$CC, $11, $03, $00, $A9, $26, $67, $0A, $26, $77, $77, $03, $70, $53, $33, $A1
-		dc.b	$00, $22, $11, $37, $07, $71, $33, $10, $71, $77, $11, $00, $13, $10, $00, $07
-		dc.b	$12, $17, $00, $77, $77, $77, $77, $77, $77, $77, $77, $33, $33, $33, $33, $11
-		dc.b	$11, $11, $11, $22, $22, $22, $22, $77, $77, $77, $77, $04, $03, $75, $04, $57
-		dc.b	$02, $3F, $01, $11, $70, $10, $75, $12, $25, $20, $17, $52, $00, $11, $31, $76
-		dc.b	$55, $00, $31, $70, $00, $11, $14, $36, $00, $03, $07, $05, $50, $33, $70, $43
-		dc.b	$50, $00, $01, $35, $70, $10, $75, $11, $25, $20, $17, $52, $00, $11, $31, $76
-		dc.b	$55, $00, $31, $70, $00, $11, $14, $36, $00, $03, $07, $05, $50, $36, $00, $64
-		dc.b	$50, $1A, $06, $01, $70, $06, $20, $11, $70, $02, $01, $02, $03, $12, $01, $57
-		dc.b	$00, $01, $00, $13, $01, $30, $11, $11, $70, $12, $22, $22, $07, $77, $77, $77
-		dc.b	$04, $1C, $77, $77, $77, $77, $77, $77, $77, $77, $77, $77, $77, $77, $33, $33
-		dc.b	$33, $33, $11, $11, $11, $10, $22, $22, $22, $01, $77, $77, $70, $23, $02, $3D
-		dc.b	$07, $01, $76, $66, $FF, $88, $76, $61, $89, $00, $70, $07, $71, $90, $26, $70
-		dc.b	$07, $10, $12, $27, $00, $09, $10, $12, $70, $70, $01, $01, $10, $00, $30, $10
-		dc.b	$30, $01, $15, $20, $06, $70, $10, $00, $03, $11, $00, $71, $10, $33, $30, $02
-		dc.b	$11, $11, $A6, $07, $22, $11, $03, $60, $76, $55, $0A, $36, $70, $02, $09, $A9
-		dc.b	$25, $55, $22, $22, $88, $89, $22, $20, $03, $03, $02, $20, $01, $03, $01, $01
-		dc.b	$07, $01, $10, $03, $01, $07, $02, $18, $21, $70, $53, $32, $10, $00, $10, $11
-		dc.b	$07, $00, $70, $00, $71, $11, $01, $17, $10, $00, $11, $71, $AA, $A0, $00, $10
-		dc.b	$02, $01, $07, $02, $03, $0A, $00, $0A, $02, $02, $67, $6D, $02, $0D, $07, $01
-		dc.b	$D0, $0A, $00, $70, $1D, $A0, $10, $07, $01, $77, $01, $06, $01, $01, $02, $04
-		dc.b	$01, $10, $00, $10, $04, $06, $76, $01, $11, $10, $07, $11, $02, $04, $71, $10
-		dc.b	$77, $77, $04, $01, $10, $04, $07, $10, $00, $01, $00, $01, $11, $10, $02, $08
-		dc.b	$11, $66, $66, $10, $07, $01, $B1, $66, $02, $02, $0A, $A1, $02, $2B, $A0, $0A
-		dc.b	$07, $01, $1A, $A0, $00, $77, $01, $1B, $10, $00, $77, $70, $01, $11, $11, $16
-		dc.b	$01, $11, $67, $D6, $11, $00, $71, $AB, $01, $10, $07, $1A, $70, $01, $00, $71
-		dc.b	$17, $10, $10, $07, $00, $01, $01, $00, $10, $02, $40, $10, $66, $11, $00, $01
-		dc.b	$AB, $89, $9D, $DA, $13, $10, $10, $01, $31, $00, $20, $00, $10, $02, $70, $73
-		dc.b	$12, $36, $00, $1A, $56, $70, $06, $30, $00, $07, $63, $A0, $55, $52, $9A, $00
-		dc.b	$25, $30, $9F, $89, $10, $13, $10, $10, $00, $71, $77, $03, $37, $07, $71, $31
-		dc.b	$A1, $00, $13, $10, $03, $70, $65, $44, $0A, $26, $70, $02, $13, $A9, $26, $67
-		dc.b	$88, $88, $21, $10, $11, $11, $11, $11, $33, $33, $33, $33, $11, $11, $11, $11
-		dc.b	$04, $04, $44, $44, $44, $44, $04, $33, $77, $77, $77, $77, $30, $07, $24, $47
-		dc.b	$01, $00, $53, $30, $03, $05, $43, $33, $01, $12, $17, $00, $10, $21, $23, $33
-		dc.b	$22, $12, $32, $66, $06, $30, $01, $22, $00, $10, $11, $11, $37, $04, $06, $65
-		dc.b	$01, $00, $53, $30, $03, $05, $43, $33, $01, $12, $17, $02, $2A, $21, $23, $33
-		dc.b	$42, $12, $32, $66, $06, $22, $11, $22, $77, $01, $23, $33, $07, $02, $31, $10
-		dc.b	$10, $73, $03, $01, $00, $01, $11, $33, $07, $07, $21, $11, $90, $00, $72, $21
-		dc.b	$01, $70, $07, $65, $09, $17, $70, $02, $13, $98, $16, $67, $88, $88, $11, $10
-		dc.b	$11, $11, $11, $11, $33, $33, $33, $33, $11, $11, $11, $11, $04, $04, $44, $44
-		dc.b	$44, $44, $04, $0A, $77, $77, $77, $77, $00, $77, $77, $70, $10, $77, $02, $06
-		dc.b	$31, $10, $70, $07, $13, $31, $02, $0A, $01, $13, $07, $00, $41, $01, $20, $00
-		dc.b	$05, $10, $03, $01, $20, $02, $05, $66, $20, $17, $07, $10, $1B, $04, $34, $77
-		dc.b	$74, $43, $02, $02, $70, $07, $02, $02, $07, $70, $02, $02, $77, $70, $03, $01
-		dc.b	$76, $02, $02, $77, $63, $02, $02, $76, $31, $02, $30, $63, $10, $06, $67, $12
-		dc.b	$45, $77, $07, $70, $64, $07, $70, $62, $21, $71, $60, $31, $01, $22, $36, $50
-		dc.b	$13, $10, $00, $01, $00, $01, $00, $65, $00, $10, $30, $07, $30, $33, $32, $23
-		dc.b	$31, $22, $10, $01, $01, $01, $12, $23, $30, $23, $30, $0B, $15, $01, $67, $77
-		dc.b	$17, $76, $10, $00, $05, $55, $54, $47, $70, $01, $10, $03, $00, $10, $33, $33
-		dc.b	$00, $03, $02, $01, $01, $03, $02, $03, $30, $02, $03, $17, $77, $10, $03, $12
-		dc.b	$67, $61, $76, $01, $16, $70, $32, $77, $77, $77, $33, $32, $17, $70, $00, $33
-		dc.b	$01, $71, $02, $02, $06, $64, $02, $02, $65, $20, $02, $1C, $01, $10, $00, $06
-		dc.b	$50, $03, $11, $17, $23, $56, $77, $07, $70, $00, $07, $70, $77, $00, $07, $00
-		dc.b	$77, $00, $71, $77, $07, $00, $27, $67, $03, $01, $71, $02, $0B, $33, $07, $11
-		dc.b	$11, $01, $22, $44, $76, $00, $12, $33, $19, $0C, $64, $56, $66, $67, $06, $44
-		dc.b	$45, $56, $00, $01, $23, $30, $14, $36, $11, $32, $11, $66, $00, $77, $70, $70
-		dc.b	$00, $70, $70, $70, $00, $77, $77, $07, $00, $07, $77, $77, $00, $07, $07, $70
-		dc.b	$07, $07, $70, $00, $01, $11, $11, $11, $61, $11, $66, $61, $77, $70, $77, $70
-		dc.b	$07, $77, $70, $70, $77, $07, $07, $70, $77, $00, $77, $00, $07, $77, $02, $02
-		dc.b	$07, $77, $02, $0C, $11, $11, $11, $11, $FF, $EE, $EE, $EE, $01, $00, $77, $77
-		dc.b	$02, $01, $70, $0A, $03, $01, $06, $06, $08, $0F, $DC, $CD, $CD, $BD, $06, $77
-		dc.b	$77, $60, $01, $21, $12, $10, $00, $32, $53, $02, $02, $06, $20, $02, $1F, $34
-		dc.b	$73, $00, $01, $21, $12, $10, $06, $77, $77, $60, $DD, $DD, $DD, $DD, $01, $66
-		dc.b	$66, $66, $07, $07, $77, $77, $00, $70, $77, $77, $00, $07, $66, $66, $02, $02
-		dc.b	$0B, $88, $02, $02, $03, $33, $02, $2E, $03, $00, $06, $16, $0B, $BB, $66, $66
-		dc.b	$66, $66, $77, $77, $77, $77, $77, $77, $77, $70, $66, $66, $66, $67, $BB, $89
-		dc.b	$99, $80, $00, $31, $00, $10, $00, $31, $00, $10, $BB, $89, $99, $86, $66, $66
-		dc.b	$66, $66, $77, $77, $77, $77, $08, $04, $10, $01, $11, $11, $02, $02, $10, $10
-		dc.b	$04, $0C, $01, $10, $10, $10, $66, $66, $66, $10, $77, $77, $70, $70, $02, $01
-		dc.b	$07, $04, $03, $70, $11, $11, $02, $02, $10, $10, $06, $16, $8F, $E9, $AB, $BB
-		dc.b	$00, $02, $10, $10, $00, $71, $01, $03, $06, $30, $10, $30, $17, $30, $03, $00
-		dc.b	$05, $62, $02, $13, $31, $41, $50, $01, $00, $02, $76, $06, $02, $23, $17, $60
-		dc.b	$30, $00, $66, $10, $00, $06, $10, $02, $0E, $71, $00, $11, $07, $00, $01, $00
-		dc.b	$60, $00, $60, $00, $10, $00, $70, $03, $02, $11, $11, $02, $10, $01, $66, $00
-		dc.b	$11, $10, $77, $11, $00, $77, $77, $77, $70, $77, $77, $77, $70, $04, $01, $77
-		dc.b	$02, $0B, $76, $22, $44, $06, $22, $11, $11, $76, $43, $33, $25, $02, $03, $70
-		dc.b	$77, $70, $02, $01, $70, $02, $02, $70, $77, $02, $02, $70, $77, $03, $10, $07
-		dc.b	$55, $41, $77, $61, $33, $30, $16, $61, $16, $06, $23, $16, $77, $17, $20, $02
-		dc.b	$1F, $07, $13, $00, $77, $07, $01, $00, $77, $07, $77, $60, $07, $70, $07, $76
-		dc.b	$17, $70, $07, $70, $06, $61, $11, $11, $77, $47, $71, $06, $00, $30, $06, $17
-		dc.b	$03, $01, $71, $03, $01, $10, $03, $01, $06, $03, $02, $01, $10, $02, $02, $06
-		dc.b	$61, $02, $05, $65, $73, $30, $00, $62, $1C, $04, $62, $13, $00, $01, $1C, $16
-		dc.b	$16, $32, $11, $11, $07, $77, $00, $07, $00, $77, $77, $70, $00, $77, $77, $70
-		dc.b	$00, $77, $77, $70, $00, $77, $02, $01, $07, $03, $13, $01, $11, $11, $11, $66
-		dc.b	$66, $66, $11, $77, $77, $77, $00, $77, $77, $70, $00, $77, $77, $70, $02, $08
-		dc.b	$07, $77, $00, $77, $07, $77, $00, $77, $03, $08, $11, $11, $11, $11, $FE, $EF
-		dc.b	$EF, $9F, $09, $03, $01, $06, $06, $04, $08, $01, $11, $16, $66, $01, $11, $66
-		dc.b	$66, $02, $06, $70, $00, $54, $44, $43, $33, $02, $09, $01, $11, $00, $01, $13
-		dc.b	$33, $00, $10, $30, $02, $03, $03, $00, $DD, $02, $01, $0D, $02, $0B, $13, $0D
-		dc.b	$00, $11, $11, $23, $ED, $42, $53, $5F, $FC, $03, $01, $33, $02, $02, $03, $11
-		dc.b	$02, $02, $01, $01, $03, $01, $13, $02, $02, $01, $30, $02, $01, $03, $05, $10
-		dc.b	$8E, $8F, $93, $3D, $11, $01, $13, $30, $11, $13, $30, $00, $33, $30, $00, $30
-		dc.b	$02, $01, $03, $02, $0F, $03, $31, $10, $03, $31, $10, $10, $30, $10, $01, $00
-		dc.b	$89, $89, $F8, $E6, $16, $02, $70, $70, $02, $06, $10, $10, $61, $70, $11, $10
-		dc.b	$14, $02, $70, $70, $02, $02, $10, $10, $02, $04, $AA, $B8, $99, $EF, $02, $05
-		dc.b	$01, $00, $01, $00, $06, $02, $02, $30, $10, $03, $03, $60, $01, $10, $03, $3F
-		dc.b	$03, $01, $00, $10, $00, $06, $00, $11, $46, $16, $66, $16, $17, $07, $77, $72
-		dc.b	$70, $07, $07, $21, $77, $77, $01, $00, $77, $70, $73, $10, $77, $70, $10, $01
-		dc.b	$00, $07, $31, $00, $11, $11, $00, $13, $45, $52, $02, $30, $10, $12, $30, $66
-		dc.b	$01, $30, $66, $65, $13, $06, $65, $30, $00, $66, $30, $35, $36, $63, $53, $02
-		dc.b	$0D, $33, $01, $06, $66, $06, $71, $00, $60, $36, $10, $00, $66, $61, $02, $13
-		dc.b	$55, $51, $66, $00, $33, $30, $66, $60, $66, $60, $00, $66, $00, $70, $06, $06
-		dc.b	$07, $10, $10, $03, $19, $17, $60, $77, $77, $10, $71, $17, $10, $60, $00, $01
-		dc.b	$70, $06, $77, $00, $11, $00, $77, $00, $07, $00, $67, $60, $01, $10, $03, $18
-		dc.b	$70, $01, $66, $00, $10, $00, $17, $00, $01, $45, $70, $16, $15, $11, $70, $06
-		dc.b	$21, $23, $77, $76, $31, $00, $77, $77, $02, $03, $77, $77, $13, $03, $0A, $70
-		dc.b	$00, $11, $11, $10, $00, $75, $47, $70, $01, $14, $02, $02, $30, $02, $08, $66
-		dc.b	$66, $66, $67, $06, $45, $66, $66, $19, $01, $23, $02, $04, $F8, $99, $99, $EE
-		dc.b	$0B, $01, $07, $03, $01, $70, $0B, $05, $70, $71, $00, $01, $70, $04, $01, $70
-		dc.b	$04, $01, $01, $03, $02, $01, $10, $02, $02, $77, $10, $02, $0B, $70, $71, $10
-		dc.b	$10, $07, $07, $11, $11, $00, $77, $76, $1B, $0C, $77, $54, $54, $45, $56, $11
-		dc.b	$11, $23, $ED, $00, $13, $0D, $03, $01, $0D, $02, $06, $03, $00, $DD, $00, $10
-		dc.b	$30, $02, $03, $01, $13, $33, $02, $0A, $01, $11, $53, $45, $33, $33, $00, $01
-		dc.b	$76, $66, $02, $02, $01, $11, $14, $0C, $60, $77, $77, $77, $66, $66, $66, $66
-		dc.b	$11, $11, $11, $11, $14, $01, $10, $03, $01, $10, $07, $18, $07, $01, $07, $07
-		dc.b	$07, $88, $A7, $07, $01, $10, $01, $01, $01, $33, $01, $01, $07, $AB, $A7, $07
-		dc.b	$07, $01, $07, $06, $08, $02, $01, $07, $02, $02, $88, $A7, $02, $02, $10, $01
-		dc.b	$02, $02, $33, $01, $02, $02, $AB, $A7, $02, $0C, $A8, $99, $EE, $8E, $56, $10
-		dc.b	$00, $70, $66, $60, $01, $70, $02, $09, $07, $70, $01, $00, $07, $00, $06, $00
-		dc.b	$10, $07, $09, $11, $11, $76, $67, $55, $47, $00, $70, $01, $02, $06, $70, $00
-		dc.b	$30, $00, $13, $10, $03, $01, $03, $02, $14, $03, $30, $00, $07, $66, $66, $66
-		dc.b	$01, $11, $11, $11, $14, $71, $11, $17, $00, $06, $66, $60, $03, $03, $08, $06
-		dc.b	$66, $66, $66, $66, $66, $66, $66, $04, $10, $66, $66, $66, $66, $11, $11, $11
-		dc.b	$11, $16, $71, $11, $17, $61, $06, $66, $60, $04, $08, $66, $66, $66, $66, $66
-		dc.b	$66, $66, $66, $04, $0B, $66, $66, $66, $66, $11, $11, $11, $11, $71, $77, $70
-		dc.b	$03, $01, $01, $03, $07, $07, $00, $60, $00, $01, $00, $66, $07, $0F, $66, $66
-		dc.b	$66, $10, $11, $11, $11, $10, $06, $66, $66, $77, $00, $77, $07, $02, $0A, $77
-		dc.b	$70, $06, $00, $77, $77, $66, $00, $77, $77, $02, $01, $77, $06, $08, $06, $11
-		dc.b	$11, $10, $60, $01, $16, $61, $02, $02, $70, $07, $02, $02, $07, $70, $02, $02
-		dc.b	$77, $70, $03, $01, $77, $02, $02, $70, $77, $02, $01, $77, $02, $07, $01, $11
-		dc.b	$61, $00, $01, $66, $61, $02, $02, $77, $70, $03, $01, $70, $02, $02, $77, $70
-		dc.b	$02, $01, $77, $0A, $07, $01, $11, $11, $8F, $EE, $EE, $99, $1E, $0E, $07, $07
-		dc.b	$01, $10, $07, $07, $70, $11, $00, $70, $00, $01, $10, $07, $02, $01, $11, $03
-		dc.b	$02, $01, $11, $03, $01, $16, $03, $0D, $70, $61, $00, $77, $07, $10, $07, $00
-		dc.b	$07, $01, $10, $00, $07, $03, $0B, $70, $01, $10, $07, $00, $11, $70, $70, $00
-		dc.b	$67, $07, $03, $01, $70, $02, $03, $77, $00, $01, $07, $01, $10, $06, $01, $01
-		dc.b	$03, $01, $10, $02, $02, $01, $01, $02, $07, $10, $10, $10, $00, $01, $70, $01
-		dc.b	$02, $02, $77, $70, $02, $02, $07, $70, $08, $01, $77, $08, $01, $01, $03, $01
-		dc.b	$11, $02, $01, $77, $0C, $01, $70, $0D, $06, $01, $11, $70, $00, $01, $11, $0F
-		dc.b	$01, $77, $08, $01, $11, $03, $01, $11, $02, $01, $76, $0C, $01, $70, $0D, $0E
-		dc.b	$01, $10, $CB, $BB, $BA, $AA, $03, $33, $33, $33, $00, $2B, $2B, $2B, $0F, $01
-		dc.b	$0A, $03, $1B, $33, $03, $18, $18, $21, $33, $33, $32, $00, $2B, $21, $22, $33
-		dc.b	$00, $33, $13, $2B, $0A, $31, $3B, $00, $33, $13, $20, $00, $31, $3B, $02, $02
-		dc.b	$13, $20, $02, $0F, $03, $18, $18, $18, $00, $33, $33, $33, $33, $32, $1B, $2B
-		dc.b	$2B, $31, $3A, $02, $07, $23, $13, $30, $00, $0B, $31, $3A, $02, $02, $23, $13
-		dc.b	$02, $0E, $0B, $31, $18, $18, $18, $30, $33, $33, $33, $33, $2B, $2B, $2B, $2B
-		dc.b	$0C, $01, $30, $03, $01, $3A, $03, $0C, $12, $18, $18, $18, $33, $33, $33, $33
-		dc.b	$2B, $2B, $2B, $2B, $0F, $01, $0A, $03, $0C, $33, $18, $18, $18, $22, $33, $33
-		dc.b	$33, $00, $2B, $2B, $2B, $0D, $01, $30, $03, $01, $3A, $03, $06, $12, $15, $F7
-		dc.b	$FC, $00, $0D, $04, $01, $31, $06, $05, $0D, $00, $10, $00, $D0, $02, $01, $DD
-		dc.b	$05, $06, $30, $10, $16, $66, $99, $88, $02, $02, $44, $44, $02, $02, $01, $11
-		dc.b	$06, $02, $0C, $C0, $03, $01, $F1, $08, $04, $71, $00, $85, $DF, $03, $01, $07
-		dc.b	$03, $01, $70, $0D, $0B, $01, $00, $07, $00, $01, $70, $07, $01, $00, $77, $77
-		dc.b	$02, $01, $70, $02, $0E, $07, $00, $07, $00, $70, $00, $70, $07, $00, $07, $00
-		dc.b	$70, $00, $70, $02, $01, $07, $03, $01, $70, $02, $01, $07, $02, $02, $01, $70
-		dc.b	$02, $01, $10, $02, $02, $01, $01, $02, $0C, $10, $10, $00, $01, $01, $07, $00
-		dc.b	$10, $10, $10, $01, $01, $02, $02, $10, $10, $02, $05, $01, $00, $01, $17, $10
-		dc.b	$07, $01, $70, $07, $02, $60, $10, $0A, $04, $11, $10, $01, $77, $0A, $01, $11
-		dc.b	$03, $01, $01, $03, $01, $10, $02, $0B, $11, $11, $66, $01, $11, $66, $66, $70
-		dc.b	$00, $76, $77, $08, $01, $61, $03, $01, $01, $03, $01, $67, $03, $0C, $66, $11
-		dc.b	$10, $00, $66, $61, $11, $00, $76, $70, $00, $77, $04, $0B, $14, $5A, $AA, $EE
-		dc.b	$0F, $C3, $22, $11, $0F, $33, $11, $0D, $04, $65, $AA, $98, $88, $04, $0B, $EA
-		dc.b	$AA, $54, $10, $12, $23, $CF, $00, $01, $13, $3F, $0D, $04, $31, $39, $0C, $BB
-		dc.b	$02, $14, $33, $13, $00, $0A, $31, $3B, $00, $33, $13, $20, $01, $31, $3B, $00
-		dc.b	$03, $13, $20, $00, $01, $3B, $02, $02, $03, $20, $02, $01, $3B, $03, $01, $20
-		dc.b	$1E, $01, $0B, $03, $01, $0B, $18, $1A, $18, $18, $18, $18, $33, $33, $32, $03
-		dc.b	$2B, $21, $22, $3B, $00, $33, $13, $20, $0A, $31, $3B, $00, $33, $13, $20, $00
-		dc.b	$31, $3B, $02, $02, $13, $20, $03, $01, $30, $02, $02, $33, $3A, $02, $07, $23
-		dc.b	$13, $30, $00, $0B, $31, $3A, $02, $07, $23, $13, $30, $00, $0B, $31, $3A, $02
-		dc.b	$02, $23, $13, $02, $08, $0B, $31, $19, $30, $00, $33, $31, $3A, $02, $07, $23
-		dc.b	$13, $30, $00, $0B, $31, $3A, $02, $02, $23, $13, $02, $02, $0B, $31, $03, $01
-		dc.b	$23, $03, $06, $0B, $00, $B3, $A3, $A4, $CF, $1C, $04, $60, $00, $82, $DF, $0A
-		dc.b	$02, $1D, $21, $02, $02, $01, $10, $02, $02, $83, $33, $02, $02, $0B, $FF, $02
-		dc.b	$06, $10, $44, $71, $00, $06, $61, $02, $02, $07, $07, $18, $01, $01, $02, $02
-		dc.b	$76, $77, $02, $05, $10, $07, $00, $01, $01, $03, $01, $10, $10, $05, $61, $00
-		dc.b	$01, $17, $10, $0A, $01, $60, $05, $07, $11, $11, $66, $00, $11, $16, $66, $02
-		dc.b	$06, $07, $00, $11, $10, $01, $77, $08, $02, $60, $10, $06, $09, $61, $11, $10
-		dc.b	$00, $66, $11, $10, $00, $07, $03, $04, $71, $00, $01, $77, $1C, $04, $71, $00
-		dc.b	$01, $76, $03, $01, $11, $02, $05, $11, $10, $00, $01, $10, $02, $07, $11, $00
-		dc.b	$70, $71, $10, $07, $70, $02, $0B, $77, $01, $11, $00, $70, $11, $05, $AA, $99
-		dc.b	$98, $15, $04, $01, $30, $02, $01, $77, $02, $03, $02, $77, $30, $02, $01, $15
-		dc.b	$0B, $0E, $9C, $0F, $C3, $9A, $03, $2D, $CF, $00, $22, $02, $30, $00, $20, $10
-		dc.b	$02, $02, $01, $3F, $03, $01, $F0, $03, $01, $DC, $03, $01, $13, $02, $06, $31
-		dc.b	$09, $06, $B3, $03, $3A, $02, $03, $03, $13, $30, $02, $02, $31, $3A, $02, $07
-		dc.b	$23, $13, $30, $00, $0B, $31, $3A, $02, $02, $23, $13, $02, $03, $0B, $31, $1B
-		dc.b	$02, $01, $28, $14, $01, $30, $03, $01, $3A, $03, $01, $0A, $1A, $01, $0A, $03
-		dc.b	$01, $33, $02, $02, $0A, $21, $02, $14, $33, $13, $00, $0A, $31, $2B, $00, $33
-		dc.b	$13, $20, $0A, $31, $3B, $00, $33, $13, $20, $00, $31, $3B, $02, $02, $13, $20
-		dc.b	$02, $0F, $03, $18, $18, $18, $30, $13, $33, $33, $23, $12, $1B, $2B, $0B, $31
-		dc.b	$3A, $02, $07, $23, $13, $30, $00, $0B, $31, $3A, $02, $02, $23, $13, $02, $02
-		dc.b	$0B, $31, $02, $02, $0A, $33, $02, $01, $33, $02, $02, $0A, $31, $02, $0D, $33
-		dc.b	$13, $00, $0A, $31, $3B, $00, $33, $13, $20, $00, $31, $3B, $02, $02, $13, $20
-		dc.b	$02, $04, $8B, $90, $90, $8C, $03, $01, $6E, $03, $01, $10, $02, $01, $06, $03
-		dc.b	$02, $01, $F0, $06, $01, $60, $03, $17, $10, $10, $88, $77, $00, $FF, $11, $EF
-		dc.b	$F0, $10, $00, $10, $F0, $16, $1E, $FE, $11, $60, $1F, $F1, $10, $00, $01, $05
-		dc.b	$01, $16, $05, $0F, $AB, $A4, $53, $44, $14, $BA, $A9, $EE, $4F, $32, $21, $11
-		dc.b	$00, $31, $10, $0E, $12, $0C, $C0, $00, $2A, $A5, $49, $88, $E9, $AA, $B4, $10
-		dc.b	$11, $22, $2C, $40, $00, $11, $23, $11, $04, $89, $99, $AA, $27, $1C, $02, $89
-		dc.b	$88, $03, $01, $11, $02, $02, $11, $03, $06, $01, $CC, $03, $03, $0F, $10, $77
-		dc.b	$03, $01, $70, $05, $04, $2A, $8A, $06, $77, $10, $06, $07, $70, $01, $10, $00
-		dc.b	$70, $04, $06, $01, $00, $67, $07, $00, $10, $16, $0A, $01, $10, $11, $07, $70
-		dc.b	$11, $14, $AA, $E9, $8B, $09, $07, $F0, $33, $10, $14, $5A, $AA, $9A, $03, $01
-		dc.b	$77, $04, $01, $10, $03, $04, $98, $9A, $A5, $67, $08, $09, $13, $30, $F0, $00
-		dc.b	$9A, $AA, $54, $10, $70, $0B, $04, $C8, $A3, $A2, $A8, $03, $01, $0B, $18, $02
-		dc.b	$02, $30, $02, $02, $31, $3A, $02, $07, $23, $13, $30, $00, $0B, $31, $3A, $02
-		dc.b	$07, $23, $13, $30, $00, $0B, $31, $3A, $02, $02, $23, $02, $02, $02, $01, $13
-		dc.b	$03, $01, $13, $02, $14, $33, $13, $00, $0A, $31, $3B, $00, $33, $13, $20, $0A
-		dc.b	$31, $3B, $00, $33, $13, $20, $00, $20, $3B, $02, $01, $31, $03, $04, $33, $20
-		dc.b	$00, $0B, $03, $01, $0B, $10, $0D, $03, $18, $18, $18, $33, $33, $33, $33, $0B
-		dc.b	$2B, $2B, $30, $20, $13, $0D, $18, $18, $18, $00, $33, $33, $33, $30, $0B, $2B
-		dc.b	$2B, $30, $20, $1B, $04, $90, $96, $E8, $12, $05, $01, $61, $05, $17, $10, $00
-		dc.b	$01, $1F, $F1, $06, $11, $EF, $E1, $61, $0F, $01, $00, $01, $0F, $FE, $11, $FF
-		dc.b	$00, $77, $88, $01, $01, $03, $01, $06, $06, $02, $0F, $10, $03, $01, $60, $02
-		dc.b	$01, $01, $03, $01, $E6, $03, $07, $19, $96, $9B, $BB, $00, $0D, $20, $02, $02
-		dc.b	$01, $10, $05, $0C, $4F, $03, $31, $10, $14, $BA, $A9, $9F, $00, $10, $00, $70
-		dc.b	$04, $04, $89, $99, $AA, $27, $02, $02, $32, $D8, $02, $02, $32, $D0, $04, $0A
-		dc.b	$11, $33, $0F, $40, $99, $AB, $B4, $10, $70, $01, $04, $06, $09, $81, $71, $00
-		dc.b	$18, $FE, $18, $02, $99, $8A, $02, $04, $C2, $00, $11, $66, $02, $02, $11, $66
-		dc.b	$04, $06, $D2, $10, $07, $00, $11, $30, $02, $02, $33, $0B, $02, $10, $FF, $B0
-		dc.b	$16, $66, $44, $01, $11, $66, $00, $01, $11, $67, $61, $11, $10, $10, $04, $06
-		dc.b	$07, $70, $01, $10, $00, $70, $04, $19, $01, $00, $66, $11, $10, $00, $61, $11
-		dc.b	$10, $10, $01, $00, $06, $00, $01, $10, $07, $77, $00, $11, $00, $77, $00, $01
-		dc.b	$11, $03, $02, $10, $11, $03, $01, $11, $08, $05, $71, $00, $01, $77, $01, $0B
-		dc.b	$01, $11, $03, $01, $10, $0B, $04, $71, $00, $01, $77, $1C, $04, $C8, $A3, $A2
-		dc.b	$A3, $17, $01, $0A, $03, $05, $33, $1B, $00, $0A, $22, $02, $14, $33, $13, $00
-		dc.b	$0A, $31, $23, $00, $33, $13, $2B, $0A, $31, $3B, $00, $33, $13, $20, $00, $31
-		dc.b	$3B, $02, $02, $13, $20, $02, $02, $33, $20, $02, $02, $31, $0A, $02, $07, $32
-		dc.b	$13, $30, $00, $2B, $11, $3A, $02, $07, $23, $13, $30, $00, $0B, $31, $3A, $02
-		dc.b	$02, $23, $13, $02, $11, $0B, $31, $18, $18, $18, $30, $00, $23, $33, $33, $03
-		dc.b	$22, $1B, $2B, $00, $31, $3A, $02, $07, $23, $13, $30, $00, $0B, $31, $3A, $02
-		dc.b	$02, $23, $13, $02, $0D, $0B, $31, $03, $18, $18, $33, $33, $33, $31, $00, $2B
-		dc.b	$21, $21, $02, $0D, $33, $13, $00, $0A, $31, $3B, $00, $33, $13, $20, $00, $31
-		dc.b	$3B, $02, $02, $13, $20, $02, $01, $1B, $17, $01, $30, $03, $01, $3A, $03, $06
-		dc.b	$ED, $E9, $09, $03, $00, $E0, $03, $10, $10, $11, $0F, $10, $FE, $FF, $F1, $1E
-		dc.b	$FF, $01, $11, $F0, $10, $F1, $0F, $10, $02, $09, $10, $10, $10, $F0, $00, $EE
-		dc.b	$11, $EE, $F0, $05, $0E, $E1, $11, $0F, $10, $F0, $00, $F1, $FE, $11, $10, $01
-		dc.b	$10, $00, $10, $02, $01, $01, $02, $0A, $11, $10, $FF, $00, $EF, $F1, $EE, $FF
-		dc.b	$00, $E0, $03, $10, $10, $11, $0F, $60, $FE, $FF, $F1, $7F, $FF, $01, $11, $F1
-		dc.b	$10, $F1, $0F, $10, $02, $09, $10, $E0, $10, $F0, $00, $1E, $11, $EE, $F0, $02
-		dc.b	$14, $01, $0F, $00, $E1, $10, $01, $10, $F0, $00, $F6, $FE, $11, $10, $06, $10
-		dc.b	$00, $10, $01, $00, $01, $02, $09, $11, $10, $FF, $07, $07, $03, $DF, $8F, $70
-		dc.b	$03, $01, $77, $03, $02, $33, $30, $02, $0B, $11, $11, $20, $00, $22, $22, $07
-		dc.b	$07, $77, $77, $70, $05, $24, $75, $04, $47, $07, $00, $01, $02, $70, $00, $75
-		dc.b	$11, $25, $10, $17, $52, $00, $01, $31, $76, $55, $30, $31, $70, $00, $11, $14
-		dc.b	$36, $00, $03, $07, $05, $50, $30, $20, $73, $57, $03, $01, $07, $02, $12, $07
-		dc.b	$77, $00, $01, $03, $33, $01, $30, $11, $11, $70, $12, $22, $22, $07, $77, $77
-		dc.b	$77, $04, $06, $89, $9A, $AA, $AA, $00, $30, $05, $01, $DD, $02, $05, $0D, $00
-		dc.b	$01, $00, $D0, $02, $01, $30, $03, $01, $13, $03, $06, $01, $D0, $00, $88, $88
-		dc.b	$D0, $03, $01, $77, $04, $01, $70, $03, $01, $70, $02, $0C, $77, $DE, $77, $7A
-		dc.b	$EE, $21, $FF, $F2, $11, $00, $11, $10, $02, $03, $EE, $32, $10, $03, $04, $10
-		dc.b	$00, $0D, $02, $02, $02, $D3, $20, $02, $07, $21, $00, $01, $11, $00, $01, $10
-		dc.b	$02, $0B, $10, $03, $33, $01, $03, $30, $00, $FD, $F5, $CF, $CD, $02, $1F, $33
-		dc.b	$13, $00, $0A, $31, $3B, $00, $33, $13, $20, $00, $31, $3B, $00, $02, $13, $20
-		dc.b	$00, $01, $03, $18, $18, $33, $33, $33, $33, $0B, $2B, $2B, $2B, $20, $13, $0C
-		dc.b	$18, $18, $18, $18, $33, $33, $33, $33, $2B, $2B, $2B, $20, $03, $01, $0B, $10
-		dc.b	$0E, $18, $18, $18, $18, $33, $33, $33, $33, $32, $1B, $2B, $2B, $31, $3A, $02
-		dc.b	$07, $23, $13, $30, $00, $0B, $31, $3A, $02, $13, $23, $13, $30, $00, $0B, $31
-		dc.b	$3A, $18, $18, $30, $12, $33, $33, $33, $33, $2B, $2B, $21, $23, $02, $20, $33
-		dc.b	$13, $00, $0A, $31, $3B, $00, $33, $13, $20, $0A, $31, $3B, $00, $33, $13, $20
-		dc.b	$00, $21, $03, $18, $18, $33, $33, $33, $33, $32, $1B, $2B, $30, $31, $3A, $02
-		dc.b	$07, $23, $13, $30, $00, $0B, $31, $3A, $02, $02, $23, $13, $02, $12, $0B, $31
-		dc.b	$00, $18, $18, $30, $00, $33, $33, $33, $30, $C3, $CC, $CD, $CC, $0E, $10, $10
-		dc.b	$02, $07, $1F, $FF, $F0, $01, $F1, $00, $0F, $04, $1A, $10, $00, $01, $0F, $01
-		dc.b	$F1, $10, $F0, $00, $1F, $FF, $00, $EE, $E0, $00, $11, $FF, $F0, $10, $E1, $01
-		dc.b	$10, $FE, $1F, $01, $0F, $03, $1F, $11, $00, $1F, $00, $1E, $11, $F0, $01, $01
-		dc.b	$FF, $01, $10, $1E, $EE, $F1, $0E, $0F, $EF, $F0, $6E, $10, $10, $00, $60, $1F
-		dc.b	$FF, $F0, $01, $F1, $00, $0F, $06, $42, $01, $0F, $01, $F1, $10, $F0, $60, $1F
-		dc.b	$FF, $00, $8E, $E0, $00, $17, $FF, $F0, $10, $E6, $01, $10, $EE, $11, $01, $0F
-		dc.b	$10, $0F, $00, $11, $00, $1F, $00, $1E, $11, $F1, $01, $01, $FF, $06, $10, $1E
-		dc.b	$EE, $F7, $DE, $F7, $35, $48, $01, $00, $53, $30, $03, $05, $43, $33, $01, $12
-		dc.b	$17, $00, $20, $21, $23, $33, $12, $12, $32, $66, $02, $02, $01, $22, $02, $06
-		dc.b	$03, $33, $DC, $FE, $ED, $DD, $06, $05, $03, $33, $33, $33, $30, $04, $05, $11
-		dc.b	$11, $11, $11, $01, $03, $01, $2E, $02, $02, $1F, $D0, $02, $0A, $1D, $00, $11
-		dc.b	$10, $02, $D0, $33, $32, $11, $2D, $02, $09, $33, $12, $DD, $D0, $00, $32, $00
-		dc.b	$0D, $DD, $04, $01, $DD, $04, $04, $77, $77, $77, $77, $04, $01, $70, $03, $02
-		dc.b	$FA, $70, $02, $0A, $12, $F9, $A7, $77, $32, $11, $2F, $FF, $00, $31, $02, $06
-		dc.b	$D0, $03, $10, $00, $E3, $33, $02, $03, $33, $30, $01, $02, $04, $03, $30, $00
-		dc.b	$DD, $02, $04, $10, $00, $DD, $03, $03, $01, $D0, $07, $07, $D3, $10, $EE, $DD
-		dc.b	$03, $22, $03, $02, $01, $DD, $02, $04, $DD, $00, $13, $0D, $06, $02, $01, $3D
-		dc.b	$03, $02, $13, $D0, $02, $07, $01, $2E, $ED, $33, $33, $32, $24, $07, $01, $50
-		dc.b	$06, $04, $55, $00, $55, $55, $06, $01, $30, $07, $05, $33, $33, $33, $33, $03
-		dc.b	$05, $01, $11, $04, $01, $11, $02, $01, $10, $03, $01, $01, $05, $03, $33, $00
-		dc.b	$01, $0F, $04, $10, $00, $11, $11, $0A, $01, $77, $02, $05, $07, $70, $77, $77
-		dc.b	$70, $05, $01, $05, $03, $02, $05, $55, $04, $01, $55, $02, $03, $50, $33, $70
-		dc.b	$02, $01, $30, $02, $02, $01, $12, $02, $02, $04, $41, $03, $01, $50, $06, $04
-		dc.b	$55, $00, $55, $55, $06, $01, $30, $03, $0C, $21, $11, $21, $11, $12, $20, $30
-		dc.b	$01, $03, $02, $22, $01, $02, $02, $11, $22, $03, $01, $11, $02, $01, $10, $03
-		dc.b	$01, $01, $05, $04, $11, $22, $22, $33, $03, $07, $04, $00, $02, $00, $04, $22
-		dc.b	$02, $03, $07, $22, $30, $00, $11, $11, $03, $33, $08, $04, $33, $33, $33, $33
-		dc.b	$0C, $24, $01, $00, $20, $00, $31, $00, $20, $00, $04, $44, $00, $01, $70, $00
-		dc.b	$41, $11, $64, $44, $41, $00, $02, $20, $00, $10, $30, $12, $20, $02, $03, $11
-		dc.b	$02, $22, $00, $01, $11, $02, $03, $01, $11, $02, $03, $10, $70, $03, $02, $05
-		dc.b	$77, $12, $22, $23, $34, $02, $01, $01, $03, $01, $01, $02, $01, $31, $02, $0C
-		dc.b	$20, $31, $10, $00, $02, $20, $10, $10, $11, $13, $00, $10, $02, $0C, $33, $00
-		dc.b	$33, $33, $23, $00, $40, $00, $10, $00, $04, $02, $03, $01, $42, $03, $07, $04
-		dc.b	$00, $02, $55, $55, $11, $02, $03, $02, $10, $30, $02, $08, $01, $31, $11, $01
-		dc.b	$11, $32, $00, $10, $02, $02, $20, $13, $03, $06, $13, $10, $00, $02, $00, $10
-		dc.b	$02, $06, $20, $00, $11, $11, $13, $01, $03, $06, $31, $32, $33, $33, $30, $41
-		dc.b	$03, $2C, $04, $04, $00, $01, $00, $04, $20, $01, $00, $40, $20, $00, $55, $50
-		dc.b	$00, $10, $00, $01, $00, $10, $30, $00, $10, $10, $03, $30, $00, $10, $00, $03
-		dc.b	$30, $00, $30, $10, $02, $00, $03, $11, $00, $03, $00, $01, $11, $23, $03, $01
-		dc.b	$10, $02, $03, $10, $74, $03, $02, $07, $70, $52, $32, $23, $34, $74, $10, $04
-		dc.b	$01, $01, $02, $02, $40, $01, $06, $01, $04, $06, $03, $70, $00, $03, $03, $01
-		dc.b	$43, $07, $01, $51, $06, $04, $55, $00, $01, $55, $02, $01, $01, $03, $02, $10
-		dc.b	$30, $02, $03, $01, $03, $30, $03, $05, $03, $33, $33, $30, $10, $02, $02, $03
-		dc.b	$11, $03, $02, $01, $11, $04, $01, $11, $02, $03, $10, $70, $03, $02, $01, $77
-		dc.b	$02, $03, $01, $17, $30, $12, $04, $10, $11, $11, $11, $05, $01, $77, $02, $05
-		dc.b	$07, $70, $77, $77, $70, $04, $01, $07, $05, $01, $05, $03, $02, $05, $55, $04
-		dc.b	$01, $07, $02, $05, $50, $70, $00, $05, $53, $03, $01, $03, $02, $01, $50, $06
-		dc.b	$01, $55, $02, $01, $55, $07, $01, $30, $03, $0B, $21, $01, $11, $11, $00, $13
-		dc.b	$20, $00, $20, $03, $32, $03, $09, $53, $02, $00, $10, $40, $02, $13, $10, $01
-		dc.b	$04, $01, $01, $02, $08, $30, $01, $77, $30, $30, $00, $70, $70, $05, $05, $10
-		dc.b	$07, $04, $00, $10, $06, $01, $01, $03, $03, $41, $00, $07, $02, $02, $03, $70
-		dc.b	$02, $01, $03, $02, $01, $04, $0B, $06, $55, $03, $55, $55, $00, $13, $04, $01
-		dc.b	$30, $03, $04, $21, $11, $11, $10, $02, $01, $01, $02, $02, $10, $01, $02, $06
-		dc.b	$12, $30, $00, $20, $02, $20, $03, $03, $10, $20, $10, $02, $03, $20, $00, $10
-		dc.b	$02, $02, $70, $10, $02, $01, $74, $04, $01, $02, $03, $01, $42, $0E, $03, $70
-		dc.b	$00, $10, $02, $02, $04, $10, $0B, $01, $01, $02, $06, $55, $01, $00, $55, $00
-		dc.b	$10, $05, $01, $30, $02, $05, $02, $65, $55, $51, $10, $03, $01, $03, $02, $01
-		dc.b	$50, $06, $01, $55, $02, $16, $74, $11, $10, $00, $30, $01, $01, $11, $00, $01
-		dc.b	$00, $20, $22, $21, $11, $31, $00, $03, $33, $33, $30, $10, $02, $02, $03, $11
-		dc.b	$03, $02, $01, $11, $04, $13, $11, $11, $00, $10, $70, $00, $22, $23, $77, $04
-		dc.b	$33, $33, $00, $04, $37, $77, $70, $00, $04, $03, $02, $40, $44, $02, $03, $44
-		dc.b	$00, $40, $02, $0E, $20, $34, $00, $04, $20, $30, $00, $01, $00, $01, $44, $45
-		dc.b	$44, $40, $07, $01, $50, $06, $04, $55, $00, $55, $55, $02, $01, $10, $03, $01
-		dc.b	$01, $04, $01, $10, $02, $07, $10, $01, $33, $33, $10, $20, $20, $02, $02, $20
-		dc.b	$02, $03, $0A, $40, $00, $04, $00, $42, $21, $04, $00, $02, $03, $02, $0B, $40
-		dc.b	$00, $04, $33, $73, $34, $00, $77, $77, $70, $24, $03, $02, $20, $05, $03, $04
-		dc.b	$45, $55, $00, $04, $02, $0C, $55, $04, $04, $50, $33, $00, $20, $00, $30, $00
-		dc.b	$20, $40, $04, $04, $03, $00, $40, $01, $02, $01, $41, $03, $01, $01, $04, $02
-		dc.b	$03, $10, $02, $01, $03, $03, $07, $04, $01, $22, $22, $27, $33, $20, $03, $01
-		dc.b	$30, $03, $01, $32, $05, $04, $10, $00, $40, $11, $02, $02, $40, $30, $02, $01
-		dc.b	$02, $03, $01, $02, $02, $07, $07, $00, $07, $77, $70, $00, $14, $03, $01, $10
-		dc.b	$04, $09, $05, $00, $04, $00, $05, $55, $04, $04, $40, $02, $03, $04, $00, $50
-		dc.b	$06, $01, $04, $02, $06, $04, $00, $50, $00, $04, $20, $03, $02, $20, $10, $0A
-		dc.b	$07, $01, $00, $12, $22, $23, $22, $30, $03, $01, $20, $0B, $01, $40, $02, $04
-		dc.b	$10, $41, $11, $11, $05, $01, $07, $02, $05, $07, $04, $77, $77, $70, $05, $01
-		dc.b	$05, $02, $05, $03, $05, $55, $00, $03, $02, $01, $55, $02, $07, $50, $33, $40
-		dc.b	$40, $00, $30, $40, $06, $01, $03, $02, $03, $50, $00, $04, $03, $02, $04, $05
-		dc.b	$07, $01, $30, $02, $02, $20, $30, $02, $02, $20, $01, $03, $05, $01, $33, $33
-		dc.b	$00, $01, $02, $05, $01, $00, $11, $00, $01, $02, $01, $11, $02, $01, $10, $03
-		dc.b	$01, $01, $02, $0A, $01, $20, $00, $20, $01, $00, $10, $20, $00, $30, $03, $01
-		dc.b	$30, $02, $01, $20, $02, $02, $04, $20, $02, $01, $04, $02, $07, $10, $00, $01
-		dc.b	$01, $00, $10, $01, $02, $09, $31, $11, $13, $33, $33, $33, $32, $00, $03, $05
-		dc.b	$01, $11, $04, $01, $01, $02, $02, $10, $31, $02, $01, $01, $05, $01, $03, $02
-		dc.b	$02, $10, $30, $0A, $01, $03, $07, $04, $10, $11, $11, $11, $05, $0F, $BB, $B6
-		dc.b	$54, $44, $0D, $E2, $11, $11, $F2, $11, $13, $33, $00, $10, $30, $02, $03, $03
-		dc.b	$00, $DD, $02, $01, $0D, $02, $0B, $13, $0D, $00, $11, $11, $23, $ED, $11, $10
-		dc.b	$01, $F3, $03, $01, $0F, $02, $01, $0E, $02, $0A, $0E, $E0, $FF, $EE, $E0, $FF
-		dc.b	$11, $00, $0F, $11, $02, $01, $F1, $06, $02, $33, $C1, $02, $07, $CC, $CC, $10
-		dc.b	$00, $11, $0C, $C1, $02, $03, $10, $0C, $D1, $02, $0C, $33, $3F, $00, $1F, $0F
-		dc.b	$FF, $11, $FF, $E1, $11, $FF, $F1, $02, $04, $EE, $10, $01, $22, $02, $01, $13
-		dc.b	$03, $0D, $03, $00, $21, $10, $11, $33, $DE, $32, $10, $11, $00, $D0, $31, $02
-		dc.b	$0A, $D0, $30, $00, $DD, $03, $01, $00, $DD, $DE, $31, $03, $02, $D3, $10, $06
-		dc.b	$01, $D0, $02, $04, $DD, $03, $00, $DD, $02, $0F, $10, $00, $03, $30, $00, $33
-		dc.b	$30, $01, $00, $10, $03, $32, $22, $00, $30, $05, $01, $DD, $02, $05, $0D, $00
-		dc.b	$01, $00, $D0, $02, $01, $30, $03, $01, $13, $04, $01, $D0, $02, $02, $01, $30
-		dc.b	$03, $02, $1F, $D0, $03, $05, $2E, $11, $11, $11, $01, $03, $04, $11, $33, $33
-		dc.b	$30, $03, $02, $03, $33, $04, $07, $22, $22, $0D, $DD, $00, $01, $D0, $02, $01
-		dc.b	$13, $03, $01, $30, $02, $03, $01, $00, $D0, $03, $01, $0D, $04, $03, $DD, $00
-		dc.b	$30, $02, $04, $01, $13, $0D, $DD, $02, $01, $D0, $02, $01, $13, $03, $01, $30
-		dc.b	$02, $03, $01, $00, $D0, $03, $01, $0D, $04, $03, $DD, $00, $30, $02, $06, $10
-		dc.b	$02, $22, $22, $11, $10, $02, $08, $FF, $F2, $11, $00, $77, $7A, $EE, $21, $02
-		dc.b	$02, $77, $DE, $03, $01, $70, $03, $01, $70, $02, $09, $77, $00, $89, $9A, $DD
-		dc.b	$DD, $01, $03, $30, $02, $0D, $10, $03, $33, $00, $01, $10, $00, $21, $00, $01
-		dc.b	$11, $D3, $20, $02, $02, $0D, $02, $04, $0C, $10, $00, $FF, $33, $02, $22, $00
-		dc.b	$10, $03, $33, $00, $01, $02, $08, $FF, $F2, $01, $10, $77, $7A, $9F, $21, $02
-		dc.b	$02, $07, $AF, $03, $01, $07, $04, $04, $AA, $AA, $AA, $AA, $04, $02, $33, $30
-		dc.b	$03, $04, $03, $33, $33, $11, $03, $05, $10, $11, $11, $11, $E2, $03, $02, $0D
-		dc.b	$F1, $03, $03, $0E, $FF, $FF, $07, $09, $DD, $00, $0D, $DD, $00, $DD, $D0, $00
-		dc.b	$32, $02, $11, $33, $12, $33, $32, $11, $2D, $11, $10, $02, $D0, $F2, $22, $12
-		dc.b	$FF, $D0, $03, $10, $02, $01, $31, $02, $0A, $32, $11, $2F, $FF, $12, $F9, $A7
-		dc.b	$77, $FA, $70, $02, $01, $70, $0E, $01, $07, $03, $01, $70, $02, $04, $77, $00
-		dc.b	$77, $77, $09, $0C, $0D, $DD, $DD, $DD, $D0, $00, $03, $32, $22, $DD, $03, $01
-		dc.b	$02, $02, $D0, $30, $02, $0B, $D0, $31, $00, $DE, $32, $10, $11, $21, $10, $11
-		dc.b	$33, $02, $01, $03, $03, $08, $13, $00, $EE, $10, $01, $22, $FF, $F1, $02, $08
-		dc.b	$11, $FF, $E1, $11, $00, $1F, $0F, $FF, $02, $10, $33, $3F, $00, $10, $0C, $D1
-		dc.b	$11, $0C, $C1, $00, $CC, $CC, $10, $00, $33, $C1, $07, $01, $F1, $03, $0B, $0F
-		dc.b	$11, $00, $EE, $E0, $FF, $11, $00, $0E, $E0, $FF, $02, $01, $0E, $04, $0C, $0F
-		dc.b	$11, $10, $01, $F3, $11, $11, $23, $ED, $00, $13, $0D, $03, $01, $0D, $02, $1D
-		dc.b	$03, $00, $DD, $00, $10, $30, $00, $F2, $11, $13, $33, $0D, $E2, $11, $11, $FF
-		dc.b	$F2, $11, $12, $00, $01, $2E, $ED, $00, $13, $D0, $00, $01, $3D, $06, $02, $13
-		dc.b	$0D, $04, $03, $DD, $00, $03, $02, $05, $DD, $66, $55, $55, $55, $80, $FC, $04
-		dc.b	$FF, $FF, $FF, $FF, $07, $01, $07, $02, $0C, $07, $AF, $77, $7A, $9F, $21, $FF
-		dc.b	$F2, $01, $10, $00, $01, $03, $09, $10, $03, $33, $FF, $E0, $12, $22, $0D, $F1
-		dc.b	$02, $01, $E2, $03, $05, $10, $11, $11, $11, $11, $04, $05, $03, $33, $33, $33
-		dc.b	$30, $06, $04, $11, $11, $16, $66, $02, $04, $07, $77, $05, $55, $02, $0A, $50
-		dc.b	$00, $50, $00, $03, $30, $05, $55, $30, $03, $02, $10, $11, $00, $33, $33, $00
-		dc.b	$11, $10, $01, $77, $70, $01, $17, $00, $07, $00, $70, $02, $0D, $77, $00, $55
-		dc.b	$50, $00, $05, $00, $05, $00, $50, $33, $30, $55, $02, $0F, $03, $00, $03, $11
-		dc.b	$00, $33, $31, $66, $77, $77, $76, $DD, $DD, $DD, $D0, $03, $01, $0D, $04, $02
-		dc.b	$77, $77, $04, $01, $77, $04, $01, $70, $03, $05, $07, $AA, $AA, $99, $88, $02
-		dc.b	$03, $30, $10, $DD, $04, $01, $D0, $03, $03, $0D, $00, $10, $06, $01, $31, $02
-		dc.b	$01, $0D, $02, $0D, $99, $94, $76, $66, $00, $03, $30, $00, $30, $30, $03, $30
-		dc.b	$03, $02, $09, $03, $10, $01, $11, $00, $01, $10, $00, $10, $03, $03, $01, $07
-		dc.b	$77, $02, $06, $25, $55, $22, $22, $03, $30, $02, $04, $30, $03, $00, $03, $02
-		dc.b	$0D, $33, $30, $00, $11, $00, $01, $01, $00, $10, $10, $10, $00, $01, $05, $04
-		dc.b	$33, $33, $33, $33, $06, $02, $08, $80, $02, $02, $87, $78, $02, $02, $70, $07
-		dc.b	$02, $01, $70, $03, $1B, $87, $00, $0F, $F0, $08, $00, $0F, $F0, $11, $EE, $00
-		dc.b	$01, $33, $33, $01, $01, $0A, $A0, $01, $00, $A7, $7A, $80, $08, $70, $07, $78
-		dc.b	$04, $01, $08, $02, $01, $07, $03, $04, $DD, $22, $DC, $CC, $0C, $1F, $A0, $00
-		dc.b	$10, $00, $71, $11, $BC, $B0, $00, $0B, $70, $7B, $00, $07, $00, $07, $B7, $0C
-		dc.b	$CC, $CB, $70, $BB, $77, $70, $0C, $77, $C0, $00, $07, $00, $70, $03, $01, $0C
-		dc.b	$03, $02, $07, $55, $03, $02, $33, $B0, $02, $05, $3A, $CB, $BB, $BB, $59, $06
-		dc.b	$02, $0B, $50, $02, $01, $0B, $02, $1A, $CC, $55, $09, $5C, $77, $90, $07, $97
-		dc.b	$00, $70, $90, $70, $00, $09, $70, $DE, $77, $E9, $EE, $AE, $77, $93, $33, $70
-		dc.b	$00, $70, $03, $02, $71, $0A, $02, $02, $B0, $A7, $02, $02, $1A, $70, $02, $01
-		dc.b	$01, $03, $0D, $A7, $00, $DE, $77, $9F, $FF, $AE, $77, $92, $00, $70, $00, $70
-		dc.b	$03, $02, $71, $08, $02, $02, $B0, $87, $02, $02, $1A, $70, $02, $01, $01, $03
-		dc.b	$0A, $A7, $00, $FF, $70, $8F, $60, $00, $8F, $00, $97, $02, $02, $08, $88, $02
-		dc.b	$02, $97, $78, $02, $02, $90, $07, $02, $01, $07, $03, $02, $08, $70, $03, $07
-		dc.b	$87, $FF, $80, $FF, $F7, $00, $78, $03, $01, $07, $16, $02, $7B, $70, $02, $02
-		dc.b	$B0, $70, $02, $01, $0C, $03, $01, $B7, $03, $01, $70, $12, $01, $E0, $07, $01
-		dc.b	$80, $03, $01, $10, $03, $01, $70, $4C, $04, $FF, $FF, $FF, $FF, $1C, $04, $DD
-		dc.b	$CC, $CB, $BB, $02, $02, $70, $07, $02, $02, $07, $70, $02, $02, $77, $70, $03
-		dc.b	$01, $77, $02, $02, $70, $77, $02, $01, $77, $02, $07, $11, $11, $61, $00, $11
-		dc.b	$66, $61, $02, $02, $77, $70, $03, $01, $70, $02, $02, $77, $70, $02, $01, $77
-		dc.b	$0A, $03, $11, $11, $11, $00, $15, $69, $0A, $00, $15, $00, $97, $00, $14, $00
-		dc.b	$97, $00, $01, $05, $3B, $0E, $00, $0F, $00, $10, $00, $10, $21, $78, $29, $79
-		dc.b	$00, $10, $00, $10, $00, $F0, $08, $F1, $00, $10, $00, $10, $00, $1E, $00, $10
-		dc.b	$00, $10, $00, $10, $00, $1E, $00, $1E, $00, $10, $00, $10, $21, $86, $21, $A8
-		dc.b	$00, $30, $00, $07, $08, $11, $08, $26, $00, $07, $00, $30, $08, $36, $08, $21
-		dc.b	$03, $17, $10, $00, $02, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00
-		dc.b	$10, $00, $10, $00, $12, $08, $12, $00, $10, $02, $04, $08, $11, $00, $21, $03
-		dc.b	$17, $21, $00, $22, $00, $23, $00, $10, $00, $10, $08, $11, $08, $11, $00, $10
-		dc.b	$00, $10, $00, $12, $08, $32, $08, $21, $05, $01, $07, $03, $17, $10, $00, $08
-		dc.b	$00, $1E, $00, $10, $00, $10, $00, $1C, $00, $1C, $00, $10, $00, $10, $00, $12
-		dc.b	$00, $15, $00, $10, $03, $03, $16, $00, $27, $03, $17, $10, $00, $28, $00, $1E
-		dc.b	$00, $10, $00, $10, $00, $1C, $00, $1C, $00, $10, $00, $10, $00, $12, $00, $35
-		dc.b	$00, $26, $09, $17, $1A, $00, $0B, $00, $16, $00, $10, $00, $10, $08, $17, $08
-		dc.b	$17, $00, $10, $00, $10, $08, $1C, $08, $1B, $08, $1A, $02, $04, $08, $1A, $00
-		dc.b	$2A, $05, $03, $2B, $00, $06, $04, $04, $08, $07, $08, $07, $05, $03, $06, $08
-		dc.b	$2B, $04, $04, $08, $2A, $00, $3A, $03, $17, $30, $00, $3B, $00, $36, $00, $2B
-		dc.b	$00, $0D, $08, $2C, $08, $0A, $00, $0D, $00, $2B, $00, $0B, $08, $10, $00, $30
-		dc.b	$02, $14, $08, $2A, $00, $36, $00, $10, $00, $3B, $08, $06, $08, $2D, $00, $3B
-		dc.b	$00, $10, $08, $3D, $08, $3D, $04, $04, $08, $3D, $08, $3D, $04, $24, $E8, $E5
-		dc.b	$E8, $D9, $00, $10, $00, $10, $00, $11, $00, $10, $00, $10, $00, $10, $00, $10
-		dc.b	$08, $11, $00, $10, $00, $10, $00, $12, $00, $13, $00, $10, $00, $10, $00, $21
-		dc.b	$08, $20, $05, $2F, $30, $00, $3C, $00, $10, $08, $1D, $00, $36, $08, $37, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $32, $00, $32, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $34, $00, $34, $00
-		dc.b	$10, $00, $10, $05, $80, $E7, $2A, $00, $2C, $01, $B0, $01, $B6, $00, $10, $00
-		dc.b	$10, $00, $12, $00, $12, $00, $10, $00, $32, $00, $16, $00, $30, $00, $36, $00
-		dc.b	$10, $00, $30, $00, $14, $00, $10, $00, $10, $00, $32, $00, $34, $00, $10, $00
-		dc.b	$10, $00, $12, $00, $F0, $00, $10, $00, $D0, $00, $F0, $00, $30, $00, $D0, $00
-		dc.b	$10, $00, $30, $00, $14, $00, $10, $00, $10, $00, $F2, $00, $F4, $00, $10, $00
-		dc.b	$10, $00, $12, $00, $F0, $00, $10, $00, $F2, $00, $F0, $00, $12, $00, $F6, $00
-		dc.b	$10, $00, $16, $00, $14, $00, $10, $00, $10, $00, $11, $00, $D6, $00, $F3, $00
-		dc.b	$32, $00, $34, $00, $F5, $00, $36, $00, $F1, $00, $F2, $00, $F4, $00, $D0, $00
-		dc.b	$D0, $00, $D2, $00, $D4, $00, $D0, $00, $D0, $00, $32, $00, $34, $00, $13, $00
-		dc.b	$F2, $00, $11, $00, $F6, $00, $F6, $00, $11, $00, $D0, $00, $27, $00, $36, $00
-		dc.b	$02, $00, $26, $00, $30, $00, $06, $00, $10, $00, $30, $00, $12, $00, $10, $00
-		dc.b	$32, $00, $16, $00, $14, $00, $36, $00, $10, $00, $D8, $00, $DE, $01, $73, $01
-		dc.b	$70, $09, $72, $01, $77, $01, $70, $01, $75, $08, $12, $00, $12, $00, $20, $01
-		dc.b	$71, $00, $20, $01, $71, $00, $10, $00, $10, $08, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $C1, $9C, $C1, $9E, $00, $10, $00, $10, $29, $47, $21, $7A, $04, $04, $08
-		dc.b	$3D, $08, $3D, $04, $1E, $E9, $E3, $E9, $DF, $00, $04, $00, $04, $61, $AA, $61
-		dc.b	$AA, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $16, $00
-		dc.b	$53, $00, $10, $03, $33, $34, $00, $61, $00, $10, $00, $10, $00, $12, $00, $12
-		dc.b	$00, $10, $00, $10, $00, $16, $00, $16, $00, $10, $08, $11, $00, $12, $08, $13
-		dc.b	$08, $15, $00, $16, $08, $1B, $00, $18, $00, $19, $00, $10, $00, $1B, $00, $12
-		dc.b	$00, $10, $00, $10, $00, $0A, $00, $0A, $05, $80, $93, $F2, $00, $F2, $00, $10
-		dc.b	$00, $F2, $00, $16, $08, $F5, $00, $F5, $08, $11, $08, $F2, $00, $12, $08, $15
-		dc.b	$00, $10, $00, $36, $00, $36, $00, $10, $00, $10, $00, $12, $00, $C0, $00, $10
-		dc.b	$00, $C2, $00, $C3, $00, $16, $00, $C5, $00, $10, $00, $12, $00, $12, $00, $10
-		dc.b	$00, $10, $00, $76, $00, $76, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10
-		dc.b	$00, $10, $00, $16, $00, $16, $00, $10, $00, $16, $00, $12, $00, $14, $00, $10
-		dc.b	$00, $10, $E1, $74, $E1, $74, $E1, $7A, $00, $19, $E1, $78, $00, $1B, $00, $1B
-		dc.b	$00, $03, $E1, $5B, $E1, $43, $00, $E0, $00, $10, $00, $E2, $00, $12, $00, $10
-		dc.b	$00, $10, $00, $84, $00, $79, $00, $F0, $00, $33, $00, $2E, $E1, $05, $00, $10
-		dc.b	$01, $BC, $E1, $05, $01, $A1, $00, $03, $00, $10, $E1, $BE, $E1, $F4, $03, $15
-		dc.b	$10, $00, $46, $00, $12, $00, $10, $00, $10, $00, $1E, $00, $1E, $00, $10, $00
-		dc.b	$10, $E0, $58, $E1, $E6, $03, $05, $7F, $E0, $00, $E1, $8A, $03, $15, $10, $00
-		dc.b	$4B, $00, $16, $00, $10, $00, $10, $00, $10, $00, $11, $00, $10, $00, $10, $00
-		dc.b	$15, $00, $12, $04, $4E, $E1, $8F, $E1, $EC, $00, $03, $00, $10, $E1, $AE, $E1
-		dc.b	$DE, $00, $10, $00, $10, $00, $37, $00, $31, $00, $10, $00, $51, $00, $76, $00
-		dc.b	$33, $00, $10, $00, $10, $00, $12, $00, $A7, $00, $10, $00, $30, $00, $3F, $00
-		dc.b	$F6, $00, $6E, $00, $30, $E1, $AD, $E1, $CE, $01, $C3, $00, $65, $E0, $8B, $E1
-		dc.b	$88, $00, $11, $00, $D7, $00, $D1, $00, $D7, $00, $D7, $00, $D1, $00, $1C, $00
-		dc.b	$2C, $00, $10, $03, $03, $21, $00, $30, $03, $15, $10, $00, $FF, $00, $DE, $00
-		dc.b	$39, $00, $37, $00, $09, $00, $07, $00, $F0, $00, $F0, $E0, $8E, $E1, $4A, $03
-		dc.b	$3D, $03, $E0, $9E, $E1, $59, $00, $30, $00, $30, $00, $04, $00, $04, $00, $10
-		dc.b	$00, $10, $00, $16, $00, $16, $00, $10, $00, $10, $00, $2F, $00, $29, $00, $30
-		dc.b	$00, $30, $00, $2F, $00, $29, $00, $32, $00, $32, $00, $6B, $00, $5A, $00, $21
-		dc.b	$00, $10, $00, $12, $00, $80, $00, $10, $00, $F0, $E0, $F6, $E1, $42, $03, $3F
-		dc.b	$0F, $01, $A4, $00, $6D, $00, $14, $00, $14, $00, $16, $00, $16, $00, $14, $00
-		dc.b	$14, $01, $B2, $01, $B3, $01, $A8, $01, $A9, $00, $08, $00, $08, $00, $10, $00
-		dc.b	$10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $18, $01, $B3, $00, $1A, $01
-		dc.b	$AB, $00, $1A, $01, $AB, $00, $1A, $01, $AB, $00, $1C, $01, $AB, $00, $01, $03
-		dc.b	$0D, $0F, $01, $AE, $00, $10, $00, $01, $00, $06, $01, $AF, $00, $01, $03, $01
-		dc.b	$03, $03, $41, $06, $01, $B7, $00, $12, $00, $0F, $00, $10, $00, $01, $00, $12
-		dc.b	$00, $70, $00, $10, $00, $03, $00, $40, $00, $3B, $00, $07, $00, $09, $00, $05
-		dc.b	$00, $0B, $00, $0B, $00, $09, $00, $0D, $00, $0F, $00, $0F, $00, $09, $00, $09
-		dc.b	$00, $0F, $00, $0B, $00, $09, $00, $0D, $00, $0C, $00, $0F, $00, $0A, $08, $0B
-		dc.b	$01, $FC, $00, $07, $02, $0A, $E9, $7F, $E0, $89, $00, $10, $00, $89, $00, $50
-		dc.b	$03, $0F, $10, $00, $5E, $00, $D6, $00, $51, $00, $10, $00, $10, $80, $1E, $80
-		dc.b	$1F, $26, $01, $80, $05, $01, $80, $37, $01, $80, $07, $01, $80, $67, $03, $80
-		dc.b	$00, $80, $4D, $03, $80, $00, $80, $2D, $03, $80, $00, $80, $0D, $03, $80, $00
-		dc.b	$80, $6D, $03, $80, $00, $80, $81, $0E, $04, $FF, $00, $FF, $FF, $02, $03, $FF
-		dc.b	$FF, $FF, $1E, $04, $FF, $FF, $FF, $FF, $08, $04, $FF, $FF, $FF, $FF, $15, $02
-		dc.b	$FF, $FF, $02, $09, $FF, $00, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $11, $02, $CC
-		dc.b	$CC, $02, $03, $CC, $33, $FF, $04, $03, $FF, $00, $FF, $02, $14, $FF, $00, $FF
-		dc.b	$FF, $00, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
-		dc.b	$FF, $13, $01, $FF, $03, $01, $FF, $81, $AF, $05, $2E, $4D, $4E, $4D, $60, $04
-		dc.b	$01, $01, $03, $01, $01, $09, $05, $7C, $4F, $4C, $4F, $30, $2A, $07, $52, $55
-		dc.b	$54, $01, $53, $54, $55, $06, $0D, $1C, $1D, $1E, $1F, $1C, $01, $03, $01, $1F
-		dc.b	$1C, $1D, $1E, $1F, $37, $06, $2D, $34, $35, $36, $18, $02, $02, $06, $02, $1A
-		dc.b	$35, $36, $37, $2C, $09, $01, $2D, $03, $01, $2D, $2A, $0A, $56, $57, $58, $59
-		dc.b	$0C, $0C, $58, $59, $5A, $5B, $03, $0D, $20, $21, $22, $23, $20, $01, $03, $01
-		dc.b	$23, $20, $21, $22, $23, $37, $06, $2C, $38, $39, $3A, $15, $02, $02, $06, $02
-		dc.b	$17, $39, $3A, $3B, $2D, $09, $01, $2C, $03, $01, $2C, $2A, $0C, $5C, $5D, $5E
-		dc.b	$5F, $FC, $D0, $D0, $D0, $A0, $8D, $8E, $8F, $02, $02, $50, $51, $02, $03, $50
-		dc.b	$01, $51, $02, $02, $50, $51, $22, $05, $2E, $4D, $4E, $4D, $60, $0C, $0B, $67
-		dc.b	$4E, $4D, $4E, $2A, $2D, $3C, $3D, $3E, $10, $02, $02, $06, $02, $12, $3D, $3E
-		dc.b	$3F, $2C, $09, $01, $2D, $03, $01, $2D, $2A, $10, $60, $61, $62, $63, $F0, $F0
-		dc.b	$F2, $F2, $02, $91, $90, $91, $92, $00, $50, $51, $02, $03, $50, $01, $51, $02
-		dc.b	$02, $50, $51, $22, $01, $2C, $03, $01, $2C, $11, $01, $2C, $03, $02, $2C, $32
-		dc.b	$03, $09, $1F, $34, $35, $36, $1A, $06, $35, $36, $37, $04, $02, $32, $2C, $03
-		dc.b	$01, $2C, $2A, $1A, $64, $65, $66, $67, $C5, $F5, $F7, $F7, $30, $03, $91, $90
-		dc.b	$91, $9B, $09, $0A, $0B, $08, $01, $03, $01, $0B, $08, $09, $0A, $0B, $21, $01
-		dc.b	$2D, $03, $01, $2D, $11, $01, $2D, $03, $02, $2D, $2D, $03, $09, $01, $38, $39
-		dc.b	$3A, $17, $15, $39, $3A, $3B, $04, $02, $2D, $2D, $03, $01, $2D, $2A, $1A, $6A
-		dc.b	$6B, $6B, $6B, $06, $06, $05, $FA, $FC, $FC, $FA, $91, $90, $9D, $99, $0E, $0F
-		dc.b	$0C, $01, $03, $01, $0F, $0C, $0D, $0E, $0F, $21, $01, $2C, $03, $01, $2C, $11
-		dc.b	$01, $2C, $03, $02, $2C, $2C, $03, $09, $01, $3C, $3D, $3E, $12, $10, $3D, $3E
-		dc.b	$3F, $04, $02, $2C, $2C, $03, $01, $2C, $2A, $1A, $6F, $70, $70, $70, $1E, $A1
-		dc.b	$02, $E0, $E0, $41, $E7, $90, $91, $80, $84, $12, $13, $10, $01, $03, $01, $13
-		dc.b	$10, $11, $12, $13, $21, $01, $2D, $03, $07, $2D, $00, $28, $2B, $29, $2B, $01
-		dc.b	$07, $05, $03, $2B, $29, $2B, $19, $03, $02, $33, $2D, $03, $0A, $1D, $4D, $4E
-		dc.b	$4D, $7E, $62, $7A, $78, $0F, $02, $02, $07, $77, $1A, $07, $35, $36, $37, $33
-		dc.b	$2A, $1A, $73, $74, $74, $75, $05, $74, $74, $02, $E6, $91, $90, $E1, $90, $85
-		dc.b	$85, $80, $17, $14, $01, $03, $01, $17, $14, $15, $16, $17, $21, $01, $2C, $03
-		dc.b	$01, $2C, $16, $01, $2C, $03, $01, $2C, $03, $0F, $40, $46, $47, $39, $03, $6A
-		dc.b	$7F, $00, $79, $64, $71, $39, $3A, $48, $49, $29, $1B, $7C, $78, $79, $7A, $07
-		dc.b	$0E, $79, $7A, $06, $E7, $90, $91, $EA, $91, $88, $88, $8D, $1B, $18, $01, $03
-		dc.b	$01, $1B, $18, $19, $1A, $1B, $21, $01, $2D, $03, $01, $2D, $16, $01, $2D, $03
-		dc.b	$01, $2D, $03, $0F, $42, $3A, $39, $3A, $79, $17, $7B, $00, $02, $17, $79, $3A
-		dc.b	$39, $3A, $3B, $29, $1B, $83, $7E, $7F, $80, $02, $FC, $7F, $80, $05, $12, $91
-		dc.b	$90, $1C, $90, $8D, $8D, $86, $1F, $1C, $01, $03, $01, $1F, $1C, $1D, $1E, $1F
-		dc.b	$21, $01, $2C, $03, $01, $2C, $16, $01, $2C, $03, $01, $2C, $03, $0F, $44, $3E
-		dc.b	$3D, $3E, $7B, $12, $79, $00, $02, $12, $7B, $3E, $3D, $3E, $3F, $29, $1B, $85
-		dc.b	$86, $87, $88, $0C, $0C, $0C, $88, $13, $11, $17, $9D, $04, $04, $80, $80, $80
-		dc.b	$80, $1C, $01, $03, $01, $1F, $1C, $1D, $1E, $1F, $11, $04, $01, $01, $01, $01
-		dc.b	$0B, $06, $4C, $4A, $4C, $4F, $00, $05, $16, $01, $07, $03, $01, $07, $08, $01
-		dc.b	$05, $03, $06, $05, $64, $4F, $4C, $4F, $28, $2B, $04, $53, $53, $53, $53, $11
-		dc.b	$04, $F0, $F0, $F0, $F0, $08, $04, $A2, $A2, $A2, $A2, $84, $24, $00, $15, $69
-		dc.b	$0A, $00, $15, $00, $97, $00, $14, $20, $97, $20, $01, $04, $38, $41, $00, $41
-		dc.b	$01, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $16, $00
-		dc.b	$16, $00, $10, $00, $10, $00, $34, $00, $34, $00, $10, $00, $10, $00, $12, $00
-		dc.b	$12, $00, $10, $00, $10, $00, $16, $00, $16, $00, $10, $00, $10, $00, $32, $00
-		dc.b	$22, $00, $10, $00, $30, $03, $29, $20, $00, $30, $00, $10, $00, $10, $00, $1E
-		dc.b	$00, $01, $00, $11, $00, $2F, $00, $01, $00, $01, $00, $11, $00, $11, $00, $01
-		dc.b	$00, $01, $00, $11, $00, $F7, $00, $11, $00, $01, $00, $11, $60, $A3, $60, $67
-		dc.b	$05, $33, $50, $00, $72, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $00, $32, $00, $32, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $00, $72, $00, $72, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00
-		dc.b	$10, $00, $02, $00, $32, $03, $37, $10, $00, $32, $00, $12, $00, $10, $00, $10
-		dc.b	$00, $56, $00, $56, $00, $10, $00, $10, $00, $12, $00, $46, $00, $10, $00, $44
-		dc.b	$00, $72, $00, $72, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10
-		dc.b	$00, $32, $00, $32, $00, $10, $00, $10, $00, $12, $00, $06, $00, $10, $03, $03
-		dc.b	$26, $00, $38, $03, $15, $10, $00, $37, $00, $3B, $00, $10, $00, $10, $00, $71
-		dc.b	$08, $76, $00, $10, $00, $10, $00, $4C, $00, $4C, $04, $80, $B4, $60, $9D, $60
-		dc.b	$4D, $00, $10, $00, $C0, $00, $17, $00, $17, $00, $10, $00, $10, $00, $11, $00
-		dc.b	$11, $00, $10, $00, $10, $00, $13, $00, $13, $00, $10, $00, $E5, $08, $01, $00
-		dc.b	$E4, $00, $0A, $00, $1B, $08, $1A, $08, $0B, $00, $1B, $00, $0A, $08, $0D, $08
-		dc.b	$0D, $08, $03, $00, $0A, $00, $02, $08, $0B, $00, $0A, $08, $03, $08, $05, $00
-		dc.b	$0C, $00, $91, $00, $0C, $08, $90, $08, $0D, $00, $0C, $00, $91, $00, $0C, $08
-		dc.b	$DD, $00, $0C, $00, $48, $00, $41, $00, $05, $00, $48, $00, $0C, $00, $03, $00
-		dc.b	$36, $00, $01, $00, $04, $00, $3D, $00, $38, $00, $04, $00, $01, $00, $04, $08
-		dc.b	$3C, $00, $04, $00, $04, $08, $05, $08, $05, $00, $04, $00, $04, $08, $64, $00
-		dc.b	$04, $00, $11, $08, $71, $00, $70, $08, $10, $08, $71, $00, $11, $08, $13, $08
-		dc.b	$13, $00, $10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08, $51, $00
-		dc.b	$50, $00, $E5, $00, $10, $00, $30, $00, $15, $00, $C0, $00, $10, $61, $DB, $69
-		dc.b	$DB, $0C, $06, $61, $EC, $01, $56, $00, $04, $02, $0E, $08, $05, $00, $5C, $00
-		dc.b	$04, $00, $10, $08, $05, $00, $4C, $08, $71, $03, $0D, $12, $00, $5C, $00, $10
-		dc.b	$00, $10, $08, $84, $00, $4C, $00, $C0, $03, $0D, $17, $00, $5C, $00, $10, $00
-		dc.b	$10, $00, $11, $00, $4C, $00, $10, $03, $0D, $13, $00, $5C, $00, $10, $00, $10
-		dc.b	$00, $11, $00, $4C, $00, $1B, $03, $0D, $0C, $00, $5C, $00, $0A, $00, $10, $00
-		dc.b	$04, $00, $4C, $00, $0C, $03, $0B, $41, $00, $5C, $00, $48, $00, $10, $68, $85
-		dc.b	$68, $F6, $03, $0D, $04, $00, $5C, $08, $05, $00, $10, $00, $04, $00, $4C, $08
-		dc.b	$05, $02, $0E, $08, $71, $00, $5C, $00, $12, $00, $10, $00, $10, $00, $4C, $08
-		dc.b	$84, $03, $0D, $C0, $00, $5C, $00, $17, $00, $10, $00, $10, $00, $4C, $00, $11
-		dc.b	$03, $0D, $10, $00, $5C, $00, $13, $00, $10, $00, $10, $00, $4C, $00, $11, $03
-		dc.b	$0D, $1B, $00, $5C, $00, $0C, $00, $10, $00, $0A, $00, $4C, $00, $04, $03, $0D
-		dc.b	$0C, $00, $5C, $00, $41, $00, $10, $00, $48, $09, $1A, $69, $D3, $7C, $03, $20
-		dc.b	$00, $20, $05, $03, $20, $00, $20, $80, $F5, $03, $20, $00, $20, $05, $03, $20
-		dc.b	$00, $20, $80, $F5, $03, $20, $00, $20, $05, $03, $20, $00, $20, $80, $F5, $03
-		dc.b	$20, $00, $20, $05, $03, $20, $00, $20, $80, $F5, $03, $20, $00, $20, $05, $03
-		dc.b	$20, $00, $20, $82, $8D, $06, $0E, $0F, $12, $13, $18, $18, $02, $02, $18, $18
-		dc.b	$02, $02, $18, $18, $02, $02, $18, $18, $02, $02, $18, $18, $02, $02, $18, $18
-		dc.b	$02, $02, $18, $18, $02, $08, $18, $18, $2A, $57, $23, $23, $15, $68, $0E, $2F
-		dc.b	$21, $2B, $26, $26, $07, $00, $02, $00, $0C, $0C, $03, $01, $00, $02, $00, $0C
-		dc.b	$0C, $03, $01, $00, $02, $00, $0C, $0C, $03, $01, $00, $02, $00, $0C, $0C, $03
-		dc.b	$01, $00, $02, $00, $0C, $0C, $03, $01, $00, $02, $00, $0B, $07, $09, $0A, $32
-		dc.b	$06, $10, $11, $14, $15, $08, $08, $02, $02, $08, $08, $02, $02, $08, $08, $02
-		dc.b	$02, $08, $08, $02, $02, $08, $08, $02, $02, $08, $08, $02, $02, $08, $08, $02
-		dc.b	$08, $08, $08, $2D, $50, $3F, $3F, $16, $6B, $0E, $2F, $23, $26, $2E, $2C, $0F
-		dc.b	$00, $08, $08, $0B, $09, $0B, $09, $00, $08, $08, $0B, $09, $0B, $09, $00, $08
-		dc.b	$08, $0B, $09, $0B, $09, $00, $08, $08, $0B, $09, $0B, $09, $00, $08, $08, $0B
-		dc.b	$09, $0B, $09, $00, $08, $08, $03, $08, $09, $0A, $32, $28, $12, $13, $0E, $0F
-		dc.b	$08, $08, $18, $18, $08, $08, $18, $18, $08, $08, $18, $18, $08, $08, $18, $18
-		dc.b	$08, $08, $18, $18, $08, $08, $18, $18, $08, $08, $18, $18, $08, $08, $2C, $51
-		dc.b	$23, $23, $0B, $76, $0E, $2F, $3D, $37, $35, $35, $0A, $00, $0D, $0F, $01, $03
-		dc.b	$0C, $0C, $00, $0D, $0F, $01, $03, $0C, $0C, $00, $0D, $0F, $01, $03, $0C, $0C
-		dc.b	$00, $0D, $0F, $01, $03, $0C, $0C, $00, $0D, $0F, $01, $03, $0C, $0C, $00, $0D
-		dc.b	$0F, $06, $07, $09, $0A, $32, $28, $14, $15, $10, $11, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $23, $5E, $27, $27, $08, $75, $0E
-		dc.b	$05, $3F, $3A, $3A, $38, $07, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01
-		dc.b	$03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04
-		dc.b	$03, $01, $03, $01, $03, $04, $0B, $08, $09, $0A, $32, $28, $16, $17, $0D, $0D
-		dc.b	$1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A
-		dc.b	$1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $1B, $1A, $2A, $5F
-		dc.b	$23, $37, $09, $68, $0E, $05, $39, $27, $3C, $2A, $07, $03, $04, $0C, $0E, $03
-		dc.b	$01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C
-		dc.b	$0E, $03, $01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0B, $07, $09, $0A, $32
-		dc.b	$28, $18, $19, $0E, $0F, $0E, $0E, $16, $16, $0E, $0E, $16, $16, $0E, $0E, $16
-		dc.b	$16, $0E, $0E, $16, $16, $0E, $0E, $16, $16, $0E, $0E, $16, $16, $0E, $0E, $16
-		dc.b	$16, $0E, $0E, $25, $50, $39, $38, $1C, $68, $0E, $05, $2D, $29, $28, $2B, $07
-		dc.b	$03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01
-		dc.b	$03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04
-		dc.b	$0B, $08, $09, $0A, $32, $28, $1A, $1B, $10, $11, $02, $02, $1E, $1E, $02, $02
-		dc.b	$1E, $1E, $02, $02, $1E, $1E, $02, $02, $1E, $1E, $02, $02, $1E, $1E, $02, $02
-		dc.b	$1E, $1E, $02, $02, $1E, $1E, $02, $02, $30, $45, $38, $39, $1C, $68, $0E, $05
-		dc.b	$2E, $25, $2B, $28, $07, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03
-		dc.b	$01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C
-		dc.b	$0E, $03, $01, $03, $04, $0B, $07, $09, $0A, $32, $28, $1C, $1D, $12, $13, $0E
-		dc.b	$0E, $02, $02, $0E, $0E, $02, $02, $0E, $0E, $02, $02, $0E, $0E, $02, $02, $0E
-		dc.b	$0E, $02, $02, $0E, $0E, $02, $02, $0E, $0E, $02, $02, $0E, $0E, $2F, $5A, $3F
-		dc.b	$29, $1C, $7F, $0E, $05, $2F, $3C, $2A, $3E, $07, $03, $04, $03, $01, $03, $01
-		dc.b	$03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01
-		dc.b	$03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $0B, $08, $09, $0A, $32, $28
-		dc.b	$0D, $0D, $14, $15, $19, $18, $06, $06, $19, $18, $06, $06, $19, $18, $06, $06
-		dc.b	$19, $18, $06, $06, $19, $18, $06, $06, $19, $18, $06, $06, $19, $18, $06, $06
-		dc.b	$19, $18, $52, $5F, $28, $29, $65, $68, $0E, $05, $29, $23, $2C, $2E, $07, $03
-		dc.b	$04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03
-		dc.b	$01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0B
-		dc.b	$07, $09, $0A, $32, $28, $0E, $0F, $0D, $0D, $14, $14, $19, $18, $14, $14, $19
-		dc.b	$18, $14, $14, $19, $18, $14, $14, $19, $18, $14, $14, $19, $18, $14, $14, $19
-		dc.b	$18, $14, $14, $19, $18, $14, $14, $55, $58, $29, $29, $66, $6B, $0E, $05, $2B
-		dc.b	$2E, $2E, $2C, $07, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01
-		dc.b	$03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01
-		dc.b	$03, $01, $03, $04, $0B, $08, $09, $0A, $32, $28, $10, $11, $1A, $1B, $0C, $0C
-		dc.b	$0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C
-		dc.b	$0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $0C, $54, $59, $39, $39
-		dc.b	$6B, $66, $0E, $05, $25, $2F, $20, $22, $07, $03, $04, $0C, $0E, $03, $01, $03
-		dc.b	$04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0C, $0E, $03
-		dc.b	$01, $03, $04, $0C, $0E, $03, $01, $03, $04, $0B, $07, $09, $0A, $32, $28, $12
-		dc.b	$13, $1C, $1D, $1F, $1E, $04, $04, $1F, $1E, $04, $04, $1F, $1E, $04, $04, $1F
-		dc.b	$1E, $04, $04, $1F, $1E, $04, $04, $1F, $1E, $04, $04, $1F, $1E, $04, $04, $1F
-		dc.b	$1E, $5B, $56, $39, $39, $68, $65, $0E, $05, $27, $22, $22, $20, $07, $03, $04
-		dc.b	$03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01
-		dc.b	$03, $04, $03, $01, $03, $01, $03, $04, $03, $01, $03, $01, $03, $04, $0B, $08
-		dc.b	$09, $0A, $84, $E9, $00, $0D, $00, $00
-Rock_Splashing: ; loc_4B76C:
-		BINCLUDE  "data\sprites\rockspsh.dat"
 Unknow_Palett_0x04BAAC: ; loc_4BAAC:
 		dc.w	$0000, $0A20, $0666, $0888, $0CAA, $0ECC, $0246, $0008
 		dc.w	$000E, $046A, $068C, $08CE, $0E22, $0E62, $0000, $0EEE
@@ -44644,960 +43037,33 @@ Unknow_Palett_0x04BAAC: ; loc_4BAAC:
 		dc.w	$08CC, $00EE, $000A, $024C, $006E, $00AE, $0000, $0EEE
 		dc.w	$0000, $0620, $0C20, $0E42, $0E66, $0A0E, $0A0E, $0A0E
 		dc.w	$0A0E, $0006, $000E, $0282, $02C2, $04E2, $0000, $0EEE
+
 		dc.w	$0000, $06CE, $02AE, $026C, $0248, $0CCE, $006E, $004E
 		dc.w	$088E, $066C, $044A, $0028, $0004, $0060, $0000, $0CEE
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
 		dc.w	$0000, $0C00, $0000, $0282, $02C2, $04E2, $0000, $0EEE
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
 		dc.w	$0000, $0000, $0000, $0282, $02C2, $04E2, $0000, $0EEE
+
 		dc.w	$0000, $0200, $0422, $0666, $0224, $0226, $0446, $0046
 		dc.w	$0048, $0400, $0888, $0282, $02C2, $04E2, $0000, $0EEE
 		dc.w	$0000, $0200, $0644, $0888, $0428, $0448, $064A, $006A
 		dc.w	$008A, $0800, $0AAA, $0282, $02C2, $04E2, $0000, $0EEE
 		dc.w	$0000, $0422, $0866, $0AAA, $042A, $064C, $0A6C, $006C
 		dc.w	$00CC, $0A00, $0CCC, $0282, $02C2, $04E2, $0000, $0EEE
+
 		dc.w	$0000, $0644, $0A88, $0CCC, $062C, $084E, $0C8E, $008E
 		dc.w	$00EE, $0C00, $0EEE, $0282, $02C2, $04E2, $0000, $0EEE
 		dc.w	$0000, $0848, $0C8C, $0EAE, $0A0E, $0C2E, $0C6E, $086E
 		dc.w	$0A8E, $0404, $0ECE, $0282, $02C2, $04E2, $0000, $0EEE
 		dc.w	$0000, $0020, $0242, $0020, $0222, $0242, $0244, $0266
 		dc.w	$0488, $00EE, $000A, $024C, $006E, $00AE, $0000, $0EEE
+
 		dc.w	$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
 		dc.w	$0000, $00EE, $000A, $024C, $006E, $00AE, $0000, $0EEE
-Unknow_Data_0x04BC4C: ; loc_4BC4C:
-		dc.b	$20, $00, $00, $20, $14, $CC, $BB, $BB, $BB, $77, $07, $12, $10, $11, $07, $63
-		dc.b	$30, $30, $10, $76, $30, $03, $01, $00, $10, $02, $04, $07, $70, $00, $30, $03
-		dc.b	$46, $30, $10, $07, $52, $11, $10, $77, $00, $21, $21, $22, $00, $02, $32, $11
-		dc.b	$00, $11, $21, $02, $00, $10, $21, $12, $00, $33, $31, $01, $00, $11, $22, $22
-		dc.b	$07, $77, $77, $77, $77, $77, $77, $77, $21, $22, $12, $10, $32, $00, $30, $30
-		dc.b	$22, $10, $30, $00, $23, $21, $00, $30, $30, $31, $33, $00, $22, $22, $21, $10
-		dc.b	$77, $77, $77, $77, $07, $77, $77, $02, $0B, $21, $70, $77, $00, $06, $70, $11
-		dc.b	$00, $57, $01, $03, $02, $04, $10, $30, $07, $70, $04, $01, $03, $02, $09, $01
-		dc.b	$03, $00, $76, $10, $33, $00, $10, $33, $02, $01, $33, $02, $01, $01, $03, $01
-		dc.b	$11, $03, $01, $01, $02, $02, $01, $10, $02, $02, $01, $10, $02, $0A, $01, $10
-		dc.b	$00, $11, $10, $10, $11, $00, $0D, $0D, $02, $02, $D0, $D0, $02, $09, $D0, $00
-		dc.b	$10, $0D, $DD, $00, $10, $0D, $0D, $06, $02, $0D, $D0, $02, $07, $0D, $0D, $DD
-		dc.b	$DD, $DD, $DD, $DD, $18, $13, $99, $96, $77, $77, $0F, $F1, $33, $33, $07, $10
-		dc.b	$00, $44, $00, $03, $04, $00, $07, $00, $40, $07, $01, $04, $05, $08, $D2, $30
-		dc.b	$40, $44, $44, $44, $40, $33, $02, $02, $04, $30, $02, $26, $04, $00, $04, $40
-		dc.b	$03, $DE, $43, $30, $7E, $FE, $30, $74, $EF, $13, $03, $43, $00, $30, $ED, $D8
-		dc.b	$69, $88, $06, $63, $22, $11, $03, $21, $0D, $D0, $01, $0D, $D0, $D0, $00, $D0
-		dc.b	$0D, $10, $03, $01, $1D, $02, $02, $DD, $0D, $02, $20, $D0, $D0, $40, $DD, $DD
-		dc.b	$D0, $0D, $DD, $D0, $01, $D0, $00, $0D, $01, $DD, $00, $0D, $01, $DD, $0D, $D1
-		dc.b	$45, $00, $D0, $15, $49, $0D, $01, $54, $D0, $D0, $10, $02, $3E, $44, $53, $62
-		dc.b	$CC, $06, $63, $22, $1C, $00, $31, $DD, $DD, $60, $1D, $00, $D0, $66, $20, $0D
-		dc.b	$10, $DE, $6C, $00, $1D, $47, $E5, $DD, $0D, $40, $00, $D0, $D0, $9D, $A4, $DD
-		dc.b	$D0, $0D, $DD, $D0, $01, $D0, $00, $0D, $01, $DD, $00, $0D, $01, $DD, $0D, $D1
-		dc.b	$45, $00, $D0, $15, $49, $0D, $01, $54, $D0, $D0, $10, $02, $0B, $44, $5A, $EA
-		dc.b	$77, $0F, $F1, $33, $77, $07, $13, $04, $02, $04, $13, $40, $00, $08, $03, $03
-		dc.b	$DE, $F1, $70, $02, $01, $FF, $02, $0C, $30, $00, $04, $00, $33, $2D, $30, $44
-		dc.b	$44, $44, $40, $33, $02, $02, $04, $30, $02, $18, $04, $00, $04, $40, $03, $DE
-		dc.b	$43, $30, $7E, $FE, $30, $74, $EF, $13, $03, $43, $00, $30, $B9, $47, $96, $44
-		dc.b	$00, $0D, $03, $1E, $DD, $D0, $00, $01, $1C, $1C, $CC, $33, $33, $33, $33, $03
-		dc.b	$2F, $FF, $6F, $31, $DD, $09, $49, $00, $D4, $94, $D0, $01, $26, $63, $97, $00
-		dc.b	$30, $10, $02, $02, $30, $10, $03, $56, $17, $70, $03, $01, $00, $10, $30, $10
-		dc.b	$76, $00, $11, $07, $71, $10, $77, $70, $77, $77, $07, $77, $77, $77, $00, $21
-		dc.b	$21, $12, $00, $31, $33, $13, $00, $11, $33, $13, $00, $20, $02, $33, $00, $33
-		dc.b	$32, $33, $00, $12, $11, $12, $07, $77, $77, $77, $77, $77, $77, $77, $12, $12
-		dc.b	$11, $20, $31, $33, $32, $30, $32, $13, $32, $30, $33, $21, $30, $30, $33, $33
-		dc.b	$33, $00, $11, $20, $12, $10, $77, $77, $77, $77, $07, $76, $65, $55, $06, $01
-		dc.b	$03, $02, $0E, $01, $10, $33, $07, $77, $01, $11, $06, $55, $33, $33, $01, $33
-		dc.b	$11, $02, $01, $03, $02, $02, $52, $30, $05, $01, $10, $03, $2F, $11, $33, $33
-		dc.b	$00, $10, $11, $11, $22, $23, $22, $02, $23, $32, $10, $00, $01, $00, $D1, $03
-		dc.b	$00, $10, $D0, $32, $CC, $CD, $00, $0D, $D0, $D0, $00, $0D, $DD, $D0, $11, $11
-		dc.b	$C1, $CC, $33, $33, $33, $33, $22, $FF, $FF, $F0, $00, $DD, $03, $01, $DD, $02
-		dc.b	$01, $DD, $02, $01, $0F, $08, $18, $CC, $CC, $CC, $CC, $33, $33, $33, $33, $03
-		dc.b	$2F, $FF, $6F, $31, $DD, $09, $49, $00, $C4, $E4, $D0, $5B, $BD, $E9, $49, $02
-		dc.b	$02, $04, $40, $03, $01, $04, $02, $36, $40, $04, $00, $03, $04, $00, $07, $10
-		dc.b	$00, $44, $08, $76, $53, $33, $00, $88, $8E, $EE, $99, $DD, $0F, $EE, $44, $40
-		dc.b	$EF, $10, $33, $74, $7D, $FE, $30, $34, $04, $9E, $47, $40, $44, $07, $40, $04
-		dc.b	$44, $04, $37, $77, $77, $73, $EE, $EE, $EE, $EE, $04, $99, $99, $44, $02, $01
-		dc.b	$0D, $02, $03, $D0, $00, $12, $02, $80, $82, $0D, $13, $01, $0D, $00, $DC, $03
-		dc.b	$10, $DD, $00, $06, $32, $11, $CC, $00, $66, $55, $55, $94, $45, $04, $94, $DD
-		dc.b	$01, $54, $C1, $1D, $D0, $15, $55, $1D, $0D, $D1, $55, $D0, $00, $0D, $11, $00
-		dc.b	$0D, $DD, $10, $CC, $C1, $11, $01, $55, $55, $55, $55, $EE, $F0, $99, $44, $11
-		dc.b	$F5, $0D, $00, $FF, $6C, $00, $12, $66, $20, $0D, $13, $00, $0D, $00, $DC, $60
-		dc.b	$10, $DD, $00, $06, $32, $11, $CC, $00, $66, $55, $55, $94, $45, $04, $94, $DD
-		dc.b	$01, $54, $C1, $1D, $D0, $15, $55, $1D, $0D, $D1, $55, $D0, $00, $0D, $11, $00
-		dc.b	$0D, $DD, $10, $CC, $C1, $11, $01, $55, $55, $55, $55, $EF, $F0, $ED, $99, $10
-		dc.b	$FE, $34, $00, $FF, $E3, $40, $04, $0F, $03, $40, $04, $02, $32, $04, $00, $07
-		dc.b	$10, $30, $44, $08, $71, $03, $33, $00, $8F, $EE, $EE, $99, $DD, $0F, $EE, $44
-		dc.b	$40, $EF, $10, $33, $74, $7D, $FE, $30, $34, $04, $9E, $47, $40, $44, $07, $40
-		dc.b	$04, $44, $04, $37, $77, $77, $73, $EE, $EE, $EE, $EE, $07, $76, $65, $55, $06
-		dc.b	$01, $03, $02, $0D, $01, $10, $33, $07, $77, $01, $11, $06, $55, $22, $22, $01
-		dc.b	$33, $03, $01, $03, $02, $04, $52, $30, $00, $11, $03, $01, $10, $03, $0D, $11
-		dc.b	$33, $33, $00, $10, $11, $11, $22, $23, $22, $22, $22, $32, $02, $01, $01, $03
-		dc.b	$1C, $10, $00, $11, $11, $DD, $DD, $00, $0D, $D0, $D0, $00, $0D, $DD, $D0, $11
-		dc.b	$11, $C1, $CC, $33, $33, $33, $33, $12, $FF, $FF, $FF, $00, $DD, $03, $01, $DD
-		dc.b	$02, $01, $ED, $0B, $0C, $CC, $CC, $CC, $CC, $33, $33, $33, $33, $FF, $FF, $FF
-		dc.b	$FF, $08, $06, $9E, $FC, $CC, $CC, $00, $03, $07, $01, $03, $07, $01, $03, $07
-		dc.b	$01, $03, $02, $07, $52, $31, $01, $11, $00, $01, $10, $03, $02, $11, $11, $02
-		dc.b	$0A, $22, $22, $00, $02, $22, $3E, $01, $22, $01, $0D, $02, $2A, $01, $00, $10
-		dc.b	$00, $01, $00, $31, $31, $CD, $DD, $00, $0D, $D0, $D0, $00, $1C, $1C, $0D, $02
-		dc.b	$22, $33, $10, $3E, $EE, $F3, $31, $0D, $DD, $0C, $33, $00, $DD, $D0, $C0, $00
-		dc.b	$0D, $D0, $00, $DD, $0D, $00, $0F, $04, $01, $0D, $03, $01, $DD, $03, $0B, $0D
-		dc.b	$00, $D0, $00, $1D, $D0, $D0, $00, $0D, $DD, $0D, $02, $15, $DD, $DD, $00, $23
-		dc.b	$3E, $3E, $EE, $21, $22, $12, $10, $32, $00, $30, $37, $22, $10, $30, $54, $23
-		dc.b	$21, $02, $3F, $30, $31, $33, $04, $22, $22, $21, $05, $77, $77, $77, $00, $77
-		dc.b	$77, $70, $63, $21, $22, $10, $06, $32, $00, $30, $66, $22, $10, $55, $46, $23
-		dc.b	$21, $0C, $D5, $30, $31, $0C, $C5, $22, $22, $75, $55, $77, $77, $70, $5C, $00
-		dc.b	$0F, $EE, $B7, $08, $F1, $03, $33, $00, $10, $30, $44, $00, $03, $04, $00, $07
-		dc.b	$00, $40, $07, $01, $04, $05, $07, $D2, $30, $40, $44, $44, $44, $40, $02, $05
-		dc.b	$04, $04, $44, $04, $04, $02, $24, $04, $40, $04, $40, $40, $40, $04, $40, $40
-		dc.b	$04, $40, $44, $04, $44, $04, $04, $9D, $BF, $BB, $8C, $06, $03, $22, $11, $03
-		dc.b	$21, $0D, $D0, $01, $0D, $D0, $D0, $00, $D0, $0D, $10, $03, $01, $1D, $02, $02
-		dc.b	$DD, $0D, $02, $68, $D0, $D0, $40, $DD, $DD, $D0, $0D, $D0, $0D, $D1, $D0, $D0
-		dc.b	$0D, $0C, $DD, $DD, $00, $DC, $DD, $0D, $0D, $DC, $00, $D1, $0D, $00, $0D, $11
-		dc.b	$1D, $0D, $D0, $0D, $C0, $D1, $99, $84, $44, $98, $44, $00, $04, $44, $40, $44
-		dc.b	$04, $44, $34, $40, $44, $00, $30, $44, $40, $40, $44, $00, $44, $04, $04, $40
-		dc.b	$44, $40, $40, $40, $00, $40, $99, $D9, $9D, $DD, $DD, $D0, $0D, $DD, $DD, $0D
-		dc.b	$DD, $D0, $0D, $00, $0D, $DD, $1D, $0D, $DC, $0D, $1D, $D0, $11, $D0, $DD, $01
-		dc.b	$CD, $D0, $D0, $1C, $00, $DC, $44, $95, $55, $89, $77, $BC, $02, $0A, $11, $07
-		dc.b	$C0, $00, $30, $10, $7C, $00, $03, $01, $04, $04, $07, $C0, $00, $30, $03, $09
-		dc.b	$30, $10, $0C, $25, $10, $6B, $CC, $00, $10, $07, $01, $01, $03, $13, $10, $0C
-		dc.b	$CC, $00, $77, $76, $66, $00, $76, $10, $00, $70, $76, $66, $66, $CC, $CC, $CC
-		dc.b	$CC, $0C, $08, $CC, $CC, $CC, $CC, $66, $66, $66, $66, $04, $08, $66, $66, $66
-		dc.b	$66, $CC, $CC, $CC, $CC, $0C, $08, $CC, $CC, $CC, $CC, $06, $66, $66, $66, $04
-		dc.b	$08, $06, $66, $66, $66, $07, $66, $55, $55, $09, $0E, $11, $23, $33, $07, $77
-		dc.b	$01, $11, $06, $55, $33, $33, $01, $33, $11, $02, $01, $03, $02, $02, $53, $10
-		dc.b	$02, $22, $10, $00, $01, $00, $01, $00, $01, $00, $20, $00, $01, $00, $12, $00
-		dc.b	$01, $00, $22, $00, $01, $00, $10, $00, $01, $00, $D1, $03, $00, $10, $D0, $3F
-		dc.b	$CC, $C2, $00, $D0, $03, $01, $0D, $02, $02, $0D, $DD, $02, $02, $0D, $0D, $03
-		dc.b	$01, $DD, $03, $01, $DD, $03, $01, $DD, $02, $01, $10, $02, $03, $0F, $00, $0D
-		dc.b	$03, $11, $DD, $D0, $00, $01, $1C, $1C, $CC, $33, $33, $33, $33, $03, $2F, $FF
-		dc.b	$FF, $31, $DD, $03, $47, $DD, $D0, $00, $53, $3E, $3E, $E9, $00, $21, $21, $25
-		dc.b	$00, $02, $32, $11, $00, $11, $21, $02, $00, $10, $21, $12, $00, $33, $31, $04
-		dc.b	$00, $11, $22, $56, $07, $77, $77, $03, $07, $77, $77, $0C, $00, $21, $21, $0F
-		dc.b	$00, $02, $32, $46, $00, $11, $21, $06, $00, $10, $21, $12, $00, $33, $31, $01
-		dc.b	$00, $11, $22, $22, $07, $77, $77, $77, $0F, $ED, $9D, $D9, $02, $02, $04, $40
-		dc.b	$03, $01, $04, $02, $36, $40, $04, $00, $03, $04, $00, $07, $10, $00, $44, $08
-		dc.b	$76, $53, $33, $00, $88, $8E, $EE, $99, $D9, $D9, $99, $40, $44, $30, $44, $04
-		dc.b	$04, $74, $03, $00, $44, $04, $43, $44, $40, $44, $04, $40, $04, $44, $04, $37
-		dc.b	$77, $77, $73, $EE, $EE, $EE, $EE, $04, $99, $49, $44, $02, $01, $DD, $02, $03
-		dc.b	$D0, $00, $12, $02, $3E, $0D, $13, $01, $0D, $00, $DC, $03, $10, $DD, $00, $06
-		dc.b	$32, $11, $CC, $00, $66, $55, $55, $94, $45, $99, $99, $DD, $01, $CD, $D0, $1D
-		dc.b	$D0, $11, $D0, $1D, $0D, $DC, $0D, $0D, $00, $0D, $DD, $DD, $0D, $DD, $D0, $CC
-		dc.b	$C1, $1C, $CC, $55, $55, $55, $55, $99, $99, $99, $9D, $04, $40, $04, $04, $04
-		dc.b	$40, $04, $40, $02, $36, $40, $40, $44, $40, $40, $00, $04, $40, $44, $44, $37
-		dc.b	$77, $33, $33, $EE, $EE, $EE, $EE, $94, $54, $59, $94, $0D, $11, $1D, $0D, $00
-		dc.b	$D1, $0D, $00, $DD, $0D, $0D, $DC, $DD, $DD, $00, $DC, $D0, $D0, $0D, $0C, $1C
-		dc.b	$C1, $1C, $C0, $55, $55, $55, $55, $07, $66, $55, $54, $04, $7E, $47, $10, $33
-		dc.b	$01, $20, $76, $10, $32, $69, $46, $76, $67, $90, $D3, $06, $54, $D0, $C5, $52
-		dc.b	$CD, $0C, $54, $CD, $00, $0C, $72, $CC, $DD, $00, $11, $55, $44, $1F, $67, $65
-		dc.b	$99, $56, $65, $FC, $00, $76, $63, $CD, $DD, $33, $66, $31, $12, $DC, $26, $63
-		dc.b	$30, $00, $D2, $60, $32, $D0, $DD, $FF, $12, $49, $4F, $DD, $10, $45, $66, $42
-		dc.b	$36, $D1, $36, $66, $66, $C1, $30, $60, $06, $35, $62, $99, $94, $65, $9D, $00
-		dc.b	$0D, $9C, $0D, $DD, $DD, $CF, $92, $0D, $D4, $36, $63, $D0, $D0, $66, $3C, $00
-		dc.b	$10, $63, $10, $0D, $26, $03, $1D, $D1, $70, $66, $31, $13, $03, $94, $65, $36
-		dc.b	$60, $0D, $46, $66, $31, $9E, $23, $53, $10, $00, $03, $02, $0C, $01, $33, $11
-		dc.b	$00, $06, $55, $33, $33, $07, $76, $11, $11, $03, $01, $33, $02, $01, $03, $05
-		dc.b	$18, $93, $00, $30, $01, $D1, $03, $00, $10, $10, $00, $01, $00, $22, $02, $23
-		dc.b	$32, $11, $11, $22, $23, $33, $33, $00, $10, $03, $01, $11, $03, $07, $10, $11
-		dc.b	$CC, $CC, $D2, $00, $DD, $03, $01, $DD, $02, $17, $22, $FF, $FF, $F0, $33, $33
-		dc.b	$33, $33, $11, $11, $C1, $CC, $00, $0D, $DD, $D0, $00, $0D, $D0, $D0, $10, $0D
-		dc.b	$D0, $02, $05, $DD, $D0, $00, $31, $DD, $02, $0C, $03, $2F, $FF, $FF, $33, $33
-		dc.b	$33, $33, $CC, $CC, $CC, $CC, $08, $46, $9E, $EE, $EE, $EE, $00, $21, $21, $22
-		dc.b	$00, $02, $32, $11, $47, $31, $21, $02, $00, $10, $21, $12, $40, $03, $31, $01
-		dc.b	$50, $01, $22, $22, $00, $77, $77, $77, $36, $07, $77, $77, $60, $01, $21, $22
-		dc.b	$66, $01, $32, $11, $64, $57, $21, $02, $5D, $C0, $21, $12, $5C, $C0, $31, $01
-		dc.b	$55, $57, $22, $22, $C5, $00, $77, $77, $92, $77, $0C, $CC, $00, $06, $0F, $01
-		dc.b	$01, $03, $01, $07, $02, $02, $07, $77, $02, $04, $CC, $CB, $0C, $BB, $02, $01
-		dc.b	$06, $13, $01, $06, $03, $02, $07, $77, $02, $02, $CB, $CC, $18, $08, $66, $66
-		dc.b	$66, $00, $66, $66, $AD, $BC, $02, $01, $01, $04, $01, $10, $04, $08, $CC, $CC
-		dc.b	$01, $00, $66, $66, $77, $10, $02, $0A, $17, $70, $66, $66, $67, $00, $CC, $CC
-		dc.b	$CC, $CC, $03, $01, $06, $03, $01, $69, $03, $01, $05, $03, $01, $03, $03, $01
-		dc.b	$06, $02, $02, $06, $95, $02, $02, $6D, $53, $02, $03, $6B, $A9, $60, $03, $02
-		dc.b	$D9, $66, $02, $06, $06, $9C, $60, $00, $04, $53, $02, $06, $02, $CF, $60, $00
-		dc.b	$D9, $66, $02, $0F, $06, $66, $60, $00, $FA, $F3, $E8, $88, $50, $CC, $24, $44
-		dc.b	$06, $C5, $60, $02, $01, $50, $02, $01, $06, $03, $02, $65, $50, $02, $07, $2C
-		dc.b	$C5, $67, $00, $0D, $C3, $67, $02, $0F, $1F, $56, $59, $42, $1D, $10, $30, $06
-		dc.b	$52, $10, $0C, $00, $06, $36, $63, $02, $02, $60, $06, $02, $13, $07, $66, $00
-		dc.b	$07, $61, $01, $07, $61, $00, $07, $93, $30, $66, $66, $C1, $56, $00, $06, $05
-		dc.b	$03, $01, $30, $03, $01, $60, $07, $01, $06, $03, $12, $52, $44, $66, $00, $0D
-		dc.b	$D1, $60, $44, $5C, $DC, $56, $00, $05, $1D, $00, $10, $00, $52, $03, $1D, $06
-		dc.b	$50, $30, $00, $06, $67, $60, $65, $92, $00, $01, $63, $F0, $31, $00, $06, $12
-		dc.b	$30, $50, $70, $01, $03, $00, $10, $01, $03, $00, $27, $71, $02, $14, $21, $00
-		dc.b	$10, $30, $33, $67, $01, $03, $22, $17, $70, $11, $77, $77, $07, $77, $55, $55
-		dc.b	$54, $54, $02, $02, $01, $10, $02, $02, $01, $10, $02, $02, $01, $10, $03, $01
-		dc.b	$01, $03, $02, $11, $33, $02, $03, $01, $10, $33, $02, $07, $32, $2F, $1C, $CC
-		dc.b	$00, $0D, $D0, $05, $07, $10, $0D, $0D, $00, $10, $0D, $DD, $03, $01, $D0, $03
-		dc.b	$0A, $D0, $D0, $11, $00, $0D, $0D, $CC, $DD, $DD, $DD, $18, $48, $DD, $DD, $DD
-		dc.b	$DD, $43, $33, $33, $33, $71, $22, $12, $10, $12, $00, $30, $30, $22, $10, $30
-		dc.b	$00, $23, $21, $00, $30, $63, $31, $33, $00, $66, $22, $21, $10, $30, $77, $77
-		dc.b	$77, $C0, $77, $77, $77, $F0, $12, $12, $10, $67, $30, $30, $30, $61, $10, $30
-		dc.b	$00, $03, $21, $00, $30, $30, $31, $33, $00, $22, $22, $21, $10, $77, $77, $77
-		dc.b	$77, $CC, $CC, $CC, $CC, $04, $01, $60, $07, $01, $C6, $02, $11, $06, $10, $00
-		dc.b	$06, $99, $10, $06, $99, $25, $30, $99, $36, $DC, $96, $9F, $A9, $0F, $02, $22
-		dc.b	$06, $F2, $00, $06, $6F, $24, $06, $9F, $03, $40, $99, $3F, $F1, $00, $24, $C0
-		dc.b	$30, $40, $DD, $60, $00, $04, $66, $00, $31, $01, $AB, $BD, $33, $DC, $54, $44
-		dc.b	$52, $CF, $02, $02, $04, $13, $03, $01, $41, $04, $02, $44, $40, $02, $0D, $12
-		dc.b	$14, $00, $40, $3F, $C2, $44, $00, $96, $69, $BB, $BB, $60, $03, $01, $F6, $03
-		dc.b	$01, $30, $03, $05, $0F, $60, $00, $06, $13, $02, $01, $6D, $02, $24, $06, $D1
-		dc.b	$13, $00, $6D, $1C, $A9, $66, $D1, $C0, $00, $6D, $1C, $FC, $06, $91, $CF, $25
-		dc.b	$69, $4C, $F2, $40, $94, $DF, $24, $44, $4D, $03, $46, $DD, $D6, $01, $6F, $00
-		dc.b	$60, $01, $02, $16, $9A, $C0, $00, $06, $25, $55, $2C, $F6, $40, $04, $01, $2F
-		dc.b	$00, $42, $D2, $02, $00, $0F, $0F, $24, $40, $0F, $02, $34, $D0, $42, $FF, $20
-		dc.b	$00, $04, $26, $45, $F3, $33, $27, $41, $55, $49, $CD, $37, $51, $DD, $C9, $40
-		dc.b	$00, $C4, $55, $50, $52, $57, $01, $C0, $66, $00, $74, $00, $F4, $07, $07, $90
-		dc.b	$0D, $46, $77, $77, $99, $41, $76, $17, $77, $77, $76, $66, $00, $07, $77, $06
-		dc.b	$03, $01, $77, $10, $36, $33, $32, $11, $E3, $21, $23, $0F, $0D, $65, $66, $0F
-		dc.b	$CD, $04, $50, $66, $52, $74, $10, $05, $56, $00, $D0, $0C, $10, $07, $97, $0D
-		dc.b	$47, $00, $70, $04, $70, $27, $71, $66, $72, $C4, $56, $60, $00, $0D, $C4, $66
-		dc.b	$00, $CD, $0D, $36, $00, $31, $00, $10, $00, $63, $D0, $03, $0D, $D0, $00, $01
-		dc.b	$03, $D0, $16, $60, $02, $2F, $05, $30, $00, $03, $03, $03, $03, $00, $01, $05
-		dc.b	$01, $03, $0E, $0B, $4E, $13, $00, $11, $00, $21, $00, $11, $0D, $C2, $23, $02
-		dc.b	$27, $DC, $21, $22, $10, $0D, $CE, $EE, $01, $00, $DD, $D0, $01, $10, $10, $0D
-		dc.b	$01, $11, $10, $00, $1C, $0C, $DD, $02, $0D, $0D, $0D, $10, $11, $11, $C1, $33
-		dc.b	$23, $33, $33, $00, $EF, $FF, $F2, $03, $02, $08, $0D, $20, $D0, $D0, $00, $D0
-		dc.b	$0D, $D0, $02, $01, $10, $02, $02, $0F, $1D, $03, $01, $0D, $03, $01, $0D, $03
-		dc.b	$02, $10, $D0, $02, $02, $0D, $D0, $0A, $09, $5F, $27, $44, $AA, $03, $04, $30
-		dc.b	$00, $08, $04, $01, $31, $02, $07, $07, $80, $40, $E0, $00, $03, $03, $02, $0F
-		dc.b	$78, $10, $00, $07, $70, $34, $00, $33, $DD, $61, $63, $00, $03, $40, $3C, $03
-		dc.b	$01, $8B, $02, $2B, $13, $00, $0E, $04, $08, $70, $00, $30, $30, $10, $00, $01
-		dc.b	$87, $10, $00, $43, $07, $77, $98, $CD, $AA, $CC, $0F, $CF, $06, $00, $CF, $C9
-		dc.b	$C6, $66, $33, $35, $59, $99, $FC, $FC, $95, $55, $9C, $F0, $0C, $31, $41, $02
-		dc.b	$25, $01, $DD, $F0, $00, $FC, $66, $60, $FF, $CC, $06, $60, $F0, $33, $60, $00
-		dc.b	$0F, $FF, $9D, $DD, $CC, $CF, $40, $04, $55, $56, $41, $D9, $99, $99, $40, $C0
-		dc.b	$FC, $C0, $DC, $C0, $FC, $3F, $02, $02, $CD, $23, $02, $16, $31, $10, $00, $0F
-		dc.b	$03, $33, $F0, $0F, $FF, $FF, $69, $99, $99, $99, $66, $65, $55, $54, $FF, $FC
-		dc.b	$CC, $CD, $04, $23, $CF, $00, $DC, $00, $3F, $00, $2C, $DF, $F9, $C0, $FD, $1F
-		dc.b	$94, $30, $C1, $30, $01, $F0, $30, $F0, $41, $CF, $F3, $0D, $D2, $3F, $F0, $02
-		dc.b	$0F, $F0, $FF, $0F, $66, $0F, $DF, $02, $19, $60, $12, $D9, $00, $0F, $31, $40
-		dc.b	$66, $60, $F3, $65, $00, $0D, $FF, $FC, $F0, $C1, $00, $0F, $F0, $C3, $F0, $0F
-		dc.b	$00, $0F, $02, $1C, $CC, $D9, $FD, $CC, $53, $D4, $31, $0C, $42, $C1, $33, $CF
-		dc.b	$01, $33, $F0, $9F, $13, $6F, $9F, $60, $50, $6F, $90, $09, $9F, $FF, $0F, $04
-		dc.b	$02, $80, $88, $0F, $FD, $33, $3E, $CA, $AA, $D0, $00, $65, $56, $2C, $C2, $01
-		dc.b	$C2, $62, $56, $5D, $0D, $07, $06, $0D, $00, $07, $06, $52, $CD, $00, $67, $76
-		dc.b	$52, $00, $02, $17, $76, $70, $12, $10, $07, $77, $77, $00, $07, $06, $66, $77
-		dc.b	$76, $46, $03, $45, $62, $D0, $03, $11, $24, $D4, $66, $34, $40, $21, $56, $05
-		dc.b	$56, $65, $56, $65, $56, $77, $77, $77, $00, $77, $77, $77, $49, $65, $05, $50
-		dc.b	$00, $25, $4C, $15, $4C, $44, $D0, $D1, $55, $4D, $0D, $D1, $30, $2F, $F2, $45
-		dc.b	$67, $66, $66, $76, $61, $00, $55, $16, $32, $96, $53, $67, $00, $D3, $06, $01
-		dc.b	$00, $13, $00, $73, $01, $56, $07, $13, $33, $07, $62, $22, $22, $61, $31, $DD
-		dc.b	$DD, $33, $1D, $D0, $00, $52, $2C, $1C, $CC, $00, $03, $08, $0A, $30, $00, $07
-		dc.b	$66, $12, $22, $06, $55, $32, $33, $02, $04, $10, $11, $01, $30, $02, $0A, $53
-		dc.b	$31, $11, $1C, $01, $11, $00, $0D, $00, $11, $03, $18, $01, $11, $11, $22, $22
-		dc.b	$22, $22, $33, $3E, $33, $22, $11, $0D, $0D, $10, $01, $10, $0D, $D1, $1D, $1D
-		dc.b	$DD, $02, $0D, $02, $1F, $D0, $00, $DD, $0D, $10, $11, $C1, $C1, $33, $22, $33
-		dc.b	$33, $31, $11, $33, $22, $1D, $03, $11, $D0, $D0, $00, $0D, $DD, $D0, $3C, $00
-		dc.b	$D0, $D0, $0D, $D0, $06, $07, $1D, $D0, $D0, $00, $D0, $D0, $D0, $02, $01, $0D
-		dc.b	$03, $01, $0D, $06, $06, $EE, $EE, $92, $7A, $21, $22, $02, $1C, $32, $00, $73
-		dc.b	$4E, $22, $10, $18, $10, $23, $21, $06, $33, $30, $31, $30, $84, $22, $22, $21
-		dc.b	$71, $77, $77, $77, $7B, $3E, $B0, $77, $77, $02, $28, $11, $22, $E4, $37, $02
-		dc.b	$11, $01, $81, $21, $02, $33, $63, $21, $12, $48, $03, $31, $01, $17, $11, $22
-		dc.b	$22, $B7, $77, $77, $77, $70, $07, $77, $77, $00, $77, $77, $77, $00, $17, $0C
-		dc.b	$CC, $00, $01, $07, $01, $10, $03, $01, $01, $02, $02, $70, $70, $02, $0C, $77
-		dc.b	$70, $7B, $BB, $77, $77, $77, $77, $CC, $CC, $CC, $CC, $14, $0C, $CB, $BB, $BB
-		dc.b	$BB, $07, $77, $77, $77, $CC, $CC, $CC, $CC, $14, $0B, $BB, $BB, $BC, $CC, $77
-		dc.b	$77, $70, $60, $CC, $CC, $06, $0C, $01, $10, $02, $01, $01, $04, $13, $70, $BB
-		dc.b	$BB, $77, $CC, $21, $22, $15, $A0, $32, $00, $30, $00, $22, $10, $30, $0C, $23
-		dc.b	$21, $02, $10, $30, $31, $33, $00, $22, $22, $21, $10, $77, $77, $77, $7C, $CC
-		dc.b	$CC, $CC, $C0, $1C, $0E, $11, $11, $11, $11, $06, $66, $66, $66, $05, $67, $77
-		dc.b	$77, $00, $31, $03, $02, $43, $10, $02, $02, $64, $31, $02, $03, $06, $43, $10
-		dc.b	$02, $0E, $64, $31, $03, $11, $17, $30, $66, $66, $66, $66, $77, $77, $76, $50
-		dc.b	$02, $10, $13, $57, $00, $01, $35, $70, $00, $13, $57, $00, $01, $35, $70, $00
-		dc.b	$23, $57, $02, $0E, $33, $61, $11, $11, $66, $66, $66, $66, $15, $67, $77, $77
-		dc.b	$64, $31, $02, $03, $06, $43, $10, $02, $02, $64, $31, $02, $03, $06, $43, $10
-		dc.b	$02, $0D, $64, $31, $11, $11, $17, $33, $66, $66, $66, $00, $77, $77, $76, $03
-		dc.b	$01, $13, $02, $02, $01, $35, $02, $09, $13, $57, $00, $01, $35, $70, $00, $23
-		dc.b	$57, $02, $04, $30, $70, $00, $12, $05, $01, $10, $03, $01, $31, $03, $02, $43
-		dc.b	$10, $02, $02, $64, $31, $02, $03, $06, $43, $10, $02, $06, $64, $31, $12, $00
-		dc.b	$06, $40, $03, $01, $73, $02, $02, $01, $35, $02, $10, $13, $57, $00, $01, $35
-		dc.b	$70, $00, $13, $57, $00, $01, $35, $70, $00, $23, $57, $02, $02, $05, $70, $02
-		dc.b	$01, $55, $03, $02, $10, $10, $02, $02, $64, $31, $02, $03, $06, $43, $10, $02
-		dc.b	$02, $64, $31, $02, $03, $06, $43, $10, $02, $02, $64, $31, $02, $02, $06, $33
-		dc.b	$06, $01, $01, $03, $01, $13, $02, $02, $01, $35, $02, $09, $13, $57, $00, $01
-		dc.b	$35, $70, $00, $23, $57, $02, $81, $04, $05, $DA, $AA, $B8, $55, $03, $32, $22
-		dc.b	$10, $B1, $1D, $D0, $C4, $39, $D0, $D0, $0E, $43, $4D, $DD, $00, $34, $39, $0D
-		dc.b	$00, $0E, $43, $4D, $00, $D0, $E4, $34, $02, $22, $2C, $40, $22, $23, $30, $73
-		dc.b	$0D, $D1, $1B, $35, $DD, $0D, $93, $5D, $01, $D4, $35, $F0, $DC, $93, $52, $00
-		dc.b	$04, $35, $F0, $00, $A3, $5F, $0D, $00, $05, $78, $84, $46, $55, $0C, $C7, $76
-		dc.b	$10, $17, $71, $10, $64, $3A, $13, $30, $0A, $43, $B1, $10, $C7, $D4, $39, $23
-		dc.b	$00, $1C, $43, $B0, $00, $03, $F4, $38, $00, $12, $2D, $40, $71, $11, $11, $73
-		dc.b	$00, $03, $3B, $35, $00, $30, $83, $52, $11, $28, $35, $FD, $32, $A3, $5C, $33
-		dc.b	$18, $35, $E1, $01, $A3, $52, $12, $11, $05, $CE, $33, $10, $55, $11, $11, $11
-		dc.b	$10, $BF, $F2, $30, $34, $34, $0D, $C0, $DE, $43, $4D, $F0, $33, $D4, $39, $32
-		dc.b	$01, $2E, $43, $8D, $13, $1D, $E4, $34, $12, $3E, $3D, $40, $11, $11, $11, $73
-		dc.b	$03, $2F, $FB, $35, $0C, $D0, $43, $52, $0F, $D4, $35, $FD, $23, $93, $5C, $33
-		dc.b	$D8, $35, $F2, $10, $73, $5F, $D1, $31, $05, $C3, $E3, $26, $55, $11, $11, $17
-		dc.b	$10, $B3, $30, $00, $94, $38, $03, $00, $7E, $43, $82, $11, $33, $D4, $3A, $23
-		dc.b	$10, $1F, $43, $81, $11, $21, $94, $39, $76, $48, $F6, $40, $67, $7C, $C0, $73
-		dc.b	$01, $17, $71, $35, $03, $31, $A3, $57, $01, $1B, $35, $B0, $32, $93, $5C, $7C
-		dc.b	$0B, $35, $D1, $00, $B3, $5E, $30, $00, $30, $79, $9A, $DE, $03, $01, $44, $02
-		dc.b	$02, $01, $01, $02, $09, $13, $57, $00, $01, $35, $70, $00, $13, $57, $02, $02
-		dc.b	$35, $70, $02, $01, $57, $02, $02, $05, $70, $02, $01, $36, $03, $02, $43, $10
-		dc.b	$02, $02, $64, $31, $02, $03, $06, $43, $10, $02, $02, $64, $31, $02, $03, $06
-		dc.b	$43, $10, $02, $02, $64, $32, $02, $02, $06, $40, $03, $01, $44, $02, $02, $01
-		dc.b	$01, $02, $10, $13, $57, $00, $01, $35, $70, $00, $13, $57, $00, $01, $35, $70
-		dc.b	$00, $13, $57, $02, $05, $05, $70, $00, $12, $36, $03, $02, $43, $10, $02, $02
-		dc.b	$64, $31, $02, $03, $06, $43, $10, $02, $02, $64, $31, $02, $02, $06, $43, $03
-		dc.b	$06, $64, $00, $12, $00, $06, $70, $03, $01, $44, $02, $02, $01, $01, $02, $17
-		dc.b	$13, $57, $00, $01, $35, $70, $00, $13, $57, $00, $03, $03, $61, $11, $66, $66
-		dc.b	$66, $66, $60, $77, $77, $77, $36, $03, $02, $43, $10, $02, $02, $64, $31, $02
-		dc.b	$03, $06, $43, $10, $02, $0F, $64, $31, $00, $11, $17, $30, $11, $66, $66, $66
-		dc.b	$66, $77, $77, $77, $15, $03, $01, $44, $02, $02, $01, $01, $02, $17, $13, $57
-		dc.b	$00, $01, $35, $70, $00, $13, $57, $00, $11, $03, $61, $11, $66, $66, $66, $66
-		dc.b	$60, $77, $77, $65, $36, $03, $02, $43, $10, $02, $02, $64, $31, $02, $03, $06
-		dc.b	$43, $10, $02, $53, $64, $31, $00, $11, $17, $30, $00, $66, $66, $66, $65, $DF
-		dc.b	$2F, $22, $15, $00, $D0, $D0, $44, $00, $0D, $D4, $01, $01, $0D, $43, $52, $00
-		dc.b	$09, $35, $20, $63, $93, $5F, $0D, $0B, $35, $D1, $C1, $D3, $5B, $65, $55, $05
-		dc.b	$F9, $45, $46, $36, $00, $0C, $00, $43, $9D, $DD, $00, $34, $39, $D0, $10, $D3
-		dc.b	$43, $90, $00, $0D, $34, $39, $36, $11, $CC, $43, $B0, $55, $56, $A4, $3E, $07
-		dc.b	$65, $5E, $40, $00, $03, $01, $44, $02, $06, $08, $01, $DA, $BB, $80, $36, $04
-		dc.b	$1C, $33, $33, $33, $33, $44, $44, $44, $44, $11, $11, $11, $11, $60, $2F, $FE
-		dc.b	$EC, $36, $D0, $11, $00, $43, $91, $01, $00, $73, $08, $88, $8A, $04, $1C, $33
-		dc.b	$33, $33, $33, $44, $44, $44, $44, $11, $11, $11, $11, $DE, $FF, $22, $15, $00
-		dc.b	$0D, $D0, $44, $00, $1C, $14, $01, $B8, $88, $80, $36, $04, $1C, $33, $33, $33
-		dc.b	$33, $44, $44, $44, $44, $11, $11, $11, $11, $60, $22, $FF, $ED, $36, $0D, $D0
-		dc.b	$00, $43, $41, $C1, $00, $73, $08, $88, $8B, $04, $1C, $33, $33, $33, $33, $44
-		dc.b	$44, $44, $44, $11, $11, $11, $11, $CE, $EF, $F8, $15, $00, $11, $07, $44, $00
-		dc.b	$10, $19, $01, $A8, $88, $80, $36, $04, $16, $33, $33, $33, $33, $44, $44, $44
-		dc.b	$44, $11, $11, $11, $11, $60, $FE, $ED, $CB, $36, $10, $30, $00, $43, $80, $02
-		dc.b	$04, $73, $08, $BB, $AD, $04, $10, $33, $33, $33, $33, $44, $44, $44, $44, $11
-		dc.b	$11, $11, $11, $65, $77, $77, $15, $03, $01, $44, $02, $06, $01, $01, $03, $11
-		dc.b	$10, $36, $04, $11, $33, $33, $33, $33, $44, $44, $44, $44, $11, $11, $11, $11
-		dc.b	$60, $77, $77, $77, $36, $03, $02, $43, $10, $02, $04, $73, $01, $11, $11, $04
-		dc.b	$10, $33, $33, $33, $33, $44, $44, $44, $44, $11, $11, $11, $11, $77, $77, $77
-		dc.b	$15, $03, $01, $44, $02, $06, $01, $01, $11, $11, $10, $36, $04, $11, $33, $33
-		dc.b	$33, $33, $44, $44, $44, $44, $11, $11, $11, $11, $60, $77, $77, $65, $36, $03
-		dc.b	$02, $43, $10, $02, $03, $73, $01, $11, $05, $11, $33, $33, $33, $30, $44, $44
-		dc.b	$44, $44, $11, $11, $11, $11, $60, $77, $77, $77, $36, $03, $02, $43, $10, $02
-		dc.b	$02, $64, $31, $02, $03, $06, $43, $10, $02, $02, $64, $31, $02, $03, $06, $43
-		dc.b	$11, $02, $02, $64, $33, $02, $02, $06, $40, $03, $01, $44, $02, $02, $01, $01
-		dc.b	$02, $10, $13, $57, $00, $01, $35, $70, $00, $13, $57, $00, $11, $35, $70, $00
-		dc.b	$03, $57, $02, $80, $84, $D9, $CC, $CB, $BA, $00, $16, $77, $71, $00, $33, $16
-		dc.b	$77, $00, $10, $23, $16, $00, $10, $21, $33, $00, $33, $31, $01, $00, $11, $22
-		dc.b	$23, $07, $77, $77, $77, $66, $65, $55, $55, $11, $13, $33, $00, $77, $71, $11
-		dc.b	$33, $77, $77, $77, $66, $11, $16, $77, $77, $33, $30, $11, $10, $22, $21, $11
-		dc.b	$10, $77, $77, $77, $77, $55, $55, $56, $66, $00, $33, $31, $11, $33, $11, $17
-		dc.b	$77, $66, $77, $77, $77, $07, $77, $61, $11, $00, $11, $03, $33, $00, $11, $12
-		dc.b	$22, $07, $77, $77, $77, $77, $70, $07, $77, $07, $77, $61, $10, $77, $61, $32
-		dc.b	$00, $61, $33, $32, $30, $33, $31, $30, $30, $30, $33, $33, $00, $12, $20, $12
-		dc.b	$10, $77, $77, $77, $77, $E9, $33, $33, $98, $0D, $01, $A0, $02, $02, $01, $A0
-		dc.b	$03, $04, $A0, $00, $A0, $07, $02, $02, $01, $01, $04, $03, $1A, $00, $0A, $02
-		dc.b	$01, $A0, $02, $06, $70, $A0, $A0, $01, $11, $A0, $02, $06, $07, $00, $A0, $01
-		dc.b	$11, $10, $02, $06, $10, $7A, $00, $01, $16, $6A, $0C, $01, $A0, $03, $04, $A0
-		dc.b	$00, $07, $1A, $02, $02, $07, $1A, $12, $01, $01, $03, $01, $01, $2C, $05, $0A
-		dc.b	$00, $DC, $CB, $AA, $05, $01, $A0, $07, $03, $0A, $00, $A0, $03, $04, $A0, $00
-		dc.b	$10, $A0, $03, $01, $0A, $02, $06, $76, $67, $DD, $DD, $70, $11, $03, $09, $11
-		dc.b	$10, $00, $07, $11, $10, $00, $07, $11, $02, $02, $07, $01, $02, $0A, $06, $01
-		dc.b	$10, $00, $76, $01, $10, $00, $77, $01, $02, $02, $07, $01, $02, $02, $07, $01
-		dc.b	$02, $02, $77, $11, $02, $07, $77, $11, $10, $00, $70, $11, $10, $02, $01, $11
-		dc.b	$02, $02, $11, $10, $02, $02, $01, $10, $02, $02, $07, $11, $02, $2B, $07, $11
-		dc.b	$10, $00, $07, $01, $10, $00, $07, $71, $10, $00, $07, $71, $10, $00, $06, $71
-		dc.b	$10, $00, $06, $71, $10, $00, $07, $71, $10, $00, $07, $71, $10, $00, $07, $71
-		dc.b	$10, $00, $07, $61, $10, $00, $07, $11, $10, $02, $05, $01, $10, $00, $01, $01
-		dc.b	$03, $01, $10, $02, $06, $11, $16, $11, $11, $00, $07, $02, $07, $07, $00, $70
-		dc.b	$00, $07, $00, $70, $02, $02, $70, $70, $02, $11, $70, $77, $00, $70, $00, $77
-		dc.b	$00, $70, $00, $70, $70, $70, $70, $00, $70, $70, $70, $03, $02, $70, $70, $02
-		dc.b	$02, $70, $70, $03, $08, $70, $00, $70, $70, $70, $00, $70, $70, $02, $1A, $11
-		dc.b	$11, $11, $11, $44, $66, $45, $AA, $22, $02, $1F, $00, $02, $01, $FF, $F0, $32
-		dc.b	$2F, $F1, $3E, $00, $1F, $12, $02, $30, $0F, $02, $16, $20, $10, $E2, $02, $00
-		dc.b	$2F, $01, $31, $EC, $C0, $FF, $F1, $00, $E3, $1F, $01, $00, $20, $21, $0F, $00
-		dc.b	$20, $02, $20, $F0, $E3, $3E, $0F, $00, $0F, $F0, $00, $F0, $0F, $00, $F1, $FF
-		dc.b	$01, $FF, $02, $30, $F1, $00, $02, $23, $00, $01, $10, $00, $31, $10, $02, $10
-		dc.b	$02, $22, $22, $02, $16, $02, $31, $10, $02, $31, $01, $20, $31, $01, $32, $02
-		dc.b	$01, $32, $22, $67, $45, $77, $57, $30, $00, $20, $02, $03, $0A, $22, $20, $22
-		dc.b	$22, $20, $23, $33, $13, $02, $30, $02, $10, $22, $00, $33, $33, $33, $11, $20
-		dc.b	$02, $11, $11, $22, $01, $11, $33, $00, $30, $03, $0A, $30, $33, $22, $20, $56
-		dc.b	$50, $66, $66, $11, $05, $03, $07, $11, $00, $01, $11, $11, $11, $10, $02, $16
-		dc.b	$55, $77, $56, $66, $02, $22, $30, $30, $02, $22, $33, $03, $20, $00, $20, $00
-		dc.b	$23, $11, $20, $22, $33, $33, $02, $01, $30, $03, $28, $22, $20, $22, $00, $12
-		dc.b	$22, $21, $11, $30, $00, $33, $03, $00, $20, $30, $30, $02, $00, $22, $22, $22
-		dc.b	$22, $02, $00, $22, $22, $20, $20, $20, $22, $00, $20, $00, $22, $22, $00, $22
-		dc.b	$00, $77, $76, $02, $14, $11, $00, $22, $00, $10, $01, $00, $07, $06, $77, $76
-		dc.b	$61, $16, $77, $11, $01, $11, $77, $11, $10, $02, $1D, $76, $77, $70, $77, $67
-		dc.b	$70, $26, $66, $10, $72, $03, $03, $00, $02, $00, $30, $77, $00, $20, $00, $21
-		dc.b	$11, $13, $02, $33, $33, $33, $02, $30, $02, $09, $22, $00, $02, $22, $00, $DC
-		dc.b	$8C, $AE, $F8, $08, $08, $66, $52, $41, $71, $66, $52, $41, $71, $08, $0C, $66
-		dc.b	$52, $41, $71, $8A, $FE, $EF, $8B, $30, $00, $20, $02, $03, $0A, $22, $20, $22
-		dc.b	$22, $20, $23, $33, $13, $02, $30, $02, $18, $22, $00, $33, $33, $33, $11, $20
-		dc.b	$02, $11, $20, $02, $01, $11, $20, $00, $33, $33, $00, $02, $30, $00, $22, $22
-		dc.b	$20, $02, $08, $32, $20, $22, $30, $30, $00, $22, $30, $02, $01, $22, $05, $18
-		dc.b	$22, $03, $11, $02, $22, $30, $30, $02, $22, $33, $03, $20, $00, $20, $00, $23
-		dc.b	$11, $20, $22, $33, $33, $00, $02, $30, $02, $1F, $02, $22, $20, $22, $00, $12
-		dc.b	$22, $21, $11, $30, $00, $33, $03, $00, $20, $30, $30, $02, $00, $22, $22, $22
-		dc.b	$22, $22, $00, $20, $00, $22, $00, $02, $22, $02, $01, $20, $03, $04, $22, $02
-		dc.b	$21, $11, $02, $05, $33, $33, $00, $02, $30, $02, $0C, $20, $22, $22, $03, $31
-		dc.b	$11, $00, $33, $33, $33, $02, $30, $03, $0C, $22, $22, $20, $20, $12, $00, $23
-		dc.b	$33, $30, $00, $33, $33, $02, $01, $30, $02, $0C, $22, $02, $22, $03, $33, $31
-		dc.b	$00, $33, $33, $33, $00, $30, $03, $1C, $02, $22, $22, $00, $75, $75, $44, $BB
-		dc.b	$00, $22, $10, $FF, $22, $20, $23, $11, $33, $32, $00, $22, $10, $12, $00, $02
-		dc.b	$23, $20, $00, $2E, $03, $19, $10, $32, $00, $02, $FF, $12, $33, $30, $C3, $13
-		dc.b	$01, $12, $00, $13, $32, $20, $00, $22, $3C, $C3, $32, $CE, $F0, $0F, $F1, $03
-		dc.b	$01, $0F, $03, $1D, $FF, $EE, $F0, $FF, $11, $22, $3C, $11, $00, $02, $20, $22
-		dc.b	$22, $21, $13, $33, $32, $23, $31, $10, $01, $22, $02, $23, $33, $10, $20, $02
-		dc.b	$22, $02, $11, $02, $22, $01, $02, $00, $23, $56, $55, $01, $33, $30, $00, $11
-		dc.b	$10, $22, $00, $10, $03, $46, $70, $00, $21, $11, $26, $57, $30, $03, $30, $01
-		dc.b	$30, $33, $33, $21, $21, $21, $22, $00, $67, $07, $76, $66, $10, $70, $10, $10
-		dc.b	$00, $77, $11, $01, $77, $00, $77, $77, $76, $66, $66, $07, $10, $00, $01, $77
-		dc.b	$10, $10, $10, $70, $76, $76, $77, $77, $76, $77, $21, $66, $11, $00, $30, $30
-		dc.b	$10, $00, $33, $03, $00, $07, $22, $00, $11, $16, $67, $55, $02, $04, $10, $07
-		dc.b	$01, $01, $02, $0B, $10, $10, $00, $70, $65, $57, $01, $66, $30, $00, $10, $02
-		dc.b	$09, $20, $00, $11, $22, $07, $11, $00, $76, $60, $02, $04, $01, $10, $00, $70
-		dc.b	$04, $0A, $77, $77, $77, $07, $67, $77, $66, $66, $10, $71, $03, $10, $01, $00
-		dc.b	$11, $77, $00, $11, $00, $76, $61, $11, $00, $11, $11, $11, $00, $10, $02, $29
-		dc.b	$77, $70, $07, $77, $00, $61, $70, $21, $11, $01, $00, $30, $30, $10, $00, $33
-		dc.b	$03, $55, $00, $22, $22, $03, $11, $11, $00, $30, $03, $03, $00, $33, $00, $30
-		dc.b	$00, $22, $12, $22, $00, $33, $33, $33, $33, $1C, $04, $11, $33, $11, $22, $02
-		dc.b	$14, $33, $03, $22, $00, $30, $30, $00, $02, $01, $22, $21, $13, $31, $22, $33
-		dc.b	$03, $33, $22, $33, $30, $02, $1D, $21, $22, $20, $22, $12, $20, $23, $33, $30
-		dc.b	$22, $03, $03, $00, $02, $00, $30, $22, $00, $20, $00, $21, $11, $13, $02, $33
-		dc.b	$33, $33, $02, $30, $02, $30, $22, $00, $02, $22, $00, $30, $22, $21, $11, $30
-		dc.b	$20, $30, $30, $00, $22, $33, $03, $22, $00, $22, $22, $21, $11, $11, $00, $30
-		dc.b	$00, $03, $00, $30, $30, $30, $00, $21, $21, $22, $00, $12, $00, $21, $12, $30
-		dc.b	$00, $33, $30, $22, $00, $30, $05, $18, $21, $11, $03, $02, $30, $03, $30, $01
-		dc.b	$30, $33, $33, $21, $21, $21, $22, $00, $12, $00, $21, $11, $30, $00, $30, $30
-		dc.b	$02, $2F, $33, $03, $02, $00, $22, $22, $01, $11, $11, $00, $30, $03, $03, $00
-		dc.b	$33, $00, $30, $00, $22, $12, $22, $00, $12, $20, $21, $11, $30, $00, $33, $33
-		dc.b	$00, $20, $30, $00, $22, $02, $02, $22, $02, $20, $02, $00, $22, $22, $22, $00
-		dc.b	$20, $07, $0D, $BB, $45, $75, $45, $00, $F1, $22, $02, $00, $F0, $00, $10, $0F
-		dc.b	$02, $0E, $22, $F0, $01, $00, $02, $11, $10, $20, $23, $22, $22, $02, $1F, $C2
-		dc.b	$03, $07, $C2, $23, $30, $3C, $00, $20, $02, $02, $02, $01, $10, $02, $0B, $02
-		dc.b	$20, $00, $23, $CC, $32, $00, $EF, $00, $F1, $22, $02, $02, $0F, $10, $04, $08
-		dc.b	$EF, $EE, $CE, $0E, $21, $00, $01, $F0, $04, $2A, $20, $02, $20, $F0, $20, $20
-		dc.b	$00, $0F, $02, $00, $23, $33, $20, $02, $33, $32, $22, $31, $FF, $FE, $57, $44
-		dc.b	$9A, $AA, $02, $22, $30, $30, $02, $22, $33, $03, $20, $00, $20, $00, $23, $11
-		dc.b	$20, $22, $33, $33, $02, $01, $30, $03, $0D, $22, $20, $22, $00, $12, $05, $76
-		dc.b	$66, $30, $00, $10, $00, $30, $02, $08, $11, $30, $67, $61, $00, $44, $06, $61
-		dc.b	$03, $01, $01, $02, $36, $11, $10, $00, $11, $00, $77, $00, $10, $77, $76, $11
-		dc.b	$10, $07, $11, $11, $10, $07, $10, $00, $10, $67, $77, $07, $01, $01, $66, $07
-		dc.b	$10, $00, $10, $07, $10, $01, $01, $70, $76, $67, $77, $00, $77, $00, $76, $66
-		dc.b	$07, $77, $10, $10, $07, $77, $11, $01, $70, $00, $77, $02, $0A, $77, $70, $77
-		dc.b	$00, $77, $70, $20, $07, $00, $22, $02, $32, $07, $22, $20, $67, $77, $21, $11
-		dc.b	$10, $02, $33, $33, $10, $02, $30, $00, $67, $70, $22, $02, $21, $11, $11, $02
-		dc.b	$30, $00, $30, $02, $30, $03, $03, $20, $21, $12, $22, $00, $20, $00, $21, $11
-		dc.b	$20, $00, $33, $33, $00, $02, $30, $00, $22, $22, $20, $02, $08, $32, $20, $22
-		dc.b	$30, $30, $00, $22, $30, $02, $01, $22, $04, $04, $11, $11, $11, $33, $1C, $0F
-		dc.b	$11, $33, $12, $22, $02, $22, $30, $30, $57, $55, $33, $03, $33, $32, $55, $02
-		dc.b	$03, $01, $22, $52, $02, $02, $10, $27, $05, $27, $11, $01, $02, $56, $75, $65
-		dc.b	$44, $30, $00, $33, $03, $00, $20, $30, $30, $02, $00, $22, $22, $22, $22, $22
-		dc.b	$20, $20, $00, $02, $20, $22, $22, $20, $00, $77, $77, $00, $02, $55, $75, $21
-		dc.b	$13, $02, $14, $33, $33, $00, $02, $35, $55, $00, $27, $52, $23, $03, $52, $21
-		dc.b	$10, $36, $20, $10, $00, $30, $01, $02, $0D, $52, $00, $11, $10, $20, $23, $01
-		dc.b	$01, $22, $00, $21, $00, $22, $02, $09, $02, $10, $20, $20, $00, $01, $02, $20
-		dc.b	$20, $02, $01, $02, $04, $11, $02, $01, $02, $02, $31, $30, $02, $02, $56, $01
-		dc.b	$11, $22, $60, $20, $00, $10, $25, $02, $23, $01, $20, $01, $00, $13, $02, $22
-		dc.b	$33, $20, $00, $23, $33, $20, $00, $EF, $FF, $E3, $22, $CE, $EC, $C3, $20, $02
-		dc.b	$22, $33, $32, $02, $3E, $FF, $01, $21, $F0, $00, $F0, $0F, $03, $01, $10, $02
-		dc.b	$04, $F0, $0F, $00, $FF, $02, $01, $FF, $03, $09, $13, $11, $00, $10, $12, $20
-		dc.b	$00, $21, $F1, $04, $28, $02, $00, $21, $F0, $00, $11, $EF, $01, $00, $02, $FF
-		dc.b	$02, $00, $20, $00, $30, $00, $02, $FF, $33, $33, $22, $FE, $13, $31, $22, $00
-		dc.b	$22, $22, $01, $12, $21, $00, $2F, $22, $10, $20, $1E, $01, $01, $02, $1C, $30
-		dc.b	$12, $00, $0E, $01, $20, $00, $1F, $11, $CC, $CC, $10, $1F, $00, $0F, $13, $FF
-		dc.b	$F0, $00, $20, $E3, $3F, $00, $20, $20, $03, $0F, $12, $03, $34, $FE, $20, $03
-		dc.b	$00, $0E, $E3, $30, $FC, $01, $A6, $46, $66, $A5, $30, $20, $30, $30, $00, $22
-		dc.b	$33, $03, $22, $00, $22, $22, $21, $11, $11, $00, $30, $00, $03, $00, $30, $30
-		dc.b	$30, $00, $21, $21, $22, $00, $12, $00, $21, $12, $30, $00, $33, $30, $22, $00
-		dc.b	$30, $05, $14, $21, $11, $03, $02, $30, $03, $30, $01, $30, $33, $33, $21, $21
-		dc.b	$21, $22, $00, $22, $00, $77, $76, $02, $14, $11, $00, $22, $00, $10, $01, $00
-		dc.b	$22, $56, $77, $21, $33, $31, $22, $33, $03, $33, $22, $33, $30, $02, $1D, $21
-		dc.b	$22, $20, $22, $67, $00, $05, $54, $10, $00, $71, $10, $00, $07, $10, $11, $77
-		dc.b	$00, $11, $00, $76, $61, $11, $00, $11, $11, $11, $00, $10, $02, $0B, $77, $00
-		dc.b	$07, $77, $00, $11, $17, $66, $66, $01, $11, $02, $16, $10, $01, $00, $11, $77
-		dc.b	$77, $61, $00, $76, $66, $61, $10, $10, $00, $01, $01, $00, $01, $10, $11, $11
-		dc.b	$10, $02, $19, $10, $07, $56, $66, $10, $72, $03, $03, $00, $02, $00, $30, $77
-		dc.b	$00, $20, $00, $21, $11, $13, $02, $33, $33, $33, $02, $30, $02, $09, $22, $00
-		dc.b	$02, $22, $00, $11, $13, $33, $33, $1C, $77, $CB, $BB, $BB, $BB, $00, $21, $21
-		dc.b	$12, $00, $31, $3B, $13, $00, $11, $B0, $13, $00, $20, $00, $33, $00, $33, $B0
-		dc.b	$33, $00, $12, $10, $12, $07, $77, $7D, $A7, $77, $77, $77, $A7, $12, $12, $11
-		dc.b	$20, $31, $33, $32, $3A, $32, $13, $32, $30, $33, $91, $30, $30, $33, $03, $33
-		dc.b	$03, $1B, $00, $12, $B0, $A0, $0A, $7A, $30, $DA, $AA, $DA, $99, $00, $21, $8A
-		dc.b	$22, $00, $02, $30, $81, $D0, $11, $B0, $02, $00, $10, $00, $82, $00, $38, $00
-		dc.b	$01, $00, $10, $0A, $28, $77, $7D, $0A, $A0, $D7, $77, $AA, $AA, $21, $22, $12
-		dc.b	$10, $3B, $00, $30, $30, $20, $10, $30, $00, $20, $91, $00, $30, $B0, $01, $33
-		dc.b	$02, $1D, $02, $21, $10, $30, $D7, $A7, $77, $9A, $77, $A7, $D7, $21, $22, $12
-		dc.b	$00, $32, $00, $38, $00, $22, $10, $30, $0A, $23, $21, $B0, $30, $30, $31, $02
-		dc.b	$0B, $22, $22, $00, $03, $77, $77, $D0, $00, $DD, $ED, $70, $02, $06, $40, $20
-		dc.b	$04, $D3, $03, $80, $02, $03, $44, $00, $01, $02, $08, $73, $00, $03, $00, $04
-		dc.b	$00, $D0, $04, $04, $0C, $01, $40, $70, $99, $D6, $75, $00, $12, $A0, $30, $03
-		dc.b	$B3, $03, $07, $03, $03, $00, $04, $3B, $30, $40, $04, $04, $10, $40, $00, $04
-		dc.b	$04, $27, $67, $D9, $39, $DD, $0A, $2A, $81, $22, $00, $80, $32, $11, $00, $90
-		dc.b	$21, $02, $00, $18, $21, $12, $3A, $33, $31, $01, $00, $11, $22, $22, $00, $A7
-		dc.b	$77, $77, $EA, $A7, $7D, $DE, $00, $21, $2B, $02, $0A, $02, $32, $03, $00, $11
-		dc.b	$21, $03, $00, $10, $28, $02, $09, $33, $30, $30, $00, $11, $80, $04, $07, $77
-		dc.b	$02, $05, $ED, $DE, $76, $40, $03, $02, $06, $10, $40, $30, $01, $01, $04, $03
-		dc.b	$03, $01, $44, $01, $03, $01, $10, $02, $01, $10, $03, $01, $01, $02, $0A, $11
-		dc.b	$11, $51, $11, $00, $10, $40, $00, $01, $11, $04, $01, $10, $02, $01, $10, $04
-		dc.b	$01, $01, $09, $08, $56, $66, $CC, $DD, $43, $00, $12, $10, $02, $05, $30, $30
-		dc.b	$00, $08, $30, $02, $33, $01, $00, $30, $03, $01, $33, $00, $40, $A2, $21, $10
-		dc.b	$00, $77, $77, $77, $9A, $77, $DD, $EE, $21, $22, $B0, $30, $32, $00, $38, $00
-		dc.b	$22, $10, $30, $83, $26, $32, $13, $38, $00, $70, $01, $13, $17, $00, $01, $10
-		dc.b	$77, $07, $01, $11, $AA, $BB, $CC, $CC, $04, $02, $40, $10, $02, $02, $04, $01
-		dc.b	$02, $14, $BB, $EE, $FF, $FF, $33, $11, $11, $00, $33, $00, $11, $00, $23, $33
-		dc.b	$11, $00, $CD, $DD, $EF, $EE, $03, $01, $04, $02, $36, $10, $40, $00, $01, $04
-		dc.b	$03, $FF, $FE, $EA, $B8, $00, $11, $11, $33, $00, $11, $00, $33, $00, $11, $33
-		dc.b	$32, $A9, $22, $11, $10, $00, $21, $21, $22, $3A, $02, $32, $11, $00, $11, $21
-		dc.b	$02, $81, $22, $32, $40, $31, $10, $07, $00, $01, $10, $00, $71, $11, $10, $70
-		dc.b	$77, $00, $15, $69, $0D, $00, $15, $00, $97, $00, $14, $00, $97, $00, $01, $60
-		dc.b	$00, $60, $02, $35, $02, $00, $03, $00, $01, $00, $01, $00, $11, $00, $11, $00
-		dc.b	$11, $00, $11, $00, $01, $00, $01, $00, $01, $00, $11, $00, $01, $00, $11, $00
-		dc.b	$11, $00, $01, $00, $11, $00, $7C, $00, $7C, $00, $7E, $00, $7C, $00, $7E, $00
-		dc.b	$01, $00, $7C, $00, $03, $00, $02, $00, $7E, $03, $81, $86, $76, $00, $09, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08, $13, $08, $13, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08, $17, $08, $17, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08, $13, $08, $13, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08, $35, $08, $35, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08, $17, $08, $17, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08, $13, $00, $12, $00
-		dc.b	$10, $00, $10, $00, $11, $00, $11, $00, $10, $00, $10, $88, $18, $80, $19, $00
-		dc.b	$37, $00, $10, $08, $36, $08, $11, $00, $10, $00, $37, $00, $32, $00, $15, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00
-		dc.b	$10, $00, $10, $00, $12, $08, $17, $00, $10, $08, $15, $08, $71, $08, $71, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $88, $77, $88, $5C, $00
-		dc.b	$01, $00, $10, $80, $43, $80, $79, $00, $10, $00, $10, $00, $12, $00, $12, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $00, $12, $00, $12, $00
-		dc.b	$10, $00, $10, $88, $19, $88, $53, $00, $10, $00, $01, $80, $5C, $80, $07, $00
-		dc.b	$24, $00, $24, $00, $26, $00, $26, $00, $24, $00, $24, $80, $20, $80, $0A, $00
-		dc.b	$01, $00, $10, $80, $63, $80, $58, $00, $10, $00, $10, $00, $12, $00, $12, $00
-		dc.b	$10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $00, $12, $00, $12, $00
-		dc.b	$10, $00, $10, $88, $38, $88, $73, $00, $10, $00, $01, $88, $5E, $88, $04, $00
-		dc.b	$24, $00, $24, $00, $26, $08, $23, $00, $24, $08, $21, $08, $05, $08, $05, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $71, $08, $71, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00
-		dc.b	$10, $00, $10, $00, $12, $00, $12, $00, $10, $08, $55, $68, $55, $60, $11, $00
-		dc.b	$4C, $E0, $02, $02, $4C, $E0, $02, $57, $4E, $00, $4F, $00, $14, $00, $14, $00
-		dc.b	$30, $00, $30, $00, $36, $00, $36, $00, $30, $00, $30, $00, $32, $00, $32, $00
-		dc.b	$30, $00, $30, $68, $6B, $60, $5F, $00, $24, $08, $10, $80, $5F, $88, $23, $00
-		dc.b	$7E, $08, $7D, $00, $7E, $08, $7D, $08, $7D, $00, $01, $00, $01, $00, $01, $00
-		dc.b	$78, $00, $78, $00, $78, $00, $78, $00, $7E, $00, $7E, $00, $36, $00, $7D, $00
-		dc.b	$7B, $00, $32, $00, $31, $00, $79, $00, $33, $00, $06, $00, $33, $00, $4D, $02
-		dc.b	$81, $52, $08, $7E, $00, $68, $08, $17, $00, $10, $00, $10, $80, $FE, $80, $FC
-		dc.b	$00, $14, $00, $14, $00, $1A, $00, $18, $00, $10, $00, $10, $00, $1C, $00, $1C
-		dc.b	$00, $10, $00, $10, $00, $14, $00, $14, $00, $14, $00, $14, $00, $10, $00, $10
-		dc.b	$00, $14, $00, $14, $00, $16, $00, $14, $00, $10, $00, $10, $00, $12, $00, $10
-		dc.b	$00, $24, $00, $24, $00, $26, $00, $24, $00, $24, $00, $24, $00, $24, $00, $26
-		dc.b	$00, $24, $00, $24, $00, $24, $00, $24, $00, $10, $00, $10, $00, $10, $00, $12
-		dc.b	$00, $10, $00, $10, $00, $14, $00, $16, $00, $14, $00, $14, $00, $10, $00, $10
-		dc.b	$00, $14, $00, $14, $00, $18, $00, $18, $00, $10, $00, $10, $00, $16, $00, $16
-		dc.b	$00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $00, $D8, $08, $D9
-		dc.b	$00, $10, $00, $10, $80, $7A, $80, $7A, $00, $10, $00, $10, $80, $BA, $88, $B9
-		dc.b	$80, $23, $00, $14, $80, $23, $00, $14, $00, $14, $80, $21, $80, $62, $00, $55
-		dc.b	$00, $04, $00, $04, $00, $06, $00, $06, $00, $04, $00, $04, $00, $0E, $00, $0E
-		dc.b	$00, $04, $00, $04, $00, $06, $00, $06, $00, $04, $00, $04, $00, $58, $00, $58
-		dc.b	$00, $A5, $00, $A5, $00, $AB, $00, $AB, $00, $AB, $00, $AB, $E9, $0C, $E9, $0C
-		dc.b	$00, $10, $00, $10, $00, $12, $00, $12, $00, $10, $00, $10, $08, $18, $09, $AC
-		dc.b	$00, $10, $00, $01, $00, $10, $09, $BA, $00, $10, $00, $10, $81, $A1, $09, $A9
-		dc.b	$00, $01, $00, $01, $80, $1F, $09, $B1, $00, $01, $00, $10, $09, $AA, $00, $12
-		dc.b	$00, $10, $00, $10, $00, $FC, $00, $FC, $00, $10, $00, $10, $00, $DB, $00, $DE
-		dc.b	$00, $CA, $00, $10, $00, $CD, $00, $12, $00, $10, $00, $10, $00, $C4, $00, $C4
-		dc.b	$00, $19, $00, $15, $00, $0E, $A8, $0B, $00, $02, $00, $10, $E9, $E2, $A8, $D4
-		dc.b	$00, $01, $E9, $2C, $E9, $2E, $E9, $2E, $E9, $2E, $00, $10, $E9, $EF, $00, $D1
-		dc.b	$00, $10, $00, $10, $03, $67, $3F, $00, $2F, $00, $10, $00, $12, $00, $12, $00
-		dc.b	$10, $00, $10, $00, $50, $00, $50, $00, $10, $00, $10, $E9, $93, $09, $3C, $00
-		dc.b	$01, $00, $01, $E9, $EE, $09, $41, $00, $10, $00, $10, $00, $10, $00, $01, $00
-		dc.b	$10, $00, $36, $00, $A2, $00, $01, $00, $30, $00, $10, $00, $CE, $00, $7A, $09
-		dc.b	$A1, $00, $10, $E0, $02, $09, $1D, $00, $01, $00, $03, $E9, $EF, $09, $43, $00
-		dc.b	$10, $00, $10, $00, $10, $00, $26, $00, $10, $00, $0E, $00, $83, $00, $6D, $00
-		dc.b	$F0, $09, $B8, $00, $62, $09, $EC, $09, $42, $00, $11, $09, $42, $03, $19, $11
-		dc.b	$00, $11, $00, $63, $00, $25, $00, $30, $00, $10, $09, $AF, $00, $68, $09, $D8
-		dc.b	$00, $66, $01, $D8, $89, $D7, $01, $D6, $02, $36, $08, $D3, $81, $06, $00, $10
-		dc.b	$00, $10, $08, $B8, $08, $BA, $00, $10, $00, $10, $00, $72, $00, $72, $00, $10
-		dc.b	$00, $10, $00, $32, $00, $22, $00, $25, $00, $3B, $00, $24, $00, $1A, $00, $2A
-		dc.b	$00, $18, $00, $1A, $00, $08, $00, $18, $00, $0E, $00, $08, $89, $C3, $01, $CC
-		dc.b	$02, $03, $88, $00, $68, $05, $80, $9C, $21, $E6, $49, $E7, $00, $10, $00, $10
-		dc.b	$00, $1E, $08, $1F, $00, $10, $00, $10, $08, $1F, $00, $1E, $00, $10, $00, $10
-		dc.b	$08, $1E, $00, $1F, $00, $10, $00, $10, $00, $13, $08, $13, $00, $10, $00, $10
-		dc.b	$00, $10, $08, $13, $00, $10, $00, $10, $C1, $D4, $C1, $D7, $00, $10, $00, $10
-		dc.b	$00, $11, $00, $11, $00, $10, $00, $10, $00, $1B, $08, $1A, $00, $10, $00, $10
-		dc.b	$00, $12, $00, $12, $00, $10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10
-		dc.b	$00, $12, $00, $12, $00, $10, $00, $10, $08, $1F, $08, $1F, $00, $10, $00, $10
-		dc.b	$08, $11, $08, $11, $00, $10, $00, $10, $08, $17, $08, $17, $00, $10, $00, $10
-		dc.b	$08, $11, $08, $11, $00, $10, $00, $10, $88, $79, $88, $79, $00, $10, $00, $10
-		dc.b	$00, $12, $08, $13, $00, $10, $00, $10, $08, $13, $00, $12, $00, $10, $08, $55
-		dc.b	$68, $55, $60, $11, $12, $01, $68, $03, $01, $68, $0B, $06, $68, $00, $20, $BF
-		dc.b	$08, $03, $03, $01, $01, $02, $02, $40, $BD, $04, $02, $40, $BD, $03, $01, $01
-		dc.b	$02, $04, $60, $03, $20, $BF, $5E, $01, $68, $07, $01, $68, $37, $01, $68, $07
-		dc.b	$01, $68, $37, $01, $68, $07, $01, $68, $3D, $03, $80, $00, $80, $2D, $03, $80
-		dc.b	$00, $80, $0D, $03, $80, $00, $80, $6D, $03, $80, $00, $80, $81, $15, $04, $FF
-		dc.b	$FF, $FF, $FF, $14, $01, $FF, $03, $02, $FF, $FF, $02, $02, $FF, $FF, $02, $02
-		dc.b	$FF, $FF, $03, $01, $FF, $06, $0A, $FF, $FF, $33, $33, $CC, $FF, $CC, $CC, $CC
-		dc.b	$FF, $05, $01, $FF, $03, $01, $FF, $07, $09, $FF, $FF, $FF, $FF, $00, $FF, $FF
-		dc.b	$FF, $FF, $04, $04, $FF, $FF, $FF, $FF, $08, $04, $FF, $FF, $FF, $FF, $10, $04
-		dc.b	$FF, $FF, $FF, $FF, $02, $02, $FF, $FF, $02, $02, $FF, $FF, $0F, $0C, $FF, $FF
-		dc.b	$FF, $FF, $00, $0F, $FF, $F0, $00, $0F, $FF, $F0, $81, $89, $62, $41, $04, $40
-		dc.b	$41, $40, $44, $01, $40, $00, $41, $71, $16, $17, $32, $31, $15, $17, $32, $00
-		dc.b	$42, $40, $05, $41, $01, $40, $44, $01, $40, $41, $01, $43, $41, $01, $40, $32
-		dc.b	$57, $57, $32, $31, $57, $57, $37, $41, $01, $42, $44, $01, $40, $43, $01, $40
-		dc.b	$41, $01, $40, $41, $01, $40, $00, $70, $56, $17, $32, $31, $16, $56, $72, $00
-		dc.b	$41, $01, $40, $41, $01, $43, $11, $51, $51, $16, $01, $03, $03, $06, $04, $01
-		dc.b	$03, $03, $07, $00, $02, $04, $01, $03, $03, $05, $02, $10, $11, $10, $11, $35
-		dc.b	$4E, $43, $01, $42, $43, $42, $43, $01, $42, $00, $62, $62, $23, $22, $04, $04
-		dc.b	$23, $22, $27, $21, $43, $42, $02, $46, $01, $42, $43, $01, $42, $43, $01, $40
-		dc.b	$43, $01, $63, $22, $60, $60, $04, $04, $60, $60, $25, $67, $01, $42, $43, $01
-		dc.b	$42, $43, $01, $42, $43, $01, $42, $43, $01, $42, $21, $63, $61, $22, $04, $04
-		dc.b	$23, $61, $67, $24, $43, $01, $42, $43, $01, $42, $04, $42, $43, $01, $05, $0E
-		dc.b	$02, $10, $14, $02, $02, $10, $14, $35, $04, $01, $01, $02, $01, $02, $11, $03
-		dc.b	$02, $05, $29, $28, $29, $2F, $04, $04, $29, $2F, $2D, $2C, $02, $05, $00, $03
-		dc.b	$03, $03, $03, $02, $05, $02, $0C, $02, $05, $29, $28, $2B, $2A, $04, $04, $2B
-		dc.b	$2A, $2D, $2C, $03, $01, $03, $03, $03, $03, $02, $05, $02, $0E, $02, $05, $29
-		dc.b	$28, $2B, $2A, $04, $04, $2B, $2A, $2D, $2C, $02, $05, $02, $07, $02, $05, $04
-		dc.b	$01, $01, $01, $05, $0F, $01, $3E, $03, $01, $3E, $35, $17, $0C, $0D, $0C, $0D
-		dc.b	$02, $04, $08, $0C, $0F, $08, $30, $34, $37, $36, $35, $34, $37, $36, $09, $0E
-		dc.b	$0D, $0C, $06, $05, $13, $02, $04, $0C, $0E, $0D, $0D, $36, $34, $35, $33, $35
-		dc.b	$34, $37, $36, $09, $0E, $0D, $0C, $06, $05, $1A, $02, $04, $0C, $0E, $0D, $0D
-		dc.b	$36, $34, $35, $33, $35, $34, $37, $36, $03, $00, $02, $05, $03, $00, $05, $03
-		dc.b	$01, $01, $06, $07, $0F, $01, $44, $03, $01, $44, $35, $0D, $01, $01, $01, $01
-		dc.b	$5B, $5A, $00, $41, $1B, $5A, $00, $41, $40, $04, $08, $03, $5B, $5A, $00, $03
-		dc.b	$5B, $5A, $03, $03, $15, $58, $5A, $00, $41, $1B, $5A, $00, $41, $40, $03, $00
-		dc.b	$41, $40, $03, $5B, $1B, $40, $00, $5B, $5A, $03, $03, $02, $58, $5A, $02, $02
-		dc.b	$5B, $5A, $03, $01, $03, $02, $0E, $41, $43, $00, $41, $01, $40, $27, $67, $6F
-		dc.b	$3C, $26, $27, $2E, $3D, $0F, $01, $44, $03, $01, $44, $35, $0F, $02, $01, $01
-		dc.b	$01, $5E, $5C, $00, $43, $1F, $5C, $03, $43, $42, $02, $06, $02, $08, $02, $58
-		dc.b	$5C, $03, $00, $5D, $5C, $03, $03, $15, $5D, $5C, $03, $43, $1F, $5E, $06, $43
-		dc.b	$42, $02, $05, $43, $42, $00, $5D, $1F, $41, $00, $5D, $5C, $03, $03, $07, $5D
-		dc.b	$5C, $03, $00, $5D, $5E, $06, $02, $11, $02, $05, $00, $43, $42, $00, $43, $01
-		dc.b	$42, $31, $73, $71, $32, $30, $31, $32, $33, $0F, $01, $44, $03, $01, $44, $35
-		dc.b	$0C, $01, $03, $04, $01, $5F, $5C, $07, $05, $5F, $5E, $02, $05, $05, $03, $02
-		dc.b	$5F, $5E, $02, $0C, $5A, $5E, $00, $02, $07, $05, $5F, $5E, $02, $05, $5F, $5E
-		dc.b	$03, $02, $02, $05, $03, $02, $5A, $5E, $02, $0C, $5A, $5E, $00, $02, $07, $05
-		dc.b	$5F, $5E, $02, $05, $5F, $5E, $03, $02, $02, $05, $03, $0C, $07, $05, $00, $02
-		dc.b	$1F, $19, $1F, $1E, $1C, $1D, $1E, $1F, $0E, $02, $44, $02, $02, $02, $44, $02
-		dc.b	$35, $04, $01, $01, $01, $01, $02, $05, $09, $0E, $0D, $0C, $06, $05, $13, $02
-		dc.b	$04, $0F, $0E, $0F, $08, $19, $18, $1B, $1A, $19, $18, $1B, $1A, $09, $0E, $0D
-		dc.b	$0C, $06, $05, $13, $02, $04, $0F, $0E, $0F, $08, $19, $18, $1B, $1A, $19, $18
-		dc.b	$1B, $1A, $09, $0E, $0D, $0C, $06, $05, $0E, $02, $04, $0F, $0E, $0F, $08, $31
-		dc.b	$16, $33, $32, $30, $17, $32, $33, $0E, $02, $10, $11, $02, $02, $10, $11, $35
-		dc.b	$39, $41, $03, $40, $41, $40, $02, $41, $01, $40, $00, $41, $01, $40, $41, $01
-		dc.b	$42, $41, $01, $40, $01, $41, $61, $20, $20, $22, $04, $04, $21, $27, $25, $24
-		dc.b	$43, $45, $00, $41, $01, $45, $41, $01, $43, $44, $01, $40, $00, $41, $61, $20
-		dc.b	$20, $22, $04, $04, $21, $27, $25, $24, $02, $05, $02, $02, $02, $05, $02, $0F
-		dc.b	$01, $05, $02, $00, $03, $03, $23, $20, $23, $1C, $3F, $21, $22, $1E, $1F, $0E
-		dc.b	$02, $12, $15, $02, $02, $12, $15, $35, $38, $43, $01, $42, $43, $41, $00, $43
-		dc.b	$01, $41, $00, $43, $01, $42, $43, $01, $42, $43, $01, $42, $00, $43, $6B, $28
-		dc.b	$2B, $2A, $04, $04, $2B, $2A, $2D, $2C, $43, $42, $00, $43, $01, $42, $43, $01
-		dc.b	$42, $43, $01, $42, $00, $43, $6B, $28, $2B, $2A, $04, $04, $2B, $2A, $2D, $2C
-		dc.b	$03, $03, $01, $03, $09, $1D, $29, $28, $2B, $33, $1B, $29, $12, $0B, $33, $38
-		dc.b	$01, $39, $38, $01, $39, $38, $01, $39, $38, $01, $39, $38, $01, $29, $11, $38
-		dc.b	$39, $10, $11, $35, $04, $01, $01, $01, $01, $02, $0C, $02, $05, $00, $02, $07
-		dc.b	$05, $02, $07, $05, $00, $02, $05, $04, $10, $1D, $1C, $1F, $1E, $1F, $19, $1F
-		dc.b	$1C, $07, $05, $02, $07, $05, $00, $02, $05, $08, $10, $1D, $1C, $1F, $1E, $1F
-		dc.b	$19, $1F, $1C, $07, $05, $02, $07, $05, $00, $02, $05, $04, $20, $02, $05, $00
-		dc.b	$02, $1F, $19, $1F, $1C, $26, $26, $22, $25, $01, $07, $06, $01, $07, $06, $01
-		dc.b	$07, $06, $01, $07, $06, $01, $07, $2E, $2F, $3B, $3C, $12, $15, $35, $04, $10
-		dc.b	$11, $10, $11, $04, $02, $02, $02, $02, $12, $02, $02, $02, $02, $02, $02, $02
-		dc.b	$02, $02, $02, $80, $80, $82, $82, $80, $80, $80, $80, $04, $04, $02, $02, $02
-		dc.b	$02, $04, $02, $02, $02, $02, $0C, $80, $80, $82, $82, $82, $82, $82, $82, $02
-		dc.b	$02, $02, $02, $02, $04, $02, $02, $02, $02, $02, $02, $02, $02, $02, $1C, $80
-		dc.b	$80, $82, $82, $04, $04, $04, $04, $00, $1B, $03, $03, $01, $1A, $00, $02, $1A
-		dc.b	$03, $01, $03, $19, $00, $86, $86, $96, $97, $12, $13, $84, $54, $00, $15, $69
-		dc.b	$0A, $00, $15, $00, $97, $00, $14, $20, $28, $20, $BE, $05, $33, $06, $00, $05
-		dc.b	$00, $70, $00, $70, $00, $72, $00, $76, $00, $70, $00, $70, $00, $76, $00, $72
-		dc.b	$00, $70, $00, $70, $00, $14, $00, $14, $00, $30, $00, $30, $00, $32, $00, $36
-		dc.b	$00, $30, $00, $30, $00, $36, $00, $32, $00, $30, $00, $30, $20, $ED, $20, $EE
-		dc.b	$04, $34, $20, $C0, $20, $C1, $00, $10, $00, $10, $00, $12, $00, $12, $00, $10
-		dc.b	$00, $10, $00, $16, $00, $16, $00, $10, $00, $10, $00, $34, $00, $34, $00, $03
-		dc.b	$00, $05, $00, $01, $00, $04, $00, $07, $00, $03, $00, $04, $00, $01, $00, $05
-		dc.b	$00, $07, $20, $E4, $20, $E5, $0C, $34, $20, $B6, $20, $B7, $00, $70, $00, $70
-		dc.b	$00, $7E, $00, $71, $00, $70, $00, $70, $00, $7F, $00, $7E, $00, $70, $00, $70
-		dc.b	$00, $11, $00, $1F, $00, $30, $00, $30, $00, $3E, $00, $31, $00, $30, $00, $30
-		dc.b	$00, $3F, $00, $3E, $00, $30, $00, $30, $20, $E7, $20, $E8, $4C, $80, $B4, $61
-		dc.b	$CB, $69, $1B, $00, $10, $00, $C0, $00, $17, $00, $17, $00, $10, $00, $10, $00
-		dc.b	$11, $00, $11, $00, $10, $00, $10, $00, $13, $00, $13, $00, $10, $00, $E5, $08
-		dc.b	$01, $00, $E4, $00, $0A, $00, $1B, $08, $1A, $08, $0B, $00, $1B, $00, $0A, $08
-		dc.b	$0D, $08, $0D, $08, $03, $00, $0A, $00, $02, $08, $0B, $00, $0A, $08, $03, $08
-		dc.b	$05, $00, $0C, $00, $91, $00, $0C, $08, $90, $08, $0D, $00, $0C, $00, $91, $00
-		dc.b	$0C, $08, $DD, $00, $0C, $00, $48, $00, $41, $00, $05, $00, $48, $00, $0C, $00
-		dc.b	$03, $00, $36, $00, $01, $00, $04, $00, $3D, $00, $38, $00, $04, $00, $01, $00
-		dc.b	$04, $08, $3C, $00, $04, $00, $04, $08, $05, $08, $05, $00, $04, $00, $04, $08
-		dc.b	$64, $00, $04, $00, $11, $08, $71, $00, $70, $08, $10, $08, $71, $00, $11, $08
-		dc.b	$13, $08, $13, $00, $10, $00, $10, $08, $11, $08, $11, $00, $10, $00, $10, $08
-		dc.b	$51, $00, $50, $00, $E5, $00, $10, $00, $30, $00, $15, $00, $C0, $00, $10, $61
-		dc.b	$DB, $69, $DB, $0C, $06, $61, $EC, $01, $56, $00, $04, $02, $0E, $08, $05, $00
-		dc.b	$5C, $00, $04, $00, $10, $08, $05, $00, $4C, $08, $71, $03, $0D, $12, $00, $5C
-		dc.b	$00, $10, $00, $10, $08, $84, $00, $4C, $00, $C0, $03, $0D, $17, $00, $5C, $00
-		dc.b	$10, $00, $10, $00, $11, $00, $4C, $00, $10, $03, $0D, $13, $00, $5C, $00, $10
-		dc.b	$00, $10, $00, $11, $00, $4C, $00, $1B, $03, $0D, $0C, $00, $5C, $00, $0A, $00
-		dc.b	$10, $00, $04, $00, $4C, $00, $0C, $03, $0B, $41, $00, $5C, $00, $48, $00, $10
-		dc.b	$68, $85, $68, $F6, $03, $0D, $04, $00, $5C, $08, $05, $00, $10, $00, $04, $00
-		dc.b	$4C, $08, $05, $02, $0E, $08, $71, $00, $5C, $00, $12, $00, $10, $00, $10, $00
-		dc.b	$4C, $08, $84, $03, $0D, $C0, $00, $5C, $00, $17, $00, $10, $00, $10, $00, $4C
-		dc.b	$00, $11, $03, $0D, $10, $00, $5C, $00, $13, $00, $10, $00, $10, $00, $4C, $00
-		dc.b	$11, $03, $0D, $1B, $00, $5C, $00, $0C, $00, $10, $00, $0A, $00, $4C, $00, $04
-		dc.b	$03, $0D, $0C, $00, $5C, $00, $41, $00, $10, $00, $48, $09, $1A, $69, $D3, $7C
-		dc.b	$03, $20, $00, $20, $05, $03, $20, $00, $20, $80, $F5, $03, $20, $00, $20, $05
-		dc.b	$03, $20, $00, $20, $80, $F5, $03, $20, $00, $20, $05, $03, $20, $00, $20, $80
-		dc.b	$F5, $03, $20, $00, $20, $05, $03, $20, $00, $20, $80, $F5, $03, $20, $00, $20
-		dc.b	$05, $03, $20, $00, $20, $82, $8D, $47, $01, $02, $03, $01, $03, $01, $02, $03
-		dc.b	$01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01
-		dc.b	$02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02
-		dc.b	$03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03
-		dc.b	$01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $01, $02, $03, $01, $50
-		dc.b	$47, $04, $05, $06, $04, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02
-		dc.b	$01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $04, $05, $06, $04, $50, $47, $02, $03, $01, $02, $01, $02
-		dc.b	$03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03
-		dc.b	$01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01
-		dc.b	$02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02
-		dc.b	$03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $02, $03, $01
-		dc.b	$02, $50, $47, $05, $06, $04, $05, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02
-		dc.b	$01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $05, $06, $04, $05, $50, $47, $01, $02, $03, $01
-		dc.b	$03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03
-		dc.b	$01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01
-		dc.b	$02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02
-		dc.b	$03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $03, $01, $02, $01
-		dc.b	$02, $03, $01, $50, $47, $04, $05, $06, $04, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02
-		dc.b	$01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $04, $05, $06, $04, $50, $47, $08, $09
-		dc.b	$0A, $08, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02
-		dc.b	$01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $08, $09, $0A, $08, $50, $47, $08, $09, $0A, $08, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02
-		dc.b	$01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $08, $09, $0A, $08, $50, $47
-		dc.b	$08, $09, $0A, $08, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02
-		dc.b	$01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $06, $05, $02, $06, $01, $06, $07, $01, $06, $07, $01, $06
-		dc.b	$07, $01, $06, $07, $01, $06, $07, $01, $06, $07, $01, $06, $07, $01, $06, $07
-		dc.b	$01, $06, $07, $0C, $0D, $0B, $0C, $50, $47, $08, $09, $0A, $08, $01, $03, $02
-		dc.b	$01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $1B, $1A, $19
-		dc.b	$1B, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $11, $12, $10, $11
-		dc.b	$50, $47, $08, $09, $0A, $08, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01
-		dc.b	$03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03, $02, $01, $03
-		dc.b	$02, $01, $03, $02, $01, $03, $1E, $1D, $1A, $1E, $01, $06, $07, $01, $06, $07
-		dc.b	$01, $06, $07, $01, $06, $07, $01, $06, $07, $01, $06, $07, $01, $06, $07, $01
-		dc.b	$06, $07, $01, $06, $07, $14, $15, $13, $14, $85, $9E, $00, $00, $10, $CB, $BB
-Fire_In_Bowl: ; loc_4E86C:
-		BINCLUDE  "data\sprites\firebowl.dat"
-Filler_1: ; loc_4EC6C: ; Filler
-		org $4EE00
-Unknow_Data_0x04EE00: ; loc_4EE00:
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $18, $18, $18, $18, $18
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $20, $20, $20, $20, $20
-		dc.b	$20, $20, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $20, $20, $20, $20, $20, $20, $20, $20, $20, $20, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $00, $00, $00, $00, $00, $00, $00, $20, $20
-		dc.b	$20, $20, $20, $25, $25, $25, $25, $25, $05, $05, $05, $05, $05, $05, $05, $05
-		dc.b	$05, $04, $04, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $20, $20, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $04, $04, $04, $04, $04, $00, $10, $10, $10, $10, $10, $10, $10, $10, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $08, $08, $29, $29, $29, $29, $29, $29, $29, $29, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $29, $29, $29, $29, $29, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $19, $19, $19, $19, $19, $19, $19, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $01, $01, $04, $04, $04, $04, $14, $14
-		dc.b	$14, $14, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $05, $05, $05, $05
-		dc.b	$05, $01, $01, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $20, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $10, $10, $10, $10, $10, $10, $10, $10, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $08, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $00, $00, $00, $10, $10
-		dc.b	$10, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08, $08, $08, $08, $00, $00
-		dc.b	$00, $00, $00, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $28, $28, $28
-		dc.b	$28, $28, $28, $28, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$10, $10, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $18, $18, $18, $18, $18, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $20, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $20, $20, $20
-		dc.b	$20, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $20, $20, $20, $20, $20, $25, $25, $25, $25, $25
-		dc.b	$05, $05, $05, $05, $05, $05, $05, $05, $05, $04, $04, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $20, $20, $20, $20, $20, $20
-		dc.b	$20, $20, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $10, $10, $10, $10
-		dc.b	$10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04, $04, $00, $10
-		dc.b	$10, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $29, $29, $29
-		dc.b	$29, $29, $29, $29, $29, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $29
-		dc.b	$29, $29, $29, $29, $09, $09, $09, $09, $09, $09, $09, $09, $09, $19, $19, $19
-		dc.b	$19, $19, $19, $19, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$01, $01, $04, $04, $04, $04, $14, $14, $14, $14, $10, $10, $10, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $05, $05, $05, $05, $05, $01, $01, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $01, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $20, $20, $20, $20, $20, $20
-		dc.b	$20, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $10
-		dc.b	$10, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $00, $00, $00, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $20, $20, $20, $20, $20
-		dc.b	$00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08, $08, $08, $08, $08, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $28, $28, $28, $28, $28, $28, $28, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $20, $20, $20, $20, $20, $20, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $10, $10, $10, $10, $10, $10, $10, $10
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $18, $18, $18, $18, $18
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $20, $20, $20, $20, $20
-		dc.b	$20, $20, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $20, $20, $20, $20, $20, $20, $20, $20, $20, $20, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $00, $00, $00, $00, $00, $00, $00, $20, $20
-		dc.b	$20, $20, $20, $25, $25, $25, $25, $25, $05, $05, $05, $05, $05, $05, $05, $05
-		dc.b	$05, $04, $04, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $20, $20, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $04, $04, $04, $04, $04, $00, $10, $10, $10, $10, $10, $10, $10, $10, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $08, $08, $29, $29, $29, $29, $29, $29, $29, $29, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $29, $29, $29, $29, $29, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $19, $19, $19, $19, $19, $19, $19, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $01, $01, $04, $04, $04, $04, $14, $14
-		dc.b	$14, $14, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
-		dc.b	$04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $05, $05, $05, $05
-		dc.b	$05, $01, $01, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $20, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $10, $10, $10, $10, $10, $10, $10, $10, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $08, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09
-		dc.b	$09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $00, $00, $00, $10, $10
-		dc.b	$10, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08, $08, $08, $08, $00, $00
-		dc.b	$00, $00, $00, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $28, $28, $28
-		dc.b	$28, $28, $28, $28, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$10, $10, $10, $10, $10, $10, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $08, $08, $08, $08, $08
-		dc.b	$08, $08, $08, $08, $08, $08, $08, $08, $08, $00, $00, $00, $00, $00, $00, $00
-		dc.b	$00, $00, $00, $00, $00, $00, $00, $00
-
 ; For whatever reason (presumably due to decompiler weirdness), the rest of the data above is missing,
 ; so this has been placed so all other data lines up with the original ROM
-		align $50000
+		org $50000
 ;---------------------------------------------------------------------------------------
 ; Uncompressed art
 ; Patterns for Sonic  ; ArtUnc_50000:
@@ -45617,12 +43083,6 @@ Tails_Sprites: ; loc_6254C:
 ;--------------------------------------------------------------------------------------
 MapRUnc_Sonic:	BINCLUDE	"mappings/spriteDPLC/Sonic.bin"
 
-ArtNem_Shield: ; loc_6DF8E:
-		BINCLUDE  "data\sprites\shield.nem"
-Invencibility_Stars: ; loc_6E114:
-		BINCLUDE  "data\sprites\invstars.nem"
-Unused_Dust: ; loc_6E1FC:
-		BINCLUDE  "data\sprites\dust.dat"
 Tails_Mappings: ; loc_6FB3C:
 		dc.w	loc_6FC46-Tails_Mappings
 		dc.w	loc_6FC48-Tails_Mappings
@@ -46702,6 +44162,57 @@ loc_70954:
 loc_7095A:
 		dc.w	$0002
 		dc.w	$759C, $35A4
+; ---------------------------------------------------------------------------
+; Compressed graphics - special stage
+; ---------------------------------------------------------------------------
+Nem_SSWalls:	binclude	"art/ss/Special Walls.nem" ; special stage walls
+		even
+Nem_SSBgFish:	binclude	"art/ss/Special Birds & Fish.nem" ; special stage birds and fish background
+		even
+Nem_SSBgCloud:	binclude	"art/ss/Special Clouds.nem" ; special stage clouds background
+		even
+Nem_SSGOAL:	binclude	"art/ss/Special GOAL.nem" ; special stage GOAL block
+		even
+Nem_SSRBlock:	binclude	"art/ss/Special R.nem"	; special stage R block
+		even
+Nem_SS1UpBlock:	binclude	"art/ss/Special 1UP.nem" ; special stage 1UP block
+		even
+Nem_SSEmStars:	binclude	"art/ss/Special Emerald Twinkle.nem" ; special stage stars from a collected emerald
+		even
+Nem_SSRedWhite:	binclude	"art/ss/Special Red-White.nem" ; special stage red/white block
+		even
+Nem_Bumper:	binclude	"art/ss/Special Bumper.nem" ; special stage bumper
+		even
+;Nem_SSZone1:	binclude	"art/ss/Special ZONE1.nem" ; special stage ZONE1 block
+;		even
+;Nem_SSZone2:	binclude	"art/ss/Special ZONE2.nem" ; ZONE2 block
+;		even
+;Nem_SSZone3:	binclude	"art/ss/Special ZONE3.nem" ; ZONE3 block
+;		even
+;Nem_SSZone4:	binclude	"art/ss/Special ZONE4.nem" ; ZONE4 block
+;		even
+;Nem_SSZone5:	binclude	"art/ss/Special ZONE5.nem" ; ZONE5 block
+;		even
+;Nem_SSZone6:	binclude	"art/ss/Special ZONE6.nem" ; ZONE6 block
+;		even
+Nem_SSUpDown:	binclude	"art/ss/Special UP-DOWN.nem" ; special stage UP/DOWN block
+		even
+Nem_SSEmerald:	binclude	"art/ss/Special Emeralds.nem" ; special stage chaos emeralds
+		even
+Nem_SSGhost:	binclude	"art/ss/Special Ghost.nem" ; special stage ghost block
+		even
+Nem_SSWBlock:	binclude	"art/ss/Special W.nem"	; special stage W block
+		even
+Nem_SSGlass:	binclude	"art/ss/Special Glass.nem" ; special stage destroyable glass block
+		even
+Nem_ResultEm:	binclude	"art/ss/Special Result Emeralds.nem" ; chaos emeralds on special stage results screen
+		even
+Eni_SSBg1:	binclude	"misc/SS Background 1.bin" ; special stage background (mappings)
+		even
+Eni_SSBg2:	binclude	"misc/SS Background 2.bin" ; special stage background (mappings)
+		even
+; ---------------------------------------------------------------------------
+
 SegaLogo: ; loc_70960:
 		BINCLUDE  "data\sprites\sega.nem"
 SegaLogo_Mappings: ; loc_70DD0:
@@ -46718,6 +44229,12 @@ Title_Screen_Sonic_Tails: ; loc_72E82:
 		BINCLUDE  "data\sprites\sontascr.nem" ; Sonic And Tails in Title Screen
 FireBall: ; loc_739C6:
 		BINCLUDE  "data\sprites\fireball.nem"
+ArtNem_Shield: ; loc_6DF8E:
+		BINCLUDE  "data\sprites\shield.nem"
+ArtNem_Stars: ; loc_6E114:
+		BINCLUDE  "data\sprites\invstars.nem"
+Unused_Dust: ; loc_6E1FC:
+		BINCLUDE  "data\sprites\dust.dat"
 ; --------------------------------------------------------------------
 ; Nemesis compressed art
 ; Waterfall in GHZ			; ArtNem_73B3C: Ghz_Waterfall:
@@ -46838,7 +44355,7 @@ ArtNem_HPZPlatform:	BINCLUDE	"art/nemesis/Collapsing platform from HPZ.bin"
 	even
 ArtNem_HPZOrb:		BINCLUDE	"art/nemesis/Pulsing orb from HPZ.bin"
 
-Hpz_Unknow_Platform: ; loc_75DD6:
+Hpz_Unknown_Platform: ; loc_75DD6:
 		BINCLUDE  "data\hpz\unkptfm.nem"
 ; ---------------------------------------------------------------------
 ; Nemesis compressed art
@@ -46849,7 +44366,7 @@ ArtNem_OOZElevator:	BINCLUDE	"art/nemesis/Rising platform from OOZ.bin"
 ; Nemesis compressed art
 ; Spiked thing from OOZ			; ArtNem_76060: OOz_Giant_Spikeball:
 	even
-ArtNem_SpikyThing:	BINCLUDE	"art/nemesis/Spiked ball from OOZ.bin"
+ArtNem_SpikedRing:	BINCLUDE	"art/nemesis/Spiked ball from OOZ.bin"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; Green platform over the burners in OOZ	; ArtNem_80274: OOz_Touch_Boost_Up:
@@ -46859,7 +44376,7 @@ ArtNem_BurnerLid:	BINCLUDE	"art/nemesis/Burner platform from OOZ.bin"
 ; Nemesis compressed art
 ; Striped blocks from OOZ			; ArtNem_762EE: OOz_Break_Boost:
 	even
-ArtNem_StripedBlocksVert:	BINCLUDE	"art/nemesis/Striped blocks from OOZ.bin"
+ArtNem_HrzntStripedBooster:	BINCLUDE	"art/nemesis/Striped blocks from OOZ.bin"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; Oil splashing into oil in OOZ			; ArtNem_7635A: OOz_Oil:
@@ -46894,7 +44411,7 @@ ArtNem_PushSpring:	BINCLUDE	"art/nemesis/Push spring from OOZ.bin"
 ; Nemesis compressed art
 ; Swinging platform from OOZ			; ArtNem_76E68: OOz_Swing_Platform:
 	even
-ArtNem_OOZSwingPlat:	BINCLUDE	"art/nemesis/Swinging platform from OOZ.bin"
+ArtNem_OOZSwingPlatform:	BINCLUDE	"art/nemesis/Swinging platform from OOZ.bin"
 ; --------------------------------------------------------------------
 ; Nemesis compressed art
 ; Large wooden box from DHZ			; ArtNem_7708A: Dhz_Box:
@@ -46904,7 +44421,7 @@ ArtNem_Crate:	BINCLUDE	"art/nemesis/Large wooden box from DHZ.bin"
 ; Nemesis compressed art
 ; Collapsing platform from DHZ			; ArtNem_772C8: Dhz_Collapsing_Platform:
 	even
-ArtNem_DHZCollapsePlat:	BINCLUDE	"art/nemesis/Collapsing platform from DHZ.bin"
+ArtNem_DHZCollapsingPlatform:	BINCLUDE	"art/nemesis/Collapsing platform from DHZ.bin"
 ; --------------------------------------------------------------------
 ; Nemesis compressed art
 ; Switch that you pull on from DHZ (not yet programmed)		; ArtNem_77472: Dhz_Vines:
@@ -46924,7 +44441,8 @@ ArtNem_DHZGateLog:	BINCLUDE	"art/nemesis/Drawbridge logs from DHZ.bin"
 ; Nemesis compressed art
 ; Large moving platform from CPZ	; ArtNem_77684: Cpz_Elevator:
 	even
-ArtNem_CPZElevator:	BINCLUDE	"art/nemesis/Large moving platform from CNZ.bin"
+ArtNem_CPZElevator:	BINCLUDE	"art/nemesis/Large moving platform from CPZ.bin"
+	even
 
 Water_Surface: ; loc_777D2:
 		BINCLUDE  "data\sprites\watrsurf.nem"
@@ -46937,30 +44455,30 @@ ArtNem_CPZBooster:	BINCLUDE	"art/nemesis/Speed booster from CPZ.bin"
 ; Nemesis compressed art
 ; CPZ droplet chain enemy		; ArtNem_779AA: Cpz_Worms:
 	even
-ArtNem_CPZDroplet:	BINCLUDE	"art/nemesis/CPZ worm enemy.bin"
+ArtNem_CPZWorm:	BINCLUDE	"art/nemesis/CPZ worm enemy.bin"
 
-Cpz_Metal_Structure: ; loc_77A1C:
+ArtNem_CPZPillars: ; loc_77A1C:
 		BINCLUDE  "data\cpz\metal_st.nem"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; CPZ metal block			; ArtNem_77C26:
 	even
-ArtNem_CPZMetalBlock:	BINCLUDE	"art/nemesis/CPZ large moving platform blocks.bin"
+ArtNem_CPZTubePlug:	BINCLUDE	"art/nemesis/CPZ large moving platform blocks.bin"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; Yellow and black stripy tiles from DEZ	; ArtNem_77C66: Cpz_Automatic_Door:
 	even
-ArtNem_ConstructionStripes:	BINCLUDE	"art/nemesis/Stripy blocks from CPZ.bin"
+ArtNem_CPZ_Door:	BINCLUDE	"art/nemesis/Stripy blocks from CPZ.bin"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; Yellow flipping platforms and stuff CPZ	; ArtNem_77CD2: Cpz_Open_Close_Platform:
 	even
-ArtNem_CPZAnimatedBits:	BINCLUDE	"art/nemesis/Small yellow moving platform from CPZ.bin"
+ArtNem_CPZFlippingPlatform:	BINCLUDE	"art/nemesis/Small yellow moving platform from CPZ.bin"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; Moving block from CPZ			; ArtNem_77EB4: Cpz_Platforms:
 	even
-ArtNem_CPZStairBlock:	BINCLUDE	"art/nemesis/Moving block from CPZ.bin"
+ArtNem_CPZPlatforms:	BINCLUDE	"art/nemesis/Moving block from CPZ.bin"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; Spring that covers tube in CPZ	; ArtNem_78074: Cpz_Spring_Tubes:
@@ -47000,9 +44518,9 @@ ArtNem_HrzntlSprng:	BINCLUDE	"art/nemesis/Horizontal spring.bin"
 	even
 ArtNem_DignlSprng:	BINCLUDE	"art/nemesis/Diagonal spring.bin"
 
-Head_up_display_Sprites: ; loc_78A12:
+ArtNem_HUD: ; loc_78A12:
 		BINCLUDE  "data\sprites\hud.nem" ; Head-up display
-Head_up_display_Sonic: ; loc_78B1A:
+ArtNem_Lives: ; loc_78B1A:
 		BINCLUDE	"art/nemesis/Sonic lives counter.bin"
 ; --------------------------------------------------------------------------------------
 ; Nemesis compressed art
@@ -47020,7 +44538,7 @@ ArtNem_Powerups:	BINCLUDE	"art/nemesis/Monitor and contents.bin"
 	even
 ArtNem_Spikes:	BINCLUDE	"art/nemesis/Spikes.bin"
 
-Enemy_Points_Spr: ; loc_7919E:
+ArtNem_Points: ; loc_7919E:
 		BINCLUDE  "data\sprites\points.nem"
 ; --------------------------------------------------------------------------------------
 ; Nemesis compressed art
@@ -47107,12 +44625,12 @@ Boss_Smoke: ; loc_7E03E:
 ; Nemesis compressed art
 ; GHZ Boss				; ArtNem_7E124: Ghz_Boss_Car:
 	even
-ArtNem_GHZBoss:	BINCLUDE	"art/nemesis/GHZ boss.bin"
+ArtNem_EHZBoss:	BINCLUDE	"art/nemesis/GHZ boss.bin"
 ;--------------------------------------------------------------------------------------
 ; Nemesis compressed art
 ; Helicopter blades for GHZ boss	; ArtNem_7E910: Ghz_Boss_Blades:
 	even
-ArtNem_EggChoppers:	BINCLUDE	"art/nemesis/Chopper blades for GHZ boss.bin"
+ArtNem_EHZBossBlades:	BINCLUDE	"art/nemesis/Chopper blades for GHZ boss.bin"
 
 Title_Cards: ; loc_7EA04:
 		BINCLUDE  "data\sprites\titlcard.nem" ; Title Cards
@@ -47153,7 +44671,7 @@ BM16_GHZ:	BINCLUDE	"mappings/16x16/GHZ.bin"
 ; ----------------------------------------------------------------------------------
 ; GHZ/HTZ main level patterns (Nemesis compression)
 ; ArtNem_81C00: Green_Hill_8x8_Tiles:
-ArtNem_GHZ:	BINCLUDE	"art/nemesis/GHZ and HTZ primary.bin"
+ArtNem_EHZ:	BINCLUDE	"art/nemesis/GHZ and HTZ primary.bin"
 ; ---------------------------------------------------------------------------------
 ; HTZ 16x16 block mappings (uncompressed)
 ; LevBlock_84A50: Hill_Top_16x16_Map:
@@ -47294,48 +44812,6 @@ Nghz_Init_Sprites_Dyn_Reload: ; loc_BF408:  Waterfalls
 ; LevChunk_BF568: Neo_Green_Hill_128x128_Map:
 BM128_NGHZ:	BINCLUDE	"mappings/128x128/NGHZ.bin"
 
-; For whatever reason, the assembler compiled the end of the NGHZ chunk data twice...
-; word_C2138:
-		dc.w	$C00B, $F8C4, $C00B, $5200, $F8C0, $F80E, $F0, 0
-
-; ===========================================================================
-; Leftover data from an earlier build; CPZ's chunk data at this point more
-; closely resembles the Nick Arcade prototype, in addition to all chunk data
-; being uncompressed rather than Kosinski-compressed
-; LevChunk_C2148:
-		BINCLUDE	"misc/leftovers/Incomplete chunk data for earlier CNZ.bin"
-; LevBlock_C943C:
-		BINCLUDE	"misc/leftovers/Block data for earlier CPZ.bin"
-; ArtNem_CAA1C:
-		BINCLUDE	"misc/leftovers/Art data for earlier CPZ.bin"
-; ArtNem_CDFC6:
-		BINCLUDE	"misc/leftovers/Initial animated tiles for earlier CPZ.bin"
-; LevChunk_CE03A:
-		BINCLUDE	"misc/leftovers/Chunk data for earlier CPZ.bin"
-; LevBlock_D603A:
-		BINCLUDE	"misc/leftovers/Block data for earlier NGHZ.bin"
-; ArtNem_D793A:
-		BINCLUDE	"misc/leftovers/Art data for earlier NGHZ.bin"
-; ArtNem_DCEEA:
-		BINCLUDE	"misc/leftovers/Initial animated tiles for earlier NGHZ.bin"
-; LevChunk_DD04A:
-		BINCLUDE	"misc/leftovers/Chunk data for earlier NGHZ.bin"
-
-; ===========================================================================
-; A second set of leftover build data, this time for NGHZ exclusively; oddly,
-; the chunk data here is created through manually writing bytes, and can be
-; viewed in a text editor (although the Japanese may not appear correctly)
-; ArtNem_E504A:
-		BINCLUDE	"misc/leftovers/Art data for earlier earlier NGHZ.bin"
-; ArtNem_E57E6:
-		BINCLUDE	"misc/leftovers/Initial animated tiles for earlier NGHZ.bin"
-; LevChunk_E5946:
-		BINCLUDE	"misc/leftovers/Uncompiled chunk data for NGHZ.bin"
-
-; ===========================================================================
-; Unused duplicate Sega sound
-Sega_SndDup:	BINCLUDE	"sound/Unused Sega PCM.bin"
-
 ; ===========================================================================
 ; Moving the music and sound effects would cause them to break due to using
 ; hardcoded pointers; I have already have converted the music to ASM, but
@@ -47352,14 +44828,14 @@ Sega_SndDup:	BINCLUDE	"sound/Unused Sega PCM.bin"
 ; ---------------------------------------------------------------------------
 ; Subroutine to load the sound driver
 ; ---------------------------------------------------------------------------
-
+	org $EC000
 ; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
 
 ; loc_EC000:
 SoundDriverLoad:
 		move	sr,-(sp)
 		movem.l	d0-a6,-(sp)
-		move	#$2700,sr
+		disable_ints
 		lea	(Z80_Bus_Request).l,a3
 		lea	(Z80_Reset).l,a2
 		moveq	#0,d2
@@ -47592,7 +45068,7 @@ Sega_Snd_End:
 ; loc_F8000: Music_81_To_97:
 MusicPoint2:
 MusPtr_OOZ:		rom_ptr_z80	Mus_OOZ		; $81
-MusPtr_GHZ:		rom_ptr_z80	Mus_GHZ		; $82
+MusPtr_EHZ:		rom_ptr_z80	Mus_EHZ		; $82
 MusPtr_MTZ:		rom_ptr_z80	Mus_MTZ		; $83
 MusPtr_CNZ:		rom_ptr_z80	Mus_CNZ		; $84
 MusPtr_DHZ:		rom_ptr_z80	Mus_DHZ		; $85
@@ -47615,7 +45091,7 @@ MusPtr_HTZ:		rom_ptr_z80	Mus_HTZ		; $96 and $97
 
 ; loc_F802A:
 Mus_OOZ:	include		"sound/music/OOZ.asm"		; CNZ 2-player theme in final
-Mus_GHZ:	include		"sound/music/GHZ.asm"
+Mus_EHZ:	include		"sound/music/EHZ.asm"
 Mus_MTZ:	include		"sound/music/MTZ.asm"
 Mus_CNZ:	include		"sound/music/CNZ.asm"
 Mus_DHZ:	include		"sound/music/DHZ.asm"

@@ -2558,7 +2558,7 @@ ptrsize :=	2
 idstart :=	80h
 
 zMusIDPtr_OOZ:		db	id(MusPtr_OOZ)
-zMusIDPtr_GHZ:		db	id(MusPtr_GHZ)
+zMusIDPtr_EHZ:		db	id(MusPtr_EHZ)
 zMusIDPtr_MTZ:		db	id(MusPtr_MTZ)
 zMusIDPtr_CNZ:		db	id(MusPtr_CNZ)
 zMusIDPtr_DHZ:		db	id(MusPtr_DHZ)

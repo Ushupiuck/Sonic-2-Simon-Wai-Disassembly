@@ -144,7 +144,7 @@ PalID_SEGA =		id(PalPtr_SEGA)
 PalID_Title =		id(PalPtr_Title)
 PalID_LevelSel =	id(PalPtr_LevelSel)
 PalID_SonicTails =	id(PalPtr_SonicTails)
-PalID_GHZ =		id(PalPtr_GHZ)
+PalID_EHZ =		id(PalPtr_EHZ)
 PalID_OWZ =		id(PalPtr_OWZ)
 PalID_WZ =		id(PalPtr_WZ)
 PalID_SSZ =		id(PalPtr_SSZ)
@@ -186,7 +186,7 @@ idstart :=	$81
 
 MusID__First = idstart
 MusID_OOZ =		id(zMusIDPtr_OOZ)
-MusID_GHZ =		id(zMusIDPtr_GHZ)
+MusID_EHZ =		id(zMusIDPtr_EHZ)
 MusID_MTZ =		id(zMusIDPtr_MTZ)
 MusID_CNZ =		id(zMusIDPtr_CNZ)
 MusID_DHZ =		id(zMusIDPtr_DHZ)
@@ -220,7 +220,7 @@ MusID_EmeraldDup2 =	id(zMusIDPtr_EmeraldDup2)
 MusID__End =		id(zMusIDPtr__End)
 
 ; Whenever the music references a slot that was its placement in Sonic 1
-S1MusID_LZ =		MusID_GHZ
+S1MusID_LZ =		MusID_EHZ
 S1MusID_Invinc =	MusID_NGHZ
 S1MusID_ExtraLife =	MusID_DEZ
 S1MusID_Boss =		MusID_FinalBoss
@@ -751,7 +751,6 @@ Oscillation_Control:		ds.w	1
 Oscillating_variables:
 Oscillating_Data:		ds.w	$20
 Oscillating_Numbers_End
-
 				; Fun Fact: when documenting the last of the ROM, I forgot to add this,
 				; causing the rest to be incorrect
 				ds.b	$20	; $FFFFFEA0-$FFFFFEBF ; seems unused

@@ -174,3 +174,45 @@ planeLocH40 function col,line,(($80 * line) + (2 * col))
 
 ; function to calculate the location of a tile in plane mappings with a width of 128 cells
 planeLocH80 function col,line,(($100 * line) + (2 * col))
+; ---------------------------------------------------------------------------
+; Set a VRAM address via the VDP control port.
+; input: 16-bit VRAM address, control port (default is ($C00004).l)
+; ---------------------------------------------------------------------------
+
+locVRAM:	macro loc,controlport
+		if ("controlport"=="")
+		move.l	#($40000000+((loc&$3FFF)<<16)+((loc&$C000)>>14)),(VDP_control_port).l
+		else
+		move.l	#($40000000+((loc&$3FFF)<<16)+((loc&$C000)>>14)),controlport
+		endif
+		endm
+
+; ---------------------------------------------------------------------------
+; DMA fill VRAM with a value
+; input: value, length, destination
+; ---------------------------------------------------------------------------
+
+fillVRAM:	macro value,length,loc
+		lea	(VDP_control_port).l,a5
+		move.w	#$8F01,(a5)
+		move.l	#$94000000+((length&$FF00)<<8)+$9300+(length&$FF),(a5)
+		move.w	#$9780,(a5)
+		move.l	#$40000080+((loc&$3FFF)<<16)+((loc&$C000)>>14),(a5)
+		move.w	#value,(VDP_data_port).l
+		endm
+; ---------------------------------------------------------------------------
+; disable interrupts
+; ---------------------------------------------------------------------------
+
+disable_ints:	macro
+		move	#$2700,sr
+		endm
+
+; ---------------------------------------------------------------------------
+; enable interrupts
+; ---------------------------------------------------------------------------
+
+enable_ints:	macro
+		move	#$2300,sr
+		endm
+
