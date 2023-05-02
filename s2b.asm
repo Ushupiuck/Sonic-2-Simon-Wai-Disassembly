@@ -8687,62 +8687,62 @@ loc_776E:
 ; [ Begin ]
 ;===============================================================================
 Main_Level_Load_16_128_Blocks: ; loc_779A: Load 16x16/128x128 Tiles
-		moveq	#$00, D0
-		move.b	(Current_Zone).w, D0
-		add.w	D0, D0
-		add.w	D0, D0
-		move.w	D0, D1
-		add.w	D0, D0
-		add.w	D1, D0
-		lea	(LevelArtPointers).l, A2    ; loc_24354
-		lea	$00(A2, D0), A2
-		move.l	A2, -(A7)
-		addq.w	#$04, A2
-		move.l	(A2)+, A0
-		bra.s	Main_Level_Load_Blocks_Convert16 ; loc_77CA
+		moveq	#0,d0
+		move.b	(Current_Zone).w,d0
+		add.w	d0,d0
+		add.w	d0,d0
+		move.w	d0,d1
+		add.w	d0,d0
+		add.w	d1,d0
+		lea	(LevelArtPointers).l,a2
+		lea	(a2,d0.w),a2
+		move.l	a2,-(a7)
+		addq.w	#4,a2
+		move.l	(a2)+,a0
+		bra.s	Main_Level_Load_Blocks_Convert16
 ;===============================================================================
 ; loc_77BC:
-		lea	(Block_Table).w, A1	  ; 16x16 Tiles
-		move.w	#$0000, D0
-		bsr.w	  EniDec	       ; loc_18DA
+		lea	(Block_Table).w,a1
+		move.w	#0,d0
+		bsr.w	EniDec
 		bra.s	loc_77EE
 ;===============================================================================
-Main_Level_Load_Blocks_Convert16: ; loc_77CA:
-		lea	(Block_Table).w, A1
-		move.w	#bytesToWcnt(Block_Table_End-Block_Table), D2
-Main_Level_Load_16_Blocks_Loop: ; loc_77D2:
-		move.w	(A0)+, D0
+Main_Level_Load_Blocks_Convert16:
+		lea	(Block_Table).w,a1
+		move.w	#bytesToWcnt(Block_Table_End-Block_Table),d2
+Main_Level_Load_16_Blocks_Loop:
+		move.w	(a0)+,d0
 		tst.w	(Two_player_mode).w
-		beq.s	Main_Level_Load_16_Blocks_Not2p ; loc_77E8
-		move.w	D0, D1
-		andi.w	#$F800, D0
-		andi.w	#$07FF, D1
-		lsr.w	#$01, D1
-		or.w	D1, D0
-Main_Level_Load_16_Blocks_Not2p: ; loc_77E8:
-		move.w	D0, (A1)+
-		dbf    D2, Main_Level_Load_16_Blocks_Loop ; loc_77D2
+		beq.s	Main_Level_Load_16_Blocks_Not2p
+		move.w	d0,d1
+		andi.w	#$F800,d0
+		andi.w	#7FF,d1
+		lsr.w	#1,d1
+		or.w	d1,d0
+Main_Level_Load_16_Blocks_Not2p:
+		move.w	d0,(a1)+
+		dbf	d2,Main_Level_Load_16_Blocks_Loop ; loc_77D2
 loc_77EE:
 		cmpi.b	#hill_top_zone, (Current_Zone).w
 		bne.s	loc_7820
-		lea	(Block_Table+$980).w, A1
-		lea	(BM16_HTZ).l, A0 ; loc_84A50
-		move.w	#$03FF, D2
+		lea	(Block_Table+$980).w,a1
+		lea	(BM16_HTZ).l,a0
+		move.w	#$3FF,d2
 loc_7804:
-		move.w	(A0)+, D0
+		move.w	(a0)+,d0
 		tst.w	(Two_player_mode).w
 		beq.s	loc_781A
-		move.w	D0, D1
-		andi.w	#$F800, D0
-		andi.w	#$07FF, D1
-		lsr.w	#$01, D1
-		or.w	D1, D0
+		move.w	d0,d1
+		andi.w	#$F800,d0
+		andi.w	#$7FF,d1
+		lsr.w	#1,d1
+		or.w	d1,d0
 loc_781A:
-		move.w	D0, (A1)+
-		dbf    D2, loc_7804
+		move.w	d0,(a1)+
+		dbf	d2,loc_7804
 loc_7820:
-		move.l	(A2)+, A0
-		lea	(Chunk_Table), A1	  ; 128x128 Tiles
+		move.l	(a2)+,a0
+		lea	(Chunk_Table),a1	  ; 128x128 Tiles
 		bsr.w	  KosDec	     ; loc_1A58
 		bra.s	Load_Level_Sprites	; loc_785E
 ;===============================================================================
@@ -8949,39 +8949,39 @@ loc_79A2:
 ; [ Begin ]
 ;===============================================================================
 Dyn_Screen_Boss_Loader: ; loc_79C0: ; Boss Loader / Level Dynamic Resize
-		moveq	#$00, D0
-		move.b	(Current_Zone).w, D0
-		add.w	D0, D0
-		move.w	DynResize_Index(PC, D0), D0 ; loc_7A26
-		jsr	DynResize_Index(PC, D0)     ; loc_7A26
-		moveq	#$02, D1
-		move.w	(Camera_Max_Y_pos).w, D0
-		sub.w	(Camera_Max_Y_pos_now).w, D0
+		moveq	#0,d0
+		move.b	(Current_Zone).w,d0
+		add.w	d0,d0
+		move.w	DynResize_Index(pc,d0.w),d0; loc_7A26
+		jsr	DynResize_Index(pc,d0.w)     ; loc_7A26
+		moveq	#2,d1
+		move.w	(Camera_Max_Y_pos).w,d0
+		sub.w	(Camera_Max_Y_pos_now).w,d0
 		beq.s	loc_79FE
 		bcc.s	loc_7A00
-		neg.w	D1
-		move.w	(Camera_Y_pos).w, D0
-		cmp.w	(Camera_Max_Y_pos).w, D0
+		neg.w	d1
+		move.w	(Camera_Y_pos).w,d0
+		cmp.w	(Camera_Max_Y_pos).w,d0
 		bls.s	loc_79F4
-		move.w	D0, (Camera_Max_Y_pos_now).w
-		andi.w	#$FFFE, (Camera_Max_Y_pos_now).w
+		move.w	d0,(Camera_Max_Y_pos_now).w
+		andi.w	#$FFFE,(Camera_Max_Y_pos_now).w
 loc_79F4:
-		add.w	D1, (Camera_Max_Y_pos_now).w
-		move.b	#$01, (Camera_Max_Y_Pos_Changing).w
+		add.w	d1,(Camera_Max_Y_pos_now).w
+		move.b	#1,(Camera_Max_Y_Pos_Changing).w
 loc_79FE:
 		rts
 loc_7A00:
-		move.w	(Camera_Y_pos).w, D0
-		addi.w	#$0008, D0
-		cmp.w	(Camera_Max_Y_pos_now).w, D0
+		move.w	(Camera_Y_pos).w,d0
+		addi.w	#8,d0
+		cmp.w	(Camera_Max_Y_pos_now).w,d0
 		bcs.s	loc_7A1A
-		btst	#$01, ($FFFFB022).w
+		btst	#1,(Object_RAM+status).w
 		beq.s	loc_7A1A
-		add.w	D1, D1
-		add.w	D1, D1
+		add.w	d1,d1
+		add.w	d1,d1
 loc_7A1A:
-		add.w	D1, (Camera_Max_Y_pos_now).w
-		move.b	#$01, (Camera_Max_Y_Pos_Changing).w
+		add.w	d1,(Camera_Max_Y_pos_now).w
+		move.b	#1,(Camera_Max_Y_Pos_Changing).w
 		rts
 ; off_7A26:
 DynResize_Index: zoneOrderedOffsetTable 2,1
@@ -9009,48 +9009,47 @@ loc_7A48:
 		bne.s	loc_7A50
 		rts
 loc_7A50:
-		moveq	#$00, D0
-		move.b	(Dynamic_Resize_Routine).w, D0
-		move.w	loc_7A5E(PC, D0), D0
-		jmp	loc_7A5E(PC, D0)
+		moveq	#0,d0
+		move.b	(Dynamic_Resize_Routine).w,d0
+		move.w	loc_7A5E(pc,d0.w),d0
+		jmp	loc_7A5E(pc,d0.w)
 loc_7A5E:
 		dc.w	loc_7A64-loc_7A5E
 		dc.w	loc_7AB4-loc_7A5E
 		dc.w	loc_7AC8-loc_7A5E
 loc_7A64:
-		cmpi.w	#$26E0, (Camera_X_pos).w
+		cmpi.w	#$26E0,(Camera_X_pos).w
 		bcs.s	loc_7AB2
-		move.w	(Camera_X_pos).w, (Camera_Min_X_pos).w
-		move.w	#$0390, (Camera_Max_Y_pos).w
-		move.w	#$0390, (Camera_Max_Y_pos_now).w
-		addq.b	#$02, (Dynamic_Resize_Routine).w
-		bsr.w	  SingleObjLoad        ; loc_E772
+		move.w	(Camera_X_pos).w,(Camera_Min_X_pos).w
+		move.w	#$390,(Camera_Max_Y_pos).w
+		move.w	#$390,(Camera_Max_Y_pos_now).w
+		addq.b	#2,(Dynamic_Resize_Routine).w
+		bsr.w	SingleObjLoad
 		bne.s	loc_7A9E
-		move.b	#$55, (A1)
-		move.b	#$81, $0028(A1)
-		move.w	#$29D0, $0008(A1)
-		move.w	#$0426, $000C(A1)
+		move.b	#$55,(a1)
+		move.b	#$81,subtype(a1)
+		move.w	#$29D0,x_pos(a1)
+		move.w	#$426,y_pos(a1)
 loc_7A9E:
-		move.w	#MusID_Boss, D0
-		bsr.w	  PlayMusic		 ; loc_14C0
-		move.b	#$01, (Current_Boss_ID).w
-		moveq	#$28, D0
-		bra.w	  LoadPLC		 ; loc_173C
+		move.w	#MusID_Boss,d0
+		bsr.w	PlayMusic
+		move.b	#1,(Current_Boss_ID).w
+		moveq	#$28,d0
+		bra.w	LoadPLC
 loc_7AB2:
 		rts
 loc_7AB4:
-		cmpi.w	#$2880, (Camera_X_pos).w
+		cmpi.w	#$2880,(Camera_X_pos).w
 		bcs.s	loc_7AC6
-		move.w	#$2880, (Camera_Min_X_pos).w
-		addq.b	#$02, (Dynamic_Resize_Routine).w
+		move.w	#$2880,(Camera_Min_X_pos).w
+		addq.b	#2,(Dynamic_Resize_Routine).w
 loc_7AC6:
 		rts
 loc_7AC8:
 		tst.b	(Boss_defeated_flag).w
 		beq.s	loc_7AD4
-		move.b	#GameModeID_SegaScreen, (Game_Mode).w
+		move.b	#GameModeID_SegaScreen,(Game_Mode).w
 loc_7AD4:
-		rts
 		rts
 loc_7AD8:
 		rts
