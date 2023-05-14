@@ -5408,8 +5408,8 @@ SS_MainLoop:
 		move.w	(Ctrl_1).w,(Ctrl_1_Logical).w
 		jsr	(RunObjects).l
 		jsr	(BuildSprites).l
-		jsr	(S1_SS_Show_Layout).l
-		bsr.w	S1_SS_Bg_Animate
+		jsr	(S1_SS_ShowLayout).l
+		bsr.w	S1_SS_BgAnimate
 		tst.w	(Demo_mode_flag).w	; is demo mode on?
 		beq.s	SS_ChkEnd	; if not, branch
 		tst.w	(Demo_Time_left).w ; is there time left on the demo?
@@ -5437,8 +5437,8 @@ SS_FinLoop:
 		move.w	(Ctrl_1).w,(Ctrl_1_Logical).w
 		jsr	(RunObjects).l
 		jsr	(BuildSprites).l
-		jsr	(S1_SS_Show_Layout).l
-		bsr.w	S1_SS_Bg_Animate
+		jsr	(S1_SS_ShowLayout).l
+		bsr.w	S1_SS_BgAnimate
 		subq.w	#1,(PalChangeSpeed).w
 		bpl.s	loc_53F8
 		move.w	#2,(PalChangeSpeed).w
@@ -5701,7 +5701,7 @@ Pal_S1_SS_Cycle2:
 ; ||||||||||||||| S U B	R O U T	I N E |||||||||||||||||||||||||||||||||||||||
 
 
-S1_SS_Bg_Animate:
+S1_SS_BgAnimate:
 		move.w	(unk_F7A0).w,d0
 		bne.s	loc_5818
 		move.w	#0,(Camera_BG_Y_pos).w
@@ -15484,11 +15484,17 @@ DrawSprite_Loop:
 		move.b	(a1)+,(a2)+	; set sprite size
 		addq.b	#1,d5
 		move.b	d5,(a2)+	; set link field
-		move.w	(a1)+,d0
-		add.w	a3,d0
-		move.w	d0,(a2)+	; set art tile and flags
+		move.w	(a1)+,d0	; get art tile
+;		add.w	a3,d0
+;		move.w	d0,(a2)+	; set art tile and flags
+;		move.b	(a1)+,d0	; get art tile
+;		lsl.w	#8,d0
+;		move.b	(a1)+,d0	; set art tile and flags
+;		ext.w	d0
+		add.w	a3,d0		; add art tile offset
+		move.w	d0,(a2)+	; write to buffer
 		addq.w	#2,a1		; reserve this part of the mappings for two-player
-		move.w	(a1)+,d0
+		move.w	(a1)+,d0	; get x-offset
 		add.w	d3,d0
 		andi.w	#$1FF,d0
 		bne.s	loc_D712
@@ -15507,35 +15513,47 @@ DrawSprite_FlipX:
 		bne.w	loc_D7C2
 
 loc_D722:
-		move.b	(A1)+, D0
-		ext.w	D0
-		add.w	D2, D0
-		move.w	D0, (A2)+
-		move.b	(A1)+, D4
-		move.b	D4, (A2)+
-		addq.b	#$01, D5
-		move.b	D5, (A2)+
-		move.w	(A1)+, D0
-		add.w	A3, D0
-		eori.w	#$0800, D0
-		move.w	D0, (A2)+
-		addq.w	#$02, A1
-		move.w	(A1)+, D0
-		neg.w	D0
-		move.b	loc_D75A(PC, D4), D4
-		sub.w	D4, D0
-		add.w	D3, D0
-		andi.w	#$01FF, D0
+		move.b	(a1)+,d0
+		ext.w	d0
+		add.w	d2,d0
+		move.w	d0,(a2)+
+		move.b	(a1)+,d4
+		move.b	d4,(a2)+
+		addq.b	#1,d5
+		move.b	d5,(a2)+
+		move.w	(a1)+,d0
+;		move.b	(a1)+,d0	; art tile
+;		lsl.w	#8,d0
+;		move.b	(a1)+,d0
+;		ext.w	d0
+		add.w	a3,d0
+		eori.w	#$800,d0	; toggle flip-x in VDP
+		move.w	d0,(a2)+	; write to buffer
+		addq.w	#2,a1
+		move.w	(a1)+,d0	; get x-offset
+		neg.w	d0
+		move.b	loc_D75A(pc,d4),d4
+		sub.w	d4,d0
+		add.w	d3,d0
+		andi.w	#$1FF,d0
 		bne.s	loc_D752
-		addq.w	#$01, D0
+		addq.w	#1,d0
 loc_D752:
-		move.w	D0, (A2)+
-		dbf    D1, loc_D722
+		move.w	d0,(a2)+
+		dbf	d1,loc_D722
 		rts
+; offsets for horizontally mirrored sprite pieces
 loc_D75A:
-		dc.b	$08, $08, $08, $08, $10, $10, $10, $10, $18, $18, $18, $18, $20, $20, $20, $20
+	dc.b   8,  8,  8,  8	; 4
+	dc.b $10,$10,$10,$10	; 8
+	dc.b $18,$18,$18,$18	; 12
+	dc.b $20,$20,$20,$20	; 16
+; offsets for vertically mirrored sprite pieces
 loc_D76A:
-		dc.b	$08, $10, $18, $20, $08, $10, $18, $20, $08, $10, $18, $20, $08, $10, $18, $20
+	dc.b   8,$10,$18,$20	; 4
+	dc.b   8,$10,$18,$20	; 8
+	dc.b   8,$10,$18,$20	; 12
+	dc.b   8,$10,$18,$20	; 16
 loc_D77A:
 		move.b	(A1)+, D0
 		move.b	(A1), D4
@@ -20645,37 +20663,37 @@ loc_10C92:
 		or.b	D1, $0001(A0)
 		bra.w	  loc_10B00
 Sonic_AnimateData: ; loc_10CB4:
-		dc.w	Sonic_Animate_Walk-Sonic_AnimateData	    ; loc_10CF2
-		dc.w	Sonic_Animate_Run-Sonic_AnimateData	    ; loc_10D00
-		dc.w	Sonic_Animate_Roll-Sonic_AnimateData	    ; loc_10D0E
-		dc.w	Sonic_Animate_Roll2-Sonic_AnimateData	    ; loc_10D18
-		dc.w	Sonic_Animate_Push-Sonic_AnimateData	    ; loc_10D22
-		dc.w	Sonic_Animate_Wait-Sonic_AnimateData	    ; loc_10D30
-		dc.w	Sonic_Animate_Balance-Sonic_AnimateData     ; loc_10D59
-		dc.w	Sonic_Animate_LookUp-Sonic_AnimateData	    ; loc_10D5D
-		dc.w	Sonic_Animate_Duck-Sonic_AnimateData	    ; loc_10D62
-		dc.w	Sonic_Animate_Spindash-Sonic_AnimateData    ; loc_10D67
-		dc.w	Sonic_Animate_WallRecoil1-Sonic_AnimateData ; loc_10D74
-		dc.w	Sonic_Animate_WallRecoil2-Sonic_AnimateData ; loc_10D77
-		dc.w	Sonic_Animate_0x0C-Sonic_AnimateData	    ; loc_10D7D
-		dc.w	Sonic_Animate_Stop-Sonic_AnimateData	    ; loc_10D81
-		dc.w	Sonic_Animate_Float1-Sonic_AnimateData	    ; loc_10D8C
-		dc.w	Sonic_Animate_Float2-Sonic_AnimateData	    ; loc_10D90
-		dc.w	Sonic_Animate_0x10-Sonic_AnimateData	    ; loc_10D97
-		dc.w	Sonic_Animate_S1LzHang-Sonic_AnimateData    ; loc_10D9B
-		dc.w	Sonic_Animate_Unused_0x12-Sonic_AnimateData ; loc_10D9F
-		dc.w	Sonic_Animate_Unused_0x13-Sonic_AnimateData ; loc_10DA5
-		dc.w	Sonic_Animate_Unused_0x14-Sonic_AnimateData ; loc_10DAA
-		dc.w	Sonic_Animate_Bubble-Sonic_AnimateData	    ; loc_10DAD
-		dc.w	Sonic_Animate_Death1-Sonic_AnimateData	    ; loc_10DB4
-		dc.w	Sonic_Animate_Drown-Sonic_AnimateData	    ; loc_10DB7
-		dc.w	Sonic_Animate_Death2-Sonic_AnimateData	    ; loc_10DBA
-		dc.w	Sonic_Animate_Unused_0x19-Sonic_AnimateData ; loc_10DBD
-		dc.w	Sonic_Animate_Hurt-Sonic_AnimateData	    ; loc_10DC6
-		dc.w	Sonic_Animate_S1LzSlide-Sonic_AnimateData   ; loc_10DC9
-		dc.w	Sonic_Animate_0x1C-Sonic_AnimateData	    ; loc_10DCD
-		dc.w	Sonic_Animate_Float3-Sonic_AnimateData	    ; loc_10DD1
-		dc.w	Sonic_Animate_0x1E-Sonic_AnimateData	    ; loc_10DD8
+		dc.w	Sonic_Animate_Walk-Sonic_AnimateData
+		dc.w	Sonic_Animate_Run-Sonic_AnimateData
+		dc.w	Sonic_Animate_Roll-Sonic_AnimateData
+		dc.w	Sonic_Animate_Roll2-Sonic_AnimateData
+		dc.w	Sonic_Animate_Push-Sonic_AnimateData
+		dc.w	Sonic_Animate_Wait-Sonic_AnimateData
+		dc.w	Sonic_Animate_Balance-Sonic_AnimateData
+		dc.w	Sonic_Animate_LookUp-Sonic_AnimateData
+		dc.w	Sonic_Animate_Duck-Sonic_AnimateData
+		dc.w	Sonic_Animate_Spindash-Sonic_AnimateData
+		dc.w	Sonic_Animate_WallRecoil1-Sonic_AnimateData
+		dc.w	Sonic_Animate_WallRecoil2-Sonic_AnimateData
+		dc.w	Sonic_Animate_0x0C-Sonic_AnimateData
+		dc.w	Sonic_Animate_Stop-Sonic_AnimateData
+		dc.w	Sonic_Animate_Float1-Sonic_AnimateData
+		dc.w	Sonic_Animate_Float2-Sonic_AnimateData
+		dc.w	Sonic_Animate_0x10-Sonic_AnimateData
+		dc.w	Sonic_Animate_S1LzHang-Sonic_AnimateData
+		dc.w	Sonic_Animate_Unused_0x12-Sonic_AnimateData
+		dc.w	Sonic_Animate_Unused_0x13-Sonic_AnimateData
+		dc.w	Sonic_Animate_Unused_0x14-Sonic_AnimateData
+		dc.w	Sonic_Animate_Bubble-Sonic_AnimateData
+		dc.w	Sonic_Animate_Death1-Sonic_AnimateData
+		dc.w	Sonic_Animate_Drown-Sonic_AnimateData
+		dc.w	Sonic_Animate_Death2-Sonic_AnimateData
+		dc.w	Sonic_Animate_Unused_0x19-Sonic_AnimateData
+		dc.w	Sonic_Animate_Hurt-Sonic_AnimateData
+		dc.w	Sonic_Animate_S1LzSlide-Sonic_AnimateData
+		dc.w	Sonic_Animate_0x1C-Sonic_AnimateData
+		dc.w	Sonic_Animate_Float3-Sonic_AnimateData
+		dc.w	Sonic_Animate_0x1E-Sonic_AnimateData
 Sonic_Animate_Walk: ; loc_10CF2:
 		dc.b	$FF, $10, $11, $12, $13, $14, $15, $16, $17, $0C, $0D, $0E, $0F, $FF
 Sonic_Animate_Run: ; loc_10D00:
@@ -38861,7 +38879,7 @@ loc_21502:
 ; Special Stage - Sub-routine
 ; [ Begin ]
 ;===============================================================================
-S1_SS_Show_Layout:
+S1_SS_ShowLayout:
 		bsr.w	S1_SS_AniWallsRings
 		bsr.w	S1_SS_AniItems
 		move.w	d5,-(sp)
@@ -38929,6 +38947,12 @@ loc_2157A:
 		divu.w	#$18,d0
 		adda.w	d0,a0
 		lea	(Level_Layout).w,a4
+		lea	(Sprite_Table).w,a2
+		moveq	#0,d5
+		move.b	(Sprite_count).w,d5
+		move.w	d5,d0
+		lsl.w	#3,d0
+		adda.w	d0,a2
 		move.w	#$F,d7
 
 loc_215C6:
@@ -38964,39 +38988,37 @@ loc_215CA:
 		move.b	(a1)+,d1
 		subq.b	#1,d1
 		bmi.s	loc_21622
-;		jsr	(DrawSprite_Loop)
-SS_Fix_Loop:
-        cmpi.b  #$50, D5
-        beq.s   SS_Fix_Exit
-        move.b  (A1)+, D0
-        ext.w   D0
-        add.w   D2, D0
-        move.w  D0, (A2)+
-        move.b  (A1)+, (A2)+
-        addq.b  #$01, D5
-        move.b  D5, (A2)+
-        move.b  (A1)+, D0
-        lsl.w   #$08, D0
-        move.b  (A1)+, D0
-        add.w   A3, D0
-        move.w  D0, (A2)+
-        move.b  (A1)+, D0
-        ext.w   D0
-        add.w   D3, D0
-        andi.w  #$01FF, D0
-        bne     SS_Fix_L001
-        addq.w  #$01, D0
-SS_Fix_L001:
-        move.w  D0, (A2)+
-        dbra    D1, SS_Fix_Loop 
-SS_Fix_Exit:
+
+.loop:		cmpi.b	#$50,d5		; check sprite limit
+		beq.s	++
+		move.b	(a1)+,d0	; get y-offset
+		ext.w	d0
+		add.w	d2,d0		; add y-position
+		move.w	d0,(a2)+	; write to buffer
+		move.b	(a1)+,(a2)+	; write sprite size
+		addq.b	#1,d5		; increase sprite counter
+		move.b	d5,(a2)+
+		move.b	(a1)+,d0	; get art tile
+		lsl.w	#8,d0
+		move.b	(a1)+,d0
+		add.w	a3,d0		; add art tile offset
+		move.w	d0,(a2)+	; write to buffer
+		move.b	(a1)+,d0	; get x-offset
+		ext.w	d0
+		add.w	d3,d0		; add x-position
+		andi.w	#$1FF,d0	; keep within 512px
+		bne.s	+
+		addq.w	#1,d0		; avoid activating sprite masking
+
++
+		move.w	d0,(a2)+
+		dbf	d1,.loop
++
 loc_21622:
 		addq.w	#4,a4
 		dbf	d6,loc_215CA
-
 		lea	$70(a0),a0
 		dbf	d7,loc_215C6
-
 		move.b	d5,(Sprite_count).w
 		cmpi.b	#$50,d5
 		beq.s	loc_21642
