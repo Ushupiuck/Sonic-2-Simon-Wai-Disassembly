@@ -11391,7 +11391,6 @@ loc_9D20:
 		move.w	#$2394, $0002(A0)
 		move.b	#$0C, $0019(A0)
 loc_9D34:
-		bsr.w	  Adjust2PArtPointer	 ; loc_DC30
 		ori.b	#$04, $0001(A0)
 		move.b	#$04, $0018(A0)
 		move.w	$000C(A0), $0032(A0)
@@ -27871,6 +27870,7 @@ loc_17190:
 		lsl.w	#$04, D0
 		move.w	D0, $0032(A0)
 		move.w	D0, $0034(A0)
+
 loc_171F2:
 		lea	(loc_173B2).l, A1
 		bsr.w	  J_AnimateSprite_00	  ; loc_1746A
