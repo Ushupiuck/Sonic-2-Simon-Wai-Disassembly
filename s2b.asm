@@ -15259,7 +15259,7 @@ BuildSprites_ObjLoop:
 		movea.l	BldSpr_ScrPos(pc,d0.w),a1
 		cmpi.b  #GameModeID_SpecialStage,(Game_Mode).w
         bne.s   Build_Sprites_A1
-        move.l  SS_Build_Sprites_Screen_Pos(PC, D0), A1 
+        move.l  SS_Build_Sprites_Screen_Pos(PC, D0), A1
         bra.s   Build_Sprites_A1
 SS_Build_Sprites_Screen_Pos:
         dc.l    $00000000, $FFFFEE00, $FFFFEE08, $FFFFEE18
@@ -35773,138 +35773,138 @@ J_SpeedToPos_0E: ; loc_1EBB0:
 ; [ Begin ]
 ;===============================================================================
 Obj_0x4A_Octus: ; loc_1EBB8:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_1EBC6(PC, D0), D1
-		jmp	loc_1EBC6(PC, D1)
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	loc_1EBC6(PC,d0),d1
+		jmp	loc_1EBC6(PC,d1)
 loc_1EBC6:
 		dc.w	loc_1EBF6-loc_1EBC6
 		dc.w	loc_1EC5C-loc_1EBC6
 		dc.w	loc_1EBEA-loc_1EBC6
 		dc.w	loc_1EBCE-loc_1EBC6
 loc_1EBCE:
-		subi.w	#$0001, $002C(A0)
+		subi.w	#1,$2C(a0)
 		bmi.s	loc_1EBD8
 		rts
 loc_1EBD8:
-		bsr.w	  J_ObjectFall_04	  ; loc_1EE60
+		bsr.w	J_ObjectFall_04	; loc_1EE60
 loc_1EBDC:
-		lea	(loc_1EDAA).l, A1
-		bsr.w	  J_AnimateSprite_0A	  ; loc_1EE5A
-		bra.w	  J_MarkObjGone_16	  ; loc_1EE54
+		lea	(loc_1EDAA).l,a1
+		bsr.w	J_AnimateSprite_0A	; loc_1EE5A
+		bra.w	J_MarkObjGone_16	; loc_1EE54
 loc_1EBEA:
-		subq.w	#$01, $002C(A0)
-		beq.w	 J_DeleteObject_25	 ; loc_1EE4E
-		bra.w	  J_DisplaySprite_10	  ; loc_1EE48
+		subq.w	#1,$2C(a0)
+		beq.w	J_DeleteObject_25	; loc_1EE4E
+		bra.w	J_DisplaySprite_10	; loc_1EE48
 loc_1EBF6:
-		move.l	#Octus_Mappings, $0004(A0) ; loc_1EDBC
-		move.w	#$238A, $0002(A0)
-		ori.b	#$04, $0001(A0)
-		move.b	#$0A, $0020(A0)
-		move.b	#$04, $0018(A0)
-		move.b	#$10, $0019(A0)
-		move.b	#$10, $0016(A0)
-		move.b	#$08, $0017(A0)
-		bsr.w	  J_ObjectFall_04	  ; loc_1EE60
+		move.l	#Octus_Mappings,4(a0)	; loc_1EDBC
+		move.w	#$238A,2(a0)
+		ori.b	#4,1(a0)
+		move.b	#$A,$20(a0)
+		move.b	#4,$18(a0)
+		move.b	#$10,$19(a0)
+		move.b	#$10,$16(a0)
+		move.b	#8,$17(a0)
+		bsr.w	J_ObjectFall_04		; loc_1EE60
 		jsr	ObjHitFloor		; (loc_13898)
-		tst.w	D1
+		tst.w	d1
 		bpl.s	loc_1EC54
-		add.w	D1, $000C(A0)
-		move.w	#$0000, $0012(A0)
-		addq.b	#$02, $0024(A0)
-		move.w	$0008(A0), D0
-		sub.w	($FFFFB008).w, D0
+		add.w	d1,$C(a0)
+		move.w	#0,$12(a0)
+		addq.b	#2,$24(a0)
+		move.w	8(a0),d0
+		sub.w	($FFFFB008).w,d0
 		bpl.s	loc_1EC54
 loc_1EC4E:
-		bchg	#0, $0022(A0)
+		bchg	#0, $0022(a0)
 loc_1EC54:
-		move.w	$000C(A0), $002A(A0)
+		move.w	$C(a0),$2A(a0)
 		rts
 loc_1EC5C:
-		moveq	#$00, D0
-		move.b	$0025(A0), D0
-		move.w	loc_1EC78(PC, D0), D1
-		jsr	loc_1EC78(PC, D1)
-		lea	(loc_1EDAA).l, A1
-		bsr.w	  J_AnimateSprite_0A	  ; loc_1EE5A
-		bra.w	  J_MarkObjGone_16	  ; loc_1EE54
+		moveq	#0,d0
+		move.b	$25(a0),d0
+		move.w	loc_1EC78(PC,d0),d1
+		jsr	loc_1EC78(PC,d1)
+		lea	(loc_1EDAA).l,a1
+		bsr.w	J_AnimateSprite_0A	; loc_1EE5A
+		bra.w	J_MarkObjGone_16	; loc_1EE54
 loc_1EC78:
 		dc.w	loc_1EC80-loc_1EC78
 		dc.w	loc_1ECA0-loc_1EC78
 		dc.w	loc_1ECC2-loc_1EC78
 		dc.w	loc_1ED94-loc_1EC78
 loc_1EC80:
-		move.w	$0008(A0), D0
-		sub.w	($FFFFB008).w, D0
-		cmpi.w	#$0080, D0
+		move.w	8(a0),d0
+		sub.w	($FFFFB008).w,d0
+		cmpi.w	#$80,d0
 		bgt.s	loc_1EC9E
-		cmpi.w	#$FF80, D0
+		cmpi.w	#$FF80,d0
 		blt.s	loc_1EC9E
-		addq.b	#$02, $0025(A0)
-		move.b	#$01, $001C(A0)
+		addq.b	#2,$25(a0)
+		move.b	#1,$1C(a0)
 loc_1EC9E:
 		rts
 loc_1ECA0:
-		subi.l	#$00018000, $000C(A0)
-		move.w	$002A(A0), D0
-		sub.w	$000C(A0), D0
-		cmpi.w	#$0020, D0
+		subi.l	#$00018000,$C(a0)
+		move.w	$2A(a0),d0
+		sub.w	$C(a0),d0
+		cmpi.w	#$20,d0
 		ble.s	loc_1ECC0
-		addq.b	#$02, $0025(A0)
-		move.w	#$0000, $002C(A0)
+		addq.b	#2,$25(a0)
+		move.w	#0,$2C(a0)
 loc_1ECC0:
 		rts
 loc_1ECC2:
-		subi.w	#$0001, $002C(A0)
-		beq.w	 loc_1ED8E
-		bpl.w	 loc_1ED8C
-		move.w	#$001E, $002C(A0)
+		subi.w	#1,$2C(a0)
+		beq.w	loc_1ED8E
+		bpl.w	loc_1ED8C
+		move.w	#$1E,$2C(a0)
 		jsr	SingleObjLoad	     ; (loc_E772)
 		bne.s	loc_1ED28
-		_move.b  #$4A, 0(A1)
-		move.b	#$04, $0024(A1)
-		move.l	#Octus_Mappings, $0004(A1) ; loc_1EDBC
-		move.b	#$04, $001A(A1)
-		move.w	#$24C6, $0002(A1)
-		move.b	#$03, $0018(A1)
-		move.b	#$10, $0019(A1)
-		move.w	$0008(A0), $0008(A1)
-		move.w	$000C(A0), $000C(A1)
-		move.w	#$001E, $002C(A1)
-		move.b	$0001(A0), $0001(A1)
-		move.b	$0022(A0), $0022(A1)
+		_move.b	#$4A,0(a1)
+		move.b	#4,$24(a1)
+		move.l	#Octus_Mappings,4(a1) ; loc_1EDBC
+		move.b	#4,$1A(a1)
+		move.w	#$24C6,2(a1)
+		move.b	#3,$18(a1)
+		move.b	#$10,$19(a1)
+		move.w	8(a0),8(a1)
+		move.w	$C(a0),$C(a1)
+		move.w	#$1E,$2C(a1)
+		move.b	1(a0),1(a1)
+		move.b	$22(a0),$22(a1)
 loc_1ED28:
 		jsr	SingleObjLoad	     ; (loc_E772)
 		bne.s	loc_1ED8C
-		_move.b  #$4A, 0(A1)
-		move.b	#$06, $0024(A1)
-		move.l	#Octus_Mappings, $0004(A1) ; loc_1EDBC
-		move.w	#$24C6, $0002(A1)
-		move.b	#$04, $0018(A1)
-		move.b	#$10, $0019(A1)
-		move.w	$0008(A0), $0008(A1)
-		move.w	$000C(A0), $000C(A1)
-		move.w	#$000F, $002C(A1)
-		move.b	$0001(A0), $0001(A1)
-		move.b	$0022(A0), $0022(A1)
-		move.b	#$02, $001C(A1)
-		move.w	#$FA80, $0010(A1)
-		btst	#$00, $0001(A1)
+		_move.b	#$4A,0(a1)
+		move.b	#6,$24(a1)
+		move.l	#Octus_Mappings,4(a1) ; loc_1EDBC
+		move.w	#$24C6,2(a1)
+		move.b	#4,$18(a1)
+		move.b	#$10,$19(a1)
+		move.w	8(a0),8(a1)
+		move.w	$C(a0),$C(a1)
+		move.w	#$F,$2C(a1)
+		move.b	1(a0),1(a1)
+		move.b	$22(a0),$22(a1)
+		move.b	#2,$1C(a1)
+		move.w	#$FA80,$10(a1)
+		btst	#0,1(a1)
 		beq.s	loc_1ED8C
-		neg.w	$0010(A1)
+		neg.w	$10(a1)
 loc_1ED8C:
 		rts
 loc_1ED8E:
-		addq.b	#$02, $0025(A0)
+		addq.b	#2,$25(a0)
 		rts
 loc_1ED94:
-		move.w	#$FFFA, D0
-		btst	#$00, $0001(A0)
+		move.w	#$FFFA,d0
+		btst	#0,1(a0)
 		beq.s	loc_1EDA2
-		neg.w	D0
+		neg.w	d0
 loc_1EDA2:
-		add.w	D0, $0008(A0)
-		bra.w	  J_MarkObjGone_16	  ; loc_1EE54
+		add.w	d0,8(a0)
+		bra.w	J_MarkObjGone_16	; loc_1EE54
 loc_1EDAA:
 		dc.w	loc_1EDB0-loc_1EDAA
 		dc.w	loc_1EDB3-loc_1EDAA
@@ -39143,7 +39143,7 @@ loc_2170A:
 		move.w	$E(a0),$38(a1)
 		adda.w	#$20,a0
 		adda.w	#$48,a1
-		rts	
+		rts
 ; End of function SS_AniWallsRings
 
 ; ===========================================================================
@@ -39241,14 +39241,14 @@ SS_AniBumper:
 		clr.l	(a0)
 		clr.l	4(a0)
 		move.b	#$25,(a1)
-		rts	
+		rts
 ; ===========================================================================
 
 loc_1B564:
 		move.b	d0,(a1)
 
 locret_1B566:
-		rts	
+		rts
 ; ===========================================================================
 SS_AniBumpData:	dc.b $32, $33, $32, $33, 0, 0
 ; ===========================================================================
@@ -39268,7 +39268,7 @@ SS_Ani1Up:
 		clr.l	4(a0)
 
 locret_1B596:
-		rts	
+		rts
 ; ===========================================================================
 SS_Ani1UpData:	dc.b $46, $47, $48, $49, 0, 0
 ; ===========================================================================
@@ -39286,14 +39286,14 @@ SS_AniReverse:
 		clr.l	(a0)
 		clr.l	4(a0)
 		move.b	#$2B,(a1)
-		rts	
+		rts
 ; ===========================================================================
 
 loc_1B5CA:
 		move.b	d0,(a1)
 
 locret_1B5CC:
-		rts	
+		rts
 ; ===========================================================================
 SS_AniRevData:	dc.b $2B, $31, $2B, $31, 0, 0
 ; ===========================================================================
@@ -39453,279 +39453,279 @@ loc_21AEA:
 ; Special stage	mappings and VRAM pointers
 ; ---------------------------------------------------------------------------
 SS_MapIndex:
-                dc.l    SS_Map_R        
-                dc.w    $0142 
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $0142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $0142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $0142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $0142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $0142
-                dc.l    SS_Map_R        
-                dc.w    $0142 
-                dc.l    SS_Map_R        
-                dc.w    $0142 
-                dc.l    SS_Map_R        
-                dc.w    $0142 
-                dc.l    SS_Map_R        
-                dc.w    $2142 
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
-                dc.w    $2142  
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
+                dc.w    $0142
+                dc.l    SS_Map_R
+                dc.w    $0142
+                dc.l    SS_Map_R
+                dc.w    $0142
+                dc.l    SS_Map_R
+                dc.w    $0142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
+                dc.w    $2142
+                dc.l    SS_Map_R
                 dc.w    $4142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $4142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $4142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $4142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $4142
-                dc.l    SS_Map_R        
+                dc.l    SS_Map_R
                 dc.w    $4142
-                dc.l    SS_Map_R        
-                dc.w    $4142 
-                dc.l    SS_Map_R        
-                dc.w    $4142 
-                dc.l    SS_Map_R        
-                dc.w    $4142   
-                dc.l    SS_Map_R        
-                dc.w    $6142   
-                dc.l    SS_Map_R        
-                dc.w    $6142   
-                dc.l    SS_Map_R        
-                dc.w    $6142   
-                dc.l    SS_Map_R        
-                dc.w    $6142  
-                dc.l    SS_Map_R        
-                dc.w    $6142 
-                dc.l    SS_Map_R        
-                dc.w    $6142 
-                dc.l    SS_Map_R        
-                dc.w    $6142 
-                dc.l    SS_Map_R        
-                dc.w    $6142 
-                dc.l    SS_Map_R        
-                dc.w    $6142  
-                dc.l    SS_Bumpers                  
+                dc.l    SS_Map_R
+                dc.w    $4142
+                dc.l    SS_Map_R
+                dc.w    $4142
+                dc.l    SS_Map_R
+                dc.w    $4142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Map_R
+                dc.w    $6142
+                dc.l    SS_Bumpers
                 dc.w    $023B
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $0570
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $0251
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $0370
-                dc.l    SS_Up_Mappings         
+                dc.l    SS_Up_Mappings
                 dc.w    $0263
-                dc.l    SS_Down_Mappings      
+                dc.l    SS_Down_Mappings
                 dc.w    $0263
-                dc.l    SS_Reverse_Goal_Mappings                 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $22F0
-                dc.l    SS_Red_White_Ball_Mappings 
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $0470
-                dc.l    SS_Red_White_Ball_Mappings 
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $05F0
-                dc.l    SS_Red_White_Ball_Mappings 
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $65F0
-                dc.l    SS_Red_White_Ball_Mappings 
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $25F0
-                dc.l    SS_Red_White_Ball_Mappings 
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $45F0
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $02F0
-                dc.l    (($01<<$18)|SS_Bumpers)   
+                dc.l    (($01<<$18)|SS_Bumpers)
                 dc.w    $023B
-                dc.l    (($02<<$18)|SS_Bumpers)   
-                dc.w    $023B 
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    (($02<<$18)|SS_Bumpers)
+                dc.w    $023B
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $0797
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $07A0
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $07A9
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $0797
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $07A0
-                dc.l    SS_Reverse_Goal_Mappings 
+                dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $07A9
-                dc.l    SS_Obj25               
+                dc.l    SS_Obj25
                 dc.w    $27B2
-                dc.l    SS_Emerald_Mappings   
-                dc.w    $0770  
-                dc.l    SS_Emerald_Mappings   
+                dc.l    SS_Emerald_Mappings
                 dc.w    $0770
-                dc.l    SS_Emerald_Mappings   
+                dc.l    SS_Emerald_Mappings
                 dc.w    $0770
-                dc.l    SS_Emerald_Mappings                      
+                dc.l    SS_Emerald_Mappings
                 dc.w    $0770
-                dc.l    SS_Red_Emerald_Mappings 
+                dc.l    SS_Emerald_Mappings
+                dc.w    $0770
+                dc.l    SS_Red_Emerald_Mappings
                 dc.w    $0770
                 dc.l    SS_Gray_Emerald_Mappings
                 dc.w    $0770
                 dc.l    SS_Reverse_Goal_Mappings
                 dc.w    $04F0
-                dc.l    (($04<<$18)|SS_Obj25)    
+                dc.l    (($04<<$18)|SS_Obj25)
                 dc.w    $27B2
-                dc.l    (($05<<$18)|SS_Obj25)                   
+                dc.l    (($05<<$18)|SS_Obj25)
                 dc.w    $27B2
-                dc.l    (($06<<$18)|SS_Obj25)    
+                dc.l    (($06<<$18)|SS_Obj25)
                 dc.w    $27B2
-                dc.l    (($07<<$18)|SS_Obj25)    
+                dc.l    (($07<<$18)|SS_Obj25)
                 dc.w    $27B2
-                dc.l    SS_Red_White_Ball_Mappings 
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $23F0
-                dc.l    (($01<<$18)|SS_Red_White_Ball_Mappings) 
+                dc.l    (($01<<$18)|SS_Red_White_Ball_Mappings)
                 dc.w    $23F0
-                dc.l    (($02<<$18)|SS_Red_White_Ball_Mappings) 
+                dc.l    (($02<<$18)|SS_Red_White_Ball_Mappings)
                 dc.w    $23F0
-                dc.l    (($03<<$18)|SS_Red_White_Ball_Mappings) 
-                dc.w    $23F0  
-                dc.l    (($02<<$18)|SS_Reverse_Goal_Mappings) 
+                dc.l    (($03<<$18)|SS_Red_White_Ball_Mappings)
+                dc.w    $23F0
+                dc.l    (($02<<$18)|SS_Reverse_Goal_Mappings)
                 dc.w    $04F0
-                dc.l    SS_Red_White_Ball_Mappings                   
-                dc.w    $05F0                   
-                dc.l    SS_Red_White_Ball_Mappings  
+                dc.l    SS_Red_White_Ball_Mappings
+                dc.w    $05F0
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $65F0
-                dc.l    SS_Red_White_Ball_Mappings  
+                dc.l    SS_Red_White_Ball_Mappings
                 dc.w    $25F0
-                dc.l    SS_Red_White_Ball_Mappings  
-                dc.w    $45F0  
+                dc.l    SS_Red_White_Ball_Mappings
+                dc.w    $45F0
 ;-------------------------------------------------------------------------------
-SS_Map_R:                                       
-                dc.w    SS_Map_R_P01-SS_Map_R   
-                dc.w    SS_Map_R_P02-SS_Map_R   
-                dc.w    SS_Map_R_P03-SS_Map_R   
-                dc.w    SS_Map_R_P04-SS_Map_R   
-                dc.w    SS_Map_R_P05-SS_Map_R   
-                dc.w    SS_Map_R_P06-SS_Map_R  
-                dc.w    SS_Map_R_P07-SS_Map_R  
-                dc.w    SS_Map_R_P08-SS_Map_R  
-                dc.w    SS_Map_R_P09-SS_Map_R  
-                dc.w    SS_Map_R_P10-SS_Map_R  
-                dc.w    SS_Map_R_P11-SS_Map_R  
-                dc.w    SS_Map_R_P12-SS_Map_R  
-                dc.w    SS_Map_R_P13-SS_Map_R  
-                dc.w    SS_Map_R_P14-SS_Map_R  
-                dc.w    SS_Map_R_P15-SS_Map_R  
-                dc.w    SS_Map_R_P16-SS_Map_R            
-SS_Map_R_P01:                                  
-                dc.b    $01                    
-                dc.b    $F4, $0A, $00, $00, $F4 
-SS_Map_R_P02:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $09, $F0 
-SS_Map_R_P03:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $19, $F0          
-SS_Map_R_P04:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $29, $F0 
-SS_Map_R_P05:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $39, $F0 
-SS_Map_R_P06:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $49, $F0 
-SS_Map_R_P07:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $59, $F0 
-SS_Map_R_P08:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $69, $F0 
-SS_Map_R_P09:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $79, $F0 
-SS_Map_R_P10:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $89, $F0 
-SS_Map_R_P11:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $99, $F0 
-SS_Map_R_P12:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $A9, $F0 
-SS_Map_R_P13:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $B9, $F0 
-SS_Map_R_P14:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $C9, $F0 
-SS_Map_R_P15:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $D9, $F0 
-SS_Map_R_P16:                                   
-                dc.b    $01                     
-                dc.b    $F0, $0F, $00, $E9, $F0                 
-;-------------------------------------------------------------------------------                   
-SS_Bumpers:   
-                dc.w    SS_Obj47_P01-SS_Bumpers 
-                dc.w    SS_Obj47_P02-SS_Bumpers 
-                dc.w    SS_Obj47_P03-SS_Bumpers 
-SS_Obj47_P01:   
-                dc.b    $02                                               
-                dc.b    $F0, $07, $00, $00, $F0, $F0, $07, $08, $00, $00 
-                dc.b    $00   
-SS_Obj47_P02:                                                             
-                dc.b    $02                                               
-                dc.b    $F4, $06, $00, $08, $F4, $F4, $02, $08, $08, $04    
-                dc.b    $00                                          
-SS_Obj47_P03:                                                             
-                dc.b    $02                                               
-                dc.b    $F0, $07, $00, $0E, $F0, $F0, $07, $08, $0E, $00  
-                dc.b    $00                   
-;-------------------------------------------------------------------------------                    
-SS_Obj25:       dc.w    SS_Obj25_P01-SS_Obj25   
-                dc.w    SS_Obj25_P02-SS_Obj25   
-                dc.w    SS_Obj25_P03-SS_Obj25   
-                dc.w    SS_Obj25_P04-SS_Obj25   
-                dc.w    SS_Obj25_P05-SS_Obj25   
-                dc.w    SS_Obj25_P06-SS_Obj25   
-                dc.w    SS_Obj25_P07-SS_Obj25 
-                dc.w    SS_Obj25_P08-SS_Obj25           
-SS_Obj25_P01:                                    
-                dc.b    $01                        
-                dc.b    $F8, $05, $00, $00, $F8    
-SS_Obj25_P02:                                    
-                dc.b    $01                       
-                dc.b    $F8, $05, $00, $04, $F8   
-SS_Obj25_P03:                                    
-                dc.b    $01                       
-                dc.b    $F8, $01, $00, $08, $FC   
-SS_Obj25_P04:                                   
-                dc.b    $01                       
-                dc.b    $F8, $05, $08, $04, $F8   
-SS_Obj25_P05:                                    
-                dc.b    $01                       
-                dc.b    $F8, $05, $00, $0A, $F8   
-SS_Obj25_P06:                                    
-                dc.b    $01                       
-                dc.b    $F8, $05, $18, $0A, $F8   
-SS_Obj25_P07:                                    
-                dc.b    $01                       
-                dc.b    $F8, $05, $08, $0A, $F8   
-SS_Obj25_P08:                                    
-                dc.b    $01                       
-                dc.b    $F8, $05, $10, $0A, $00                        
-SS_Reverse_Goal_Mappings: ; loc_21CC6:   
+SS_Map_R:
+                dc.w    SS_Map_R_P01-SS_Map_R
+                dc.w    SS_Map_R_P02-SS_Map_R
+                dc.w    SS_Map_R_P03-SS_Map_R
+                dc.w    SS_Map_R_P04-SS_Map_R
+                dc.w    SS_Map_R_P05-SS_Map_R
+                dc.w    SS_Map_R_P06-SS_Map_R
+                dc.w    SS_Map_R_P07-SS_Map_R
+                dc.w    SS_Map_R_P08-SS_Map_R
+                dc.w    SS_Map_R_P09-SS_Map_R
+                dc.w    SS_Map_R_P10-SS_Map_R
+                dc.w    SS_Map_R_P11-SS_Map_R
+                dc.w    SS_Map_R_P12-SS_Map_R
+                dc.w    SS_Map_R_P13-SS_Map_R
+                dc.w    SS_Map_R_P14-SS_Map_R
+                dc.w    SS_Map_R_P15-SS_Map_R
+                dc.w    SS_Map_R_P16-SS_Map_R
+SS_Map_R_P01:
+                dc.b    $01
+                dc.b    $F4, $0A, $00, $00, $F4
+SS_Map_R_P02:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $09, $F0
+SS_Map_R_P03:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $19, $F0
+SS_Map_R_P04:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $29, $F0
+SS_Map_R_P05:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $39, $F0
+SS_Map_R_P06:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $49, $F0
+SS_Map_R_P07:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $59, $F0
+SS_Map_R_P08:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $69, $F0
+SS_Map_R_P09:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $79, $F0
+SS_Map_R_P10:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $89, $F0
+SS_Map_R_P11:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $99, $F0
+SS_Map_R_P12:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $A9, $F0
+SS_Map_R_P13:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $B9, $F0
+SS_Map_R_P14:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $C9, $F0
+SS_Map_R_P15:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $D9, $F0
+SS_Map_R_P16:
+                dc.b    $01
+                dc.b    $F0, $0F, $00, $E9, $F0
+;-------------------------------------------------------------------------------
+SS_Bumpers:
+                dc.w    SS_Obj47_P01-SS_Bumpers
+                dc.w    SS_Obj47_P02-SS_Bumpers
+                dc.w    SS_Obj47_P03-SS_Bumpers
+SS_Obj47_P01:
+                dc.b    $02
+                dc.b    $F0, $07, $00, $00, $F0, $F0, $07, $08, $00, $00
+                dc.b    $00
+SS_Obj47_P02:
+                dc.b    $02
+                dc.b    $F4, $06, $00, $08, $F4, $F4, $02, $08, $08, $04
+                dc.b    $00
+SS_Obj47_P03:
+                dc.b    $02
+                dc.b    $F0, $07, $00, $0E, $F0, $F0, $07, $08, $0E, $00
+                dc.b    $00
+;-------------------------------------------------------------------------------
+SS_Obj25:       dc.w    SS_Obj25_P01-SS_Obj25
+                dc.w    SS_Obj25_P02-SS_Obj25
+                dc.w    SS_Obj25_P03-SS_Obj25
+                dc.w    SS_Obj25_P04-SS_Obj25
+                dc.w    SS_Obj25_P05-SS_Obj25
+                dc.w    SS_Obj25_P06-SS_Obj25
+                dc.w    SS_Obj25_P07-SS_Obj25
+                dc.w    SS_Obj25_P08-SS_Obj25
+SS_Obj25_P01:
+                dc.b    $01
+                dc.b    $F8, $05, $00, $00, $F8
+SS_Obj25_P02:
+                dc.b    $01
+                dc.b    $F8, $05, $00, $04, $F8
+SS_Obj25_P03:
+                dc.b    $01
+                dc.b    $F8, $01, $00, $08, $FC
+SS_Obj25_P04:
+                dc.b    $01
+                dc.b    $F8, $05, $08, $04, $F8
+SS_Obj25_P05:
+                dc.b    $01
+                dc.b    $F8, $05, $00, $0A, $F8
+SS_Obj25_P06:
+                dc.b    $01
+                dc.b    $F8, $05, $18, $0A, $F8
+SS_Obj25_P07:
+                dc.b    $01
+                dc.b    $F8, $05, $08, $0A, $F8
+SS_Obj25_P08:
+                dc.b    $01
+                dc.b    $F8, $05, $10, $0A, $00
+SS_Reverse_Goal_Mappings: ; loc_21CC6:
         dc.w    loc_21CCC-SS_Reverse_Goal_Mappings
         dc.w    loc_21CD2-SS_Reverse_Goal_Mappings
         dc.w    loc_21CD8-SS_Reverse_Goal_Mappings
@@ -39737,7 +39737,7 @@ loc_21CD2:
         dc.b    $F4, $A, $00, $9, $F4        ; Sonic 1 Mappings Format
 loc_21CD8:
         dc.b    $00
-        dc.b    $00             ; Filler     
+        dc.b    $00             ; Filler
 SS_Red_White_Ball_Mappings: ; loc_21CDA:
         dc.w    loc_21CE2-SS_Red_White_Ball_Mappings
         dc.w    loc_21CE8-SS_Red_White_Ball_Mappings
@@ -39754,7 +39754,7 @@ loc_21CEE:
         dc.b    $F4, $A, $18, $00, $F4        ; Sonic 1 Mappings Format
 loc_21CF4:
         dc.b    $1
-        dc.b    $F4, $A, $10, $00, $F4        ; Sonic 1 Mappings Format   
+        dc.b    $F4, $A, $10, $00, $F4        ; Sonic 1 Mappings Format
 SS_Up_Mappings: ; loc_21CFA:
         dc.w    loc_21CFE-SS_Up_Mappings
         dc.w    loc_21D04-SS_Up_Mappings
@@ -39763,13 +39763,13 @@ loc_21CFE:
         dc.b    $F4, $A, $00, $00, $F4        ; Sonic 1 Mappings Format
 loc_21D04:
         dc.b    $1
-        dc.b    $F4, $A, $00, $12, $F4        ; Sonic 1 Mappings Format 
+        dc.b    $F4, $A, $00, $12, $F4        ; Sonic 1 Mappings Format
 SS_Down_Mappings: ; loc_21D0A:
         dc.w    loc_21D0E-SS_Down_Mappings
         dc.w    loc_21D14-SS_Down_Mappings
 loc_21D0E:
         dc.b    $1
-        dc.b    $F4, $A, $00, $9, $F4        ; Sonic 1 Mappings Format 
+        dc.b    $F4, $A, $00, $9, $F4        ; Sonic 1 Mappings Format
 loc_21D14:
         dc.b    $1
         dc.b    $F4, $A, $00, $12, $F4        ; Sonic 1 Mappings Format
@@ -39778,22 +39778,22 @@ SS_Red_Emerald_Mappings: ; loc_21D1A:
         dc.w    loc_21D38-SS_Red_Emerald_Mappings
 SS_Gray_Emerald_Mappings: ; loc_21D1E:
         dc.w    loc_21D2C-SS_Gray_Emerald_Mappings
-        dc.w    loc_21D38-SS_Gray_Emerald_Mappings        
-SS_Emerald_Mappings: ; loc_21D22:  {Blue / Yellow / Purple / Green}  
+        dc.w    loc_21D38-SS_Gray_Emerald_Mappings
+SS_Emerald_Mappings: ; loc_21D22:  {Blue / Yellow / Purple / Green}
         dc.w    loc_21D32-SS_Emerald_Mappings
         dc.w    loc_21D38-SS_Emerald_Mappings
 loc_21D26:
         dc.b    $1
-        dc.b    $F8, $5, $00, $00, $F8        ; Sonic 1 Mappings Format   
+        dc.b    $F8, $5, $00, $00, $F8        ; Sonic 1 Mappings Format
 loc_21D2C:
         dc.b    $1
-        dc.b    $F8, $5, $00, $4, $F8        ; Sonic 1 Mappings Format        
+        dc.b    $F8, $5, $00, $4, $F8        ; Sonic 1 Mappings Format
 loc_21D32:
         dc.b    $1
         dc.b    $F8, $5, $00, $8, $F8        ; Sonic 1 Mappings Format
 loc_21D38:
         dc.b    $1
-        dc.b    $F8, $5, $00, $C, $F8        ; Sonic 1 Mappings Format          
+        dc.b    $F8, $5, $00, $C, $F8        ; Sonic 1 Mappings Format
 ;===============================================================================
 ; Special Stage - Sub-routine
 ; [ End ]
@@ -40216,7 +40216,7 @@ loc_220A8:
 		move.b	(a1)+,d4
 		bsr.s	sub_1BD30
 		tst.b	d5
-		rts	
+		rts
 ; End of function sub_1BCE8
 
 
@@ -40233,14 +40233,14 @@ sub_1BD30:
 		bcc.s	loc_1BD46
 
 locret_1BD44:
-		rts	
+		rts
 ; ===========================================================================
 
 loc_1BD46:
 		move.b	d4,$30(a0)
 		move.l	a1,$32(a0)
 		moveq	#-1,d5
-		rts	
+		rts
 ; End of function sub_1BD30
 
 
