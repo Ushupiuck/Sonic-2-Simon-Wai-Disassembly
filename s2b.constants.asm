@@ -9,6 +9,132 @@ Size_of_SEGA_sound =		$6174
 Size_of_Snd_driver_guess =	$DF3 ; approximate post-compressed size of the Z80 sound driver
 
 ; ---------------------------------------------------------------------------
+; Object Status Table offsets (for everything between Object_RAM and Primary_Collision)
+; ---------------------------------------------------------------------------
+; universally followed object conventions:
+id =			  0 ; object ID (if you change this, change insn1op and insn2op in s2.macrosetup.asm, if you still use them)
+render_flags =		  1 ; bitfield ; bit 7 = onscreen flag, bit 0 = x mirror, bit 1 = y mirror, bit 2 = coordinate system, bit 6 = render subobjects
+art_tile =		  2 ; and 3 ; start of sprite's art
+mappings =		  4 ; and 5 and 6 and 7
+x_pos =			  8 ; and 9 ... some objects use $A and $B as well when extra precision is required (see ObjectMove) ... for screen-space objects this is called x_pixel instead
+x_sub =			 $A ; and $B
+y_pos =			 $C ; and $D ... some objects use $E and $F as well when extra precision is required ... screen-space objects use y_pixel instead
+y_sub =			 $E ; and $F
+priority =		$18 ; 0 = front
+width_pixels =		$19
+mapping_frame =		$1A
+; ---------------------------------------------------------------------------
+; conventions followed by most objects:
+x_vel =			$10 ; and $11 ; horizontal velocity
+y_vel =			$12 ; and $13 ; vertical velocity
+y_radius =		$16 ; collision height / 2
+x_radius =		$17 ; collision width / 2
+anim_frame =		$1B
+anim =			$1C
+prev_anim =		$1D
+anim_frame_duration =	$1E
+status =		$22 ; note: exact meaning depends on the object... for Sonic/Tails: bit 0: left-facing. bit 1: in-air. bit 2: spinning. bit 3: on-object. bit 4: roll-jumping. bit 5: pushing. bit 6: underwater.
+routine =		$24
+routine_secondary =	$25
+angle =			$26 ; angle about the z axis (360 degrees = 256)
+; ---------------------------------------------------------------------------
+; conventions followed by many objects but NOT Sonic/Tails:
+collision_flags =	$20
+collision_property =	$21
+respawn_index =		$23
+subtype =		$28
+; ---------------------------------------------------------------------------
+; conventions specific to Sonic/Tails (Obj01, Obj02, and ObjDB):
+; note: $1F, $20, and $21 are unused and available
+inertia =		$14 ; and $15 ; directionless representation of speed... not updated in the air
+; KiS2: New SSTs, related to Knuckles' abilities.
+double_jump_property =	$20 ; Changed from $1F
+double_jump_flag =	$21
+flip_angle =		$27 ; angle about the x axis (360 degrees = 256) (twist/tumble)
+air_left =		$28
+flip_turned =		$29 ; 0 for normal, 1 to invert flipping (it's a 180 degree rotation about the axis of Sonic's spine, so he stays in the same position but looks turned around)
+obj_control =		$2A ; 0 for normal, 1 for hanging or for resting on a flipper, $81 for going through CNZ/OOZ/MTZ tubes or stopped in CNZ cages or stoppers or flying if Tails
+status_secondary =	$2B
+flips_remaining =	$2C ; number of flip revolutions remaining
+flip_speed =		$2D ; number of flip revolutions per frame / 256
+move_lock =		$2E ; and $2F ; horizontal control lock, counts down to 0
+invulnerable_time =	$30 ; and $31 ; time remaining until you stop blinking
+invincibility_time =	$32 ; and $33 ; remaining
+speedshoes_time =	$34 ; and $35 ; remaining
+next_tilt =		$36 ; angle on ground in front of sprite
+tilt =			$37 ; angle on ground
+stick_to_convex =	$38 ; 0 for normal, 1 to make Sonic stick to convex surfaces like the rotating discs in Sonic 1 and 3 (unused in Sonic 2 but fully functional)
+spindash_flag =		$39 ; 0 for normal, 1 for charging a spindash or forced rolling
+pinball_mode =		spindash_flag
+spindash_counter =	$3A ; and $3B
+restart_countdown =	spindash_counter; and 1+spindash_counter
+jumping =		$3C
+interact =		$3D ; RAM address of the last object Sonic stood on, minus $FFFFB000 and divided by $40
+top_solid_bit = 	$3E ; the bit to check for top solidity (either $C or $E)
+lrb_solid_bit =		$3F ; the bit to check for left/right/bottom solidity (either $D or $F)
+; ---------------------------------------------------------------------------
+; conventions followed by several objects but NOT Sonic/Tails:
+y_pixel =		2+x_pos ; and 3+x_pos ; y coordinate for objects using screen-space coordinate system
+x_pixel =		x_pos ; and 1+x_pos ; x coordinate for objects using screen-space coordinate system
+parent =		$3E ; and $3F ; address of object that owns or spawned this one, if applicable
+; TODO: $2C is often parent instead (see LoadChildObject); consider defining parent2 = $2C and changing some objoff_2Cs to that
+; ---------------------------------------------------------------------------
+; conventions followed by some/most bosses:
+boss_subtype		= $A
+boss_invulnerable_time	= $14
+boss_sine_count		= $1A	;mapping_frame
+boss_routine		= $26	;angle
+boss_defeated		= $2C
+boss_hitcount2		= $32
+boss_hurt_sonic		= $38	; flag set by collision response routine when Sonic has just been hurt (by boss?)
+; ---------------------------------------------------------------------------
+; when childsprites are activated (i.e. bit #6 of render_flags set)
+mainspr_mapframe	= $B
+mainspr_width		= $E
+mainspr_childsprites 	= $F	; amount of child sprites
+mainspr_height		= $14
+sub2_x_pos		= $10	;x_vel
+sub2_y_pos		= $12	;y_vel
+sub2_mapframe		= $15
+sub3_x_pos		= $16	;y_radius
+sub3_y_pos		= $18	;priority
+sub3_mapframe		= $1B	;anim_frame
+sub4_x_pos		= $1C	;anim
+sub4_y_pos		= $1E	;anim_frame_duration
+sub4_mapframe		= $21	;collision_property
+sub5_x_pos		= $22	;status
+sub5_y_pos		= $24	;routine
+sub5_mapframe		= $27
+sub6_x_pos		= $28	;subtype
+sub6_y_pos		= $2A
+sub6_mapframe		= $2D
+sub7_x_pos		= $2E
+sub7_y_pos		= $30
+sub7_mapframe		= $33
+sub8_x_pos		= $34
+sub8_y_pos		= $36
+sub8_mapframe		= $39
+sub9_x_pos		= $3A
+sub9_y_pos		= $3C
+sub9_mapframe		= $3F
+next_subspr		= $6
+; ---------------------------------------------------------------------------
+; unknown or inconsistently used offsets that are not applicable to Sonic/Tails:
+; (provided because rearrangement of the above values sometimes requires making space in here too)
+objoff_A =		2+x_pos ; note: x_pos can be 4 bytes, but sometimes the last 2 bytes of x_pos are used for other unrelated things
+objoff_B =		3+x_pos ; unused
+objoff_E =		2+y_pos	; unused
+objoff_F =		3+y_pos ; unused
+objoff_10 =		$10
+objoff_14 =		$14
+objoff_15 =		$15
+objoff_1F =		$1F
+objoff_27 =		$27
+objoff_28 =		$28 ; overlaps subtype, but a few objects use it for other things anyway
+ enum               objoff_29=$29,objoff_2A=$2A,objoff_2B=$2B,objoff_2C=$2C,objoff_2D=$2D,objoff_2E=$2E,objoff_2F=$2F
+ enum objoff_30=$30,objoff_31=$31,objoff_32=$32,objoff_33=$33,objoff_34=$34,objoff_35=$35,objoff_36=$36,objoff_37=$37
+ enum objoff_38=$38,objoff_39=$39,objoff_3A=$3A,objoff_3B=$3B,objoff_3C=$3C,objoff_3D=$3D,objoff_3E=$3E,objoff_3F=$3F
+; ---------------------------------------------------------------------------
 ; Constants that can be used instead of hard-coded IDs for various things.
 ; The "id" function allows to remove elements from an array/table without having
 ; to change the IDs everywhere in the code.
