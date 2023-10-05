@@ -39570,6 +39570,7 @@ loc_21CFE:
 loc_21D04:
         dc.b    $1
         dc.b    $F4, $A, $00, $12, $F4        ; Sonic 1 Mappings Format
+
 SS_Down_Mappings: ; loc_21D0A:
         dc.w    loc_21D0E-SS_Down_Mappings
         dc.w    loc_21D14-SS_Down_Mappings
