@@ -9,7 +9,7 @@
 
 paddingSoFar set 0
 
-; 128 = 80h = z80, 32988 = 80DCh = z80unDoC 
+; 128 = 80h = z80, 32988 = 80DCh = z80unDoC
 notZ80 function cpu,(cpu<>128)&&(cpu<>32988)
 
 ; make org safer (impossible to overwrite previously assembled bytes) and count padding
@@ -52,7 +52,7 @@ even macro
 	if notZ80(MOMCPU)
 		if (*)&1
 paddingSoFar		set paddingSoFar+1
-			dc.b 0 ;ds.b 1 
+			dc.b 0 ;ds.b 1
 		endif
 	else
 		if ($)&1
