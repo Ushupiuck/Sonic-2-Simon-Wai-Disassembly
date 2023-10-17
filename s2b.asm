@@ -4283,46 +4283,43 @@ Level_Select_Text: ; loc_3D7C: ; Level Select Menu Text
 		lea	($FE0000),a1
 		move.w	#$FF,d5
 
-Unused_Code3_Loop2: ; loc_40DE:
-		lea     (Chunk_Table), A3
-		move.w  D7, D6
-Unused_Code3_Loop3: ; loc_40E6:
-		movem.l A1-A3, -(A7)
-		move.w  #$003F, D0
-Unused_Code3_Loop4: ; loc_40EE:
-		cmpm.w  (A1)+, (A3)+
-		bne.s   Unused_Code3_loc_4104
-		dbf    D0, Unused_Code3_Loop4  ; loc_40EE
-		movem.l (A7)+, A1-A3
-		adda.w  #$0080, A1
-		dbf    D5, Unused_Code3_Loop2  ; loc_40DE
-		bra.s   Unused_Code3_loc_411E
+.loop2:
+		lea	(Chunk_Table),a3
+		move.w	d7,d6
+
+.loop3:		movem.l	a1-a3,-(a7)
+		move.w	#$3F,d0
+-		cmpm.w	(a1)+,(a3)+
+		bne.s	Unused_Code3_loc_4104
+		dbf	d0,-
+		movem.l	(a7)+,a1-a3
+		adda.w	#$80,a1
+		dbf	d5,.loop2
+		bra.s	Unused_Code3_loc_411E
 Unused_Code3_loc_4104:
-		movem.l (A7)+, A1-A3
-		adda.w  #$0080, A3
-		dbf    D6, Unused_Code3_Loop3  ; loc_40E6
-		moveq   #$1F, D0
-Unused_Code3_Loop5: ; loc_4112:
-		move.l  (A1)+, (A3)+
-		dbf    D0, Unused_Code3_Loop5  ; loc_4112
-		addq.l  #$01, D7
-		dbf    D5, Unused_Code3_Loop2  ; loc_40DE
+		movem.l	(a7)+,a1-a3
+		adda.w	#$80,a3
+		dbf	d6,.loop3
+		moveq	#$1F,d0
+-		move.l	(a1)+,(a3)+
+		dbf	d0,-
+		addq.l	#$1,d7
+		dbf	d5,Unused_Code3_Loop2
 Unused_Code3_loc_411E:
-		bra.s   Unused_Code3_loc_411E
-Unused_Code4: ; loc_4120:
-		moveq   #$07, D0
-Unused_Code4_Loop: ; loc_4122:
-		move.l  (A3)+, (A1)+
-		move.l  (A3)+, (A1)+
-		move.l  (A3)+, (A1)+
-		move.l  (A3)+, (A1)+
-		move.l  (A3)+, (A2)+
-		move.l  (A3)+, (A2)+
-		move.l  (A3)+, (A2)+
-		move.l  (A3)+, (A2)+
-		dbf	D0, Unused_Code4_Loop   ; loc_4122
-		adda.w  #$0080, A1
-		adda.w  #$0080, A2
+		bra.s	Unused_Code3_loc_411E ; Freezes the engine once the routine has been run
+Unused_Code4:
+		moveq   #$7,d0
+-		move.l	(a3)+,(a1)+
+		move.l	(a3)+,(a1)+
+		move.l	(a3)+,(a1)+
+		move.l	(a3)+,(a1)+
+		move.l	(a3)+,(a2)+
+		move.l	(a3)+,(a2)+
+		move.l	(a3)+,(a2)+
+		move.l	(a3)+,(a2)+
+		dbf	d0,-
+		adda.w	#$80,a1
+		adda.w	#$80,a2
 		rts
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
