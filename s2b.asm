@@ -14216,75 +14216,81 @@ loc_C940:
 ; [ Begin ]
 ;===============================================================================
 Obj_0x36_Spikes: ; loc_C944:
-		moveq   #$00, D0
-		move.b  $0024(A0), D0
-		move.w  loc_C952(PC, D0), D1
-		jmp     loc_C952(PC, D1)
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	loc_C952(pc,d0),d1
+		jmp	loc_C952(pc,d1)
 loc_C952:
-		dc.w    loc_C96A-loc_C952
-		dc.w    loc_C9D6-loc_C952
-		dc.w    loc_CA26-loc_C952
-		dc.w    loc_CA82-loc_C952
+		dc.w	loc_C96A-loc_C952
+		dc.w	loc_C9D6-loc_C952
+		dc.w	loc_CA26-loc_C952
+		dc.w	loc_CA82-loc_C952
 loc_C95A:
 		dc.b    $10, $10, $20, $10, $30, $10, $40, $10, $10, $10, $10, $20, $10, $30, $10, $40
 loc_C96A:
-		addq.b  #$02, $0024(A0)
-		move.l  #Obj36_MapUnc_CAB0, $0004(A0) ; loc_CBA0
-		move.w  #$2434, $0002(A0)
-		bsr.w     Adjust2PArtPointer     ; loc_DC30
-		ori.b   #$04, $0001(A0)
-		move.b  #$04, $0018(A0)
-		move.b  $0028(A0), D0
-		andi.b  #$0F, $0028(A0)
-		andi.w  #$00F0, D0
-		lea     loc_C95A(PC), A1
-		lsr.w   #$03, D0
-		adda.w  D0, A1
-		move.b  (A1)+, $0019(A0)
-		move.b  (A1)+, $0016(A0)
-		lsr.w   #$01, D0
-		move.b  D0, $001A(A0)
-		cmpi.b  #$04, D0
-		bcs.s   loc_C9BA
-		addq.b  #$02, $0024(A0)
+		addq.b	#2,$24(a0)
+		move.l	#Obj36_MapUnc_CAB0,4(a0) ; loc_CBA0
+		move.w	#$2434,2(a0)
+		ori.b	#4,1(a0)
+		move.b	#4,$18(d0)
+		move.b	$28(a0),d0
+		andi.b	#$F,$28(a0)
+		andi.w	#$F0,d0
+		lea	loc_C95A(pc),a1
+		lsr.w	#3,d0
+		adda.w	d0,a1
+		move.b	(a1)+,$19(a0)
+		move.b	(a1)+,$16(a0)
+		lsr.w	#1,d0
+		move.b	d0,$1A(a0)
+		cmpi.b	#4,d0
+		bcs.s	loc_C9BA
+		addq.b	#2,$24(a0)
+
 loc_C9BA:
-		btst    #$01, $0022(A0)
-		beq.s   loc_C9C8
-		move.b  #$06, $0024(A0)
+		btst	#1,$22(a0)
+		beq.s	loc_C9C8
+		move.b	#6,$24(a0)
 loc_C9C8:
-		move.w  $0008(A0), $0030(A0)
-		move.w  $000C(A0), $0032(A0)
+		move.w	8(a0),$30(a0)
+		move.w	$C(a0),$32(a0)
 		rts
+; ===========================================================================
+
 loc_C9D6:
-		bsr.w     loc_CAFE
-		moveq   #$00, D1
-		move.b  $0019(A0), D1
-		addi.w  #$000B, D1
-		moveq   #$00, D2
-		move.b  $0016(A0), D2
-		move.w  D2, D3
-		addq.w  #$01, D3
-		move.w  $0008(A0), D4
-		bsr.w     SolidObject             ; loc_F4A0
-		move.b  $0022(A0), D6
-		andi.b  #$18, D6
-		beq.s   loc_CA1E
-		move.b  D6, D0
-		andi.b  #$08, D0
-		beq.s   loc_CA10
-		lea     (MainCharacter).w, A1
-		bsr.w     Touch_Spikes            ; loc_CAD0
+		bsr.w	loc_CAFE
+		moveq	#0,d1
+		move.b	$19(a0),d1
+		addi.w	#$B,d1
+		moveq	#0,d2
+		move.b	$16(a0),d2
+		move.w	d2,d3
+		addq.w	#1,d3
+		move.w	8(a0),d4
+		bsr.w	SolidObject
+		move.b	$22(a0),d6
+		andi.b	#$18,d6
+		beq.s	loc_CA1E
+		move.b	d6,d0
+		andi.b	#8,d0
+		beq.s	loc_CA10
+		lea	(MainCharacter).w,a1
+		bsr.w	Touch_Spikes
 loc_CA10:
-		andi.b  #$10, D6
-		beq.s   loc_CA1E
-		lea     (Sidekick).w, A1
-		bsr.w     Touch_Spikes            ; loc_CAD0
+		andi.b	#$10,d6
+		beq.s	loc_CA1E
+		lea	(Sidekick).w,a1
+		bsr.w	Touch_Spikes            ; loc_CAD0
+
+
 loc_CA1E:
-		move.w  $0030(A0), D0
-		bra.w     loc_D2D8
+		move.w	$30(a0),d0
+		bra.w	loc_D2D8
+
+
 loc_CA26:
-		move.w  $0008(A0), -(A7)
-		bsr.w     loc_CAFE
+		move.w	$0008(a0),-(A7)
+		bsr.w	loc_CAFE
 		moveq   #$00, D1
 		move.b  $0019(A0), D1
 		addi.w  #$000B, D1
@@ -14309,9 +14315,13 @@ loc_CA66:
 		lea     (Sidekick).w, A1
 		bsr.w     Touch_Spikes            ; loc_CAD0
 		bclr    #$06, $0022(A0)
+
+
 loc_CA7A:
 		move.w  $0030(A0), D0
 		bra.w     loc_D2D8
+
+
 loc_CA82:
 		bsr.w     loc_CAFE
 		moveq   #$00, D1
@@ -14336,6 +14346,8 @@ loc_CABA:
 		beq.s   loc_CAC8
 		lea     (Sidekick).w, A1
 		bsr.w     Touch_Spikes            ; loc_CAD0
+
+
 loc_CAC8:
 		move.w  $0030(A0), D0
 		bra.w     loc_D2D8
@@ -14689,94 +14701,94 @@ loc_D010:
 ; ---------------------------------------------------------------------------
 ; loc_D01A:
 Obj_Index:
-ObjPtr_Sonic:	dc.l	Obj01			; Sonic
-		dc.l    Obj_0x02_Tails		    ; loc_10E38
-		dc.l	Obj03			; Collision plane/layer switcher
-		dc.l	Obj04			; Surface of the water
-		dc.l	Obj05			; Tails' tails
-		dc.l	Obj06			; Twisting spiral pathway in GHZ
-		dc.l	Obj07			; Oil Ocean in OOZ
-		dc.l    Obj_0x08_Water_Splash             ; loc_12B42
-		dc.l    Obj_0x09_Sonic_In_Special_Stage   ; loc_21D40
-		dc.l    Obj_0x0A_Bubbles_And_Numbers      ; loc_1207C
+ObjPtr_Sonic:	dc.l	Obj01				; Sonic
+		dc.l	Obj_0x02_Tails			; Tails
+		dc.l	Obj03				; Collision plane/layer switcher
+		dc.l	Obj04				; Surface of the water
+		dc.l	Obj05				; Tails' tails
+		dc.l	Obj06				; Twisting spiral pathway in GHZ
+		dc.l	Obj07				; Oil Ocean in OOZ
+		dc.l	Obj_0x08_Water_Splash		; loc_12B42
+		dc.l	Obj_0x09_Sonic_In_Special_Stage	; loc_21D40
+		dc.l	Obj_0x0A_Bubbles_And_Numbers	; loc_1207C
 		dc.l	Obj0B			; Section of pipe that tips you off from CPZ
 		dc.l	Obj0C			; Small floating platform (used in CPZ in the Nick Arcade prototype)
 		dc.l	Obj0D			; End of level signpost
 		dc.l	Obj0E			; Sonic and Tails on the title screen
 		dc.l	Obj0F			; Mappings test?
-		dc.l    Obj_0x10		          ; loc_223E2
-		dc.l    Obj_0x11_Bridge		   ; loc_7FDC
+		dc.l	Obj_0x10		          ; loc_223E2
+		dc.l	Obj_0x11_Bridge		   ; loc_7FDC
 		dc.l	Obj12			; Emerald from Hidden Palace Zone
-		dc.l    Obj_0x13_Hpz_Waterfalls           ; loc_14B78
-		dc.l    Obj_0x14_See_Saw		  ; loc_15B8C
-		dc.l    Obj_0x15_Swing_Platform           ; loc_85F8
-		dc.l    Obj_0x16_Teleferics               ; loc_1600C
-		dc.l    Obj_0x17		          ; loc_8B9C
-		dc.l    Obj_0x18_Platforms		; loc_8D38
-		dc.l    Obj_0x19_Elevator		 ; loc_1621C
-		dc.l    Obj_0x1A_Collapsing_Platforms     ; loc_9128
-		dc.l    Obj_0x1B_Speed_Booster            ; loc_16468
-		dc.l    Obj_0x1C_Misc		     ; loc_999C
-		dc.l    Obj_0x1D_Worms		    ; loc_165B0
-		dc.l    Obj_0x1E_Tube_Attributes          ; loc_16724
-		dc.l    Obj_0x1F_Collapsing_Platforms     ; loc_9274
-		dc.l    Obj_0x20_Fireball		 ; loc_17174
-		dc.l    Obj_0x21_Head_Up_Display          ; loc_22DFC
-		dc.l    Obj_0x22_Arrow_Shooter            ; loc_19660
-		dc.l    Obj_0x23_Pillar		   ; loc_19850
-		dc.l    Obj_0x24		          ; loc_A012
+		dc.l	Obj_0x13_Hpz_Waterfalls           ; loc_14B78
+		dc.l	Obj_0x14_See_Saw		  ; loc_15B8C
+		dc.l	Obj_0x15_Swing_Platform           ; loc_85F8
+		dc.l	Obj_0x16_Teleferics               ; loc_1600C
+		dc.l	Obj_0x17		          ; loc_8B9C
+		dc.l	Obj_0x18_Platforms		; loc_8D38
+		dc.l	Obj_0x19_Elevator		 ; loc_1621C
+		dc.l	Obj_0x1A_Collapsing_Platforms     ; loc_9128
+		dc.l	Obj_0x1B_Speed_Booster            ; loc_16468
+		dc.l	Obj_0x1C_Misc		     ; loc_999C
+		dc.l	Obj_0x1D_Worms		    ; loc_165B0
+		dc.l	Obj_0x1E_Tube_Attributes          ; loc_16724
+		dc.l	Obj_0x1F_Collapsing_Platforms     ; loc_9274
+		dc.l	Obj_0x20_Fireball		 ; loc_17174
+		dc.l	Obj_0x21_Head_Up_Display          ; loc_22DFC
+		dc.l	Obj_0x22_Arrow_Shooter            ; loc_19660
+		dc.l	Obj_0x23_Pillar		   ; loc_19850
+		dc.l	Obj_0x24		          ; loc_A012
 		dc.l	Obj25			; A ring
-		dc.l    Obj_0x26_Monitors		 ; loc_B29C
-		dc.l    Obj_0x27_Object_Hit               ; loc_A086
-		dc.l    Obj_0x28_Flickies		 ; loc_A2B0
-		dc.l    Obj_0x29_Enemy_Points             ; loc_A7C0
-		dc.l    Obj_0x2A_Up_Down_Pillar           ; loc_9C0C
-		dc.l    Obj_0x2B_Breakable_Pillar         ; loc_19A1E
-		dc.l    Obj_0x2C_Leaves		   ; loc_1A0C4
-		dc.l    Obj_0x2D_Automatic_Door           ; loc_9CE2
-		dc.l    Obj_0x2E_Monitors_Contents        ; loc_B46A
-		dc.l    Obj_0x2F_Breakable_Floor          ; loc_1747C
-		dc.l    Obj_0x30		          ; loc_17A4C
-		dc.l    Obj_0x31_Lava_Attributes          ; loc_155A0
-		dc.l    Obj_0x32_Breakable_Obstacule      ; loc_1768A
-		dc.l    Obj_0x33_Touch_Booster            ; loc_17CA0
+		dc.l	Obj_0x26_Monitors		 ; loc_B29C
+		dc.l	Obj_0x27_Object_Hit               ; loc_A086
+		dc.l	Obj_0x28_Flickies		 ; loc_A2B0
+		dc.l	Obj_0x29_Enemy_Points             ; loc_A7C0
+		dc.l	Obj_0x2A_Up_Down_Pillar           ; loc_9C0C
+		dc.l	Obj_0x2B_Breakable_Pillar         ; loc_19A1E
+		dc.l	Obj_0x2C_Leaves		   ; loc_1A0C4
+		dc.l	Obj_0x2D_Automatic_Door           ; loc_9CE2
+		dc.l	Obj_0x2E_Monitors_Contents        ; loc_B46A
+		dc.l	Obj_0x2F_Breakable_Floor          ; loc_1747C
+		dc.l	Obj_0x30		          ; loc_17A4C
+		dc.l	Obj_0x31_Lava_Attributes          ; loc_155A0
+		dc.l	Obj_0x32_Breakable_Obstacule      ; loc_1768A
+		dc.l	Obj_0x33_Touch_Booster            ; loc_17CA0
 		dc.l	Obj34			; Sonic 1 title cards
-		dc.l    Obj_0x35_Invincibility            ; loc_1264E
-		dc.l    Obj_0x36_Spikes		   ; loc_C944
-		dc.l    Obj_0x37_Rings_Out		; loc_AD62
-		dc.l    Obj_0x38_Shield		   ; loc_125CE
-		dc.l    Obj_0x39_Time_Game_Over           ; loc_BD76
-		dc.l    Obj_0x3A_Level_Results            ; loc_BE38
+		dc.l	Obj_0x35_Invincibility            ; loc_1264E
+		dc.l	Obj_0x36_Spikes		   ; loc_C944
+		dc.l	Obj_0x37_Rings_Out		; loc_AD62
+		dc.l	Obj_0x38_Shield		   ; loc_125CE
+		dc.l	Obj_0x39_Time_Game_Over           ; loc_BD76
+		dc.l	Obj_0x3A_Level_Results            ; loc_BE38
 		dc.l	Obj3B			; Purple rock (leftover from S1)
 		dc.l	Obj3C			; Breakable wall (leftover from S1) (mostly unused)
-		dc.l    Obj_0x3D_Break_Boost              ; loc_18E78
-		dc.l    Obj_0x3E_Egg_Prison               ; loc_20E5C
-		dc.l    Obj_0x3F		          ; loc_A11E
-		dc.l    Obj_0x40_Diagonal_Springs         ; loc_1A30C
-		dc.l    Obj_0x41_Springs		  ; loc_E7B8
-		dc.l    Obj_0x42_Steam_Vent               ; loc_1A5CC
-		dc.l    Obj_0x43_Giant_Spikeball          ; loc_17F0C
-		dc.l    Obj_0x44		          ; loc_F10C
-		dc.l    Obj_0x45_Spring_Push_Boost        ; loc_181A0
-		dc.l    Obj_0x46_Spring_Ball              ; loc_18ABE
-		dc.l    Obj_0x47_Switch		   ; loc_18D9C
-		dc.l    Obj_0x48_Cannon		   ; loc_19250
-		dc.l    Obj_0x49_Waterfall		; loc_15352
-		dc.l    Obj_0x4A_Octus		    ; loc_1EBB8
-		dc.l    Obj_0x4B_Buzz_Bomber              ; loc_1E89C
-		dc.l    Obj_0x4C_Batbot		   ; loc_1EE68
-		dc.l    Obj_0x4D_Rhinobot		 ; loc_1D984
-		dc.l    Obj_0x4E_Crocobot		 ; loc_1F2F0
-		dc.l    Obj_0x4F_Dinobot		  ; loc_1DEAC
-		dc.l    Obj_0x50_Aquis		    ; loc_1E010
-		dc.l    Obj_0x51_Aquis		    ; loc_1E62C
-		dc.l    Obj_0x52_Piranha		  ; loc_1DC54
+		dc.l	Obj_0x3D_Break_Boost              ; loc_18E78
+		dc.l	Obj_0x3E_Egg_Prison               ; loc_20E5C
+		dc.l	Obj_0x3F		          ; loc_A11E
+		dc.l	Obj_0x40_Diagonal_Springs         ; loc_1A30C
+		dc.l	Obj_0x41_Springs		  ; loc_E7B8
+		dc.l	Obj_0x42_Steam_Vent               ; loc_1A5CC
+		dc.l	Obj_0x43_Giant_Spikeball          ; loc_17F0C
+		dc.l	Obj_0x44		          ; loc_F10C
+		dc.l	Obj_0x45_Spring_Push_Boost        ; loc_181A0
+		dc.l	Obj_0x46_Spring_Ball              ; loc_18ABE
+		dc.l	Obj_0x47_Switch		   ; loc_18D9C
+		dc.l	Obj_0x48_Cannon		   ; loc_19250
+		dc.l	Obj_0x49_Waterfall		; loc_15352
+		dc.l	Obj_0x4A_Octus		    ; loc_1EBB8
+		dc.l	Obj_0x4B_Buzz_Bomber              ; loc_1E89C
+		dc.l	Obj_0x4C_Batbot		   ; loc_1EE68
+		dc.l	Obj_0x4D_Rhinobot		 ; loc_1D984
+		dc.l	Obj_0x4E_Crocobot		 ; loc_1F2F0
+		dc.l	Obj_0x4F_Dinobot		  ; loc_1DEAC
+		dc.l	Obj_0x50_Aquis		    ; loc_1E010
+		dc.l	Obj_0x51_Aquis		    ; loc_1E62C
+		dc.l	Obj_0x52_Piranha		  ; loc_1DC54
 		dc.l	Obj53			; Masher (jumping piranha fish badnik) from GHZ
-		dc.l    Obj_0x54_Motobug		  ; loc_1F6E8
-		dc.l    Obj_0x55_Ghz_Boss		 ; loc_2030C
-		dc.l    Obj_0x56		          ; loc_205A6
-		dc.l    Obj_0x57		          ; loc_1F99C
-		dc.l    Obj_0x58		          ; loc_1FC0A
+		dc.l	Obj_0x54_Motobug		  ; loc_1F6E8
+		dc.l	Obj_0x55_Ghz_Boss		 ; loc_2030C
+		dc.l	Obj_0x56		          ; loc_205A6
+		dc.l	Obj_0x57		          ; loc_1F99C
+		dc.l	Obj_0x58		          ; loc_1FC0A
 		dc.l	Obj_Null		          ; loc_D24A ; Object $59
 		dc.l	Obj_Null		          ; loc_D24A ; Object $5A
 		dc.l	Obj_Null		          ; loc_D24A ; Object $5B
@@ -14788,30 +14800,30 @@ ObjPtr_Sonic:	dc.l	Obj01			; Sonic
 		dc.l	Obj_Null		          ; loc_D24A ; Object $61
 		dc.l	Obj_Null		          ; loc_D24A ; Object $62
 		dc.l	Obj_Null		          ; loc_D24A ; Object $63
-		dc.l    Obj_0x64_Pistons		  ; loc_1A8B4
-		dc.l    Obj_0x65_Platform		 ; loc_1AA74
-		dc.l    Obj_0x66_Spring_Wall              ; loc_1AEBC
-		dc.l    Obj_0x67_Teleport_Attributes      ; loc_1B0C4
-		dc.l    Obj_0x68_Block_Arrow              ; loc_1B520
-		dc.l    Obj_0x69_Screw_Nut		; loc_1B810
-		dc.l    Obj_0x6A_Rotating_Boxes           ; loc_1BA30
-		dc.l    Obj_0x6B_Mz_Platform              ; loc_1BCEC
-		dc.l    Obj_0x6C_Mz_Moving_Platforms      ; loc_1BF6C
-		dc.l    Obj_0x6D_Harpoon		  ; loc_1B720
-		dc.l    Obj_0x6E_Machine		  ; loc_1C2E4
-		dc.l    Obj_Ox6F_Parallelogram_Elevator   ; loc_1C4F8
-		dc.l    Obj_0x70_Rotating_Gears           ; loc_1C850
-		dc.l    Obj_0x71_Hpz_Misc		 ; loc_9A54
-		dc.l    Obj_0x72_Conveyor_Belt_Attributes ; loc_1CBCC
-		dc.l    Obj_0x73_Rotating_Rings           ; loc_1CC54
-		dc.l    Obj_0x74_Invisible_Block          ; loc_1561A
-		dc.l    Obj_0x75_Spikeball_Chain          ; loc_1CE48
-		dc.l    Obj_0x76_Platform_Spikes          ; loc_1D078
-		dc.l    Obj_0x77_Bridge		   ; loc_1D208
-		dc.l    Obj_0x78_Rotating_Platforms       ; loc_1D3C0
-		dc.l    Obj_0x79_Lamp_Post		; loc_13B54
-		dc.l    Obj_0x7A_Platform_Horizontal      ; loc_1D594
-		dc.l    Obj_0x7B_Spring_Tubes             ; loc_1D74C
+		dc.l	Obj_0x64_Pistons		  ; loc_1A8B4
+		dc.l	Obj_0x65_Platform		 ; loc_1AA74
+		dc.l	Obj_0x66_Spring_Wall              ; loc_1AEBC
+		dc.l	Obj_0x67_Teleport_Attributes      ; loc_1B0C4
+		dc.l	Obj_0x68_Block_Arrow              ; loc_1B520
+		dc.l	Obj_0x69_Screw_Nut		; loc_1B810
+		dc.l	Obj_0x6A_Rotating_Boxes           ; loc_1BA30
+		dc.l	Obj_0x6B_Mz_Platform              ; loc_1BCEC
+		dc.l	Obj_0x6C_Mz_Moving_Platforms      ; loc_1BF6C
+		dc.l	Obj_0x6D_Harpoon		  ; loc_1B720
+		dc.l	Obj_0x6E_Machine		  ; loc_1C2E4
+		dc.l	Obj_Ox6F_Parallelogram_Elevator   ; loc_1C4F8
+		dc.l	Obj_0x70_Rotating_Gears           ; loc_1C850
+		dc.l	Obj_0x71_Hpz_Misc		 ; loc_9A54
+		dc.l	Obj_0x72_Conveyor_Belt_Attributes ; loc_1CBCC
+		dc.l	Obj_0x73_Rotating_Rings           ; loc_1CC54
+		dc.l	Obj_0x74_Invisible_Block          ; loc_1561A
+		dc.l	Obj_0x75_Spikeball_Chain          ; loc_1CE48
+		dc.l	Obj_0x76_Platform_Spikes          ; loc_1D078
+		dc.l	Obj_0x77_Bridge		   ; loc_1D208
+		dc.l	Obj_0x78_Rotating_Platforms       ; loc_1D3C0
+		dc.l	Obj_0x79_Lamp_Post		; loc_13B54
+		dc.l	Obj_0x7A_Platform_Horizontal      ; loc_1D594
+		dc.l	Obj_0x7B_Spring_Tubes             ; loc_1D74C
 		dc.l	Obj_Null		          ; loc_D24A ; Object $7C
 		dc.l	Obj7D			; Points that can be gotten at the end of an act (leftover from S1)
 		dc.l	Obj_Null		          ; loc_D24A ; Object $7E
@@ -14842,19 +14854,19 @@ Obj_Null:
 ; [ Begin ]
 ;===============================================================================
 ObjectFall: ; loc_D24E:
-		move.l  $0008(A0), D2
-		move.l  $000C(A0), D3
-		move.w  $0010(A0), D0
-		ext.l   D0
-		asl.l   #$08, D0
-		add.l   D0, D2
-		move.w  $0012(A0), D0
-		addi.w  #$0038, $0012(A0)
-		ext.l   D0
-		asl.l   #$08, D0
-		add.l   D0, D3
-		move.l  D2, $0008(A0)
-		move.l  D3, $000C(A0)
+		move.l	8(a0),d2
+		move.l	$C(a0),d3
+		move.w	$10(a0),d0
+		ext.l	d0
+		asl.l	#8,d0
+		add.l	d0,d2
+		move.w	$12(a0),d0
+		addi.w	#$38,$12(a0)
+		ext.l	d0
+		asl.l	#$8,d0
+		add.l	d0,d3
+		move.l	d2,8(a0)
+		move.l	d3,$C(a0)
 		rts
 ;===============================================================================
 ; Sub Routine ObjectFall
