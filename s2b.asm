@@ -934,7 +934,7 @@ loc_12DC:
 		move.b	d0,8(a1)
 
 loc_12E0:
-		moveq	#4-1,d1	; this is one digit too high, meaning the first byte of the voice table pointer is overwritten
+		moveq	#3-1,d1	; this is one digit too high, meaning the first byte of the voice table pointer is overwritten
 
 loc_12E2:
 		move.b	1(a0,d1.w),d0
@@ -4229,100 +4229,6 @@ Level_Select_Text: ; loc_3D7C: ; Level Select Menu Text
 		dc.b    $00 ; Filler
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
-; These subroutines overwrite data in the ROM, likely similar
-; to ConvertCollisionArray (but need special read/write carts to work)
-; ---------------------------------------------------------------------------
-; For some reason, this is similar to the MainLoadBlock code, but with the
-; registers reversed...
-; loc_4056: Unused_Code1:
-		lea	(Chunk_Table).l,a1
-		move.w	#$2EB,d2
-
--		move.w	(a1),d0
-		move.w	d0,d1
-		andi.w	#$F800,d1
-		andi.w	#$7FF,d0
-		lsr.w	#$01,d0
-		or.w	d0,d1
-		move.w	d1,(a1)+
-		dbf	d2,-
-		rts
-; ---------------------------------------------------------------------------
-; This chunk is duplicated after loc_78F8 for some reason; its' purpose
-; was to convert Sonic 1's chunk data to the Sonic 2 format
-; ConvertChunksFrom256x256To128x128: Unused_Code2: loc_4078:
-		lea	($FE0000).l,a1
-		lea	($FE0080).l,a2
-		lea	(Chunk_Table).l,a3
-		move.w	#$3F,d1
-
--		bsr.w	Unused_Code4
-		bsr.w	Unused_Code4
-		dbf	d1,-
-		lea	($FE0000).l,a1
-		lea	($FF0000).l,a2
-		move.w	#$3F,d1
-
--		move.w	#0,(a2)+
-		dbf	d1,-
-		move.w	#$3FBF,d1
-
--		move.w	(a1)+,(a2)+
-		dbf	d1,-
-		rts
-; ===========================================================================
-; This code removes duplicate chunks
-; EliminateChunkDuplicates: Unused_Code3: loc_40BE:
-		lea	($FE0000).l,a1
-		lea	(Chunk_Table).l,a3
-		moveq	#$1F,d0
-
--		move.l	(a1)+,(a3)+
-		dbf	d0,-
-		moveq	#0,d7
-		lea	($FE0000),a1
-		move.w	#$FF,d5
-
-.loop2:
-		lea	(Chunk_Table),a3
-		move.w	d7,d6
-
-.loop3:		movem.l	a1-a3,-(a7)
-		move.w	#$3F,d0
--		cmpm.w	(a1)+,(a3)+
-		bne.s	Unused_Code3_loc_4104
-		dbf	d0,-
-		movem.l	(a7)+,a1-a3
-		adda.w	#$80,a1
-		dbf	d5,.loop2
-		bra.s	Unused_Code3_loc_411E
-Unused_Code3_loc_4104:
-		movem.l	(a7)+,a1-a3
-		adda.w	#$80,a3
-		dbf	d6,.loop3
-		moveq	#$1F,d0
--		move.l	(a1)+,(a3)+
-		dbf	d0,-
-		addq.l	#$1,d7
-		dbf	d5,Unused_Code3_Loop2
-Unused_Code3_loc_411E:
-		bra.s	Unused_Code3_loc_411E ; Freezes the engine once the routine has been run
-Unused_Code4:
-		moveq   #$7,d0
--		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		dbf	d0,-
-		adda.w	#$80,a1
-		adda.w	#$80,a2
-		rts
-; ===========================================================================
-; ---------------------------------------------------------------------------
 ; Music Playlist
 ; ---------------------------------------------------------------------------
 ; byte_4140:
@@ -4343,8 +4249,7 @@ MusicList:	zoneOrderedTable 1,1
 	zoneTableEntry.b	MusID_CPZ	; CPZ
 	zoneTableEntry.b	MusID_CPZ	; GCZ
 	zoneTableEntry.b	MusID_NGHZ	; NGHZ
-	; no *proper* entry for DEZ, so it instead uses the alignment to play sound $08
-	;zoneTableEntry.b	MusID_DEZ	; DEZ
+	zoneTableEntry.b	MusID_DEZ	; DEZ
     zoneTableEnd
 	even
 
@@ -11192,13 +11097,13 @@ Obj1A_MapUnc_9942:	BINCLUDE	"mappings/sprite/obj1F_DHZ.bin"
 ; [ Begin ]
 ;===============================================================================
 Obj_0x1C_Misc: ; loc_999C:
-		moveq   #$00, D0
-		move.b  $0024(A0), D0
-		move.w  loc_99AA(PC, D0), D1
-		jmp     loc_99AA(PC, D1)
+		moveq   #0,d0
+		move.b  $24(a0),d0
+		move.w  loc_99AA(PC,d0),d1
+		jmp     loc_99AA(PC,d1)
 loc_99AA:
-		dc.w    loc_9A1E-loc_99AA
-		dc.w    loc_9A50-loc_99AA
+		dc.w    Scen_Main-loc_99AA
+		dc.w    Scen_ChkDel-loc_99AA
 loc_99AE:
 		dc.l    Obj1C_MapUnc_9B9A
 		dc.w    $43FD
@@ -11208,7 +11113,7 @@ loc_99AE:
 		dc.w    $43FD
 		dc.b    $04, $06
 
-		dc.l    ($01<<$18)|Obj11_MapUnc_85E0 ; loc_85E0
+		dc.l    ($01<<$18)|Obj11_MapUnc_85E0
 		dc.w    $43C6
 		dc.b    $04, $01
 
@@ -11255,22 +11160,27 @@ loc_99AE:
 		dc.l    ($03<<$18)|Obj1C_MapUnc_9B6A
 		dc.w    $4346
 		dc.b    $08, $04
-loc_9A1E:
-		addq.b  #$02, $0024(A0)
-		moveq   #$00, D0
-		move.b  $0028(A0), D0
-		lsl.w   #$03, D0
-		lea     loc_99AE(PC), A1
-		lea     $00(A1, D0), A1
-		move.b  (A1), $001A(A0)
-		move.l  (A1)+, $0004(A0)
-		move.w  (A1)+, $0002(A0)
-		bsr.w     Adjust2PArtPointer     ; loc_DC30
-		ori.b   #$04, $0001(A0)
-		move.b  (A1)+, $0019(A0)
-		move.b  (A1)+, $0018(A0)
-loc_9A50:
-		bra.w     MarkObjGone             ; loc_D2A0
+Scen_Main:
+		addq.b  #2,$24(a0)
+		moveq   #0,d0
+		move.b  $28(a0),d0
+
+		lsl.w   #3,d0
+		lea     loc_99AE(pc),a1
+		lea     (a1,d0),a1
+		move.b  (a1),$1A(a0)
+		move.l  (a1)+,4(a0)
+		move.w  (a1)+,2(a0)
+		ori.b   #4,1(a0)
+		move.b  (a1)+,$19(a0)
+		move.b  (a1)+,$18(a0)
+
+
+
+
+
+Scen_ChkDel:
+		bra.w     MarkObjGone
 ;===============================================================================
 ; Object 0x1C - Bridge, Support, Hill Top Posts...
 ; [ End ]
