@@ -14800,10 +14800,10 @@ Obj_Index:
 		dc.l	Obj_0x3A_Level_Results		  ; loc_BE38
 		dc.l	Obj3B			; Purple rock (leftover from S1)
 		dc.l	Obj3C			; Breakable wall (leftover from S1) (mostly unused)
-		dc.l	Obj_0x3D_Break_Boost		  ; loc_18E78
-		dc.l	Obj_0x3E_Egg_Prison		  ; loc_20E5C
-		dc.l	Obj3F			  ; loc_A11E
-		dc.l	Obj_0x40_Diagonal_Springs	  ; loc_1A30C
+		dc.l	Obj_0x3D_Break_Boost              ; loc_18E78
+		dc.l	Obj3E               ; loc_20E5C
+		dc.l	Obj_0x3F		          ; loc_A11E
+		dc.l	Obj_0x40_Diagonal_Springs         ; loc_1A30C
 		dc.l	Obj_0x41_Springs		  ; loc_E7B8
 		dc.l	Obj_0x42_Steam_Vent		  ; loc_1A5CC
 		dc.l	Obj_0x43_Giant_Spikeball	  ; loc_17F0C
@@ -38147,173 +38147,205 @@ Obj8A_MapUnc_207C6:	BINCLUDE	"mappings/sprite/obj8A.bin"
 ; Object 0x3E - Egg Prison / Animals Container
 ; [ Begin ]
 ;===============================================================================
-Obj_0x3E_Egg_Prison: ; loc_20E5C:
-		moveq	#$00, D0
-		move.b	$0024(A0), D0
-		move.w	loc_20E88(PC, D0), D1
-		jsr	loc_20E88(PC, D1)
-		move.w	$0008(A0), D0
-		andi.w	#$FF80, D0
-		sub.w	(Camera_X_pos_coarse).w, D0
-		cmpi.w	#$0280, D0
-		bhi.s	J_DeleteObject_29	; loc_20E82
-		jmp	DisplaySprite		; (loc_D3C2)
+Obj3E:
+		moveq	#0,d0
+		move.b	$24(a0),d0
+		move.w	Pri_Index(pc,d0),d1
+		jsr	Pri_Index(pc,d1)
+		move.w	8(a0),d0
+		andi.w	#$FF80,d0
+		sub.w	(Camera_X_pos_coarse).w,d0
+		cmpi.w	#$280,d0
+		bhi.s	J_DeleteObject_29
+		jmp	DisplaySprite
 J_DeleteObject_29: ; loc_20E82:
-		jmp	DeleteObject		; (loc_D3B4)
-loc_20E88:
-		dc.w	loc_20EA8-loc_20E88
-		dc.w	loc_20EF6-loc_20E88
-		dc.w	loc_20F32-loc_20E88
-		dc.w	loc_20F9A-loc_20E88
-		dc.w	loc_20F9A-loc_20E88
-		dc.w	loc_20F9A-loc_20E88
-		dc.w	loc_21032-loc_20E88
-		dc.w	loc_21082-loc_20E88
-loc_20E98:
-		dc.w	$0220, $0400, $040C, $0501, $0610, $0403, $0810, $0305
-loc_20EA8:
-		move.l	#loc_210AC, $0004(A0)
-		move.w	#$049D, $0002(A0)
-		bsr.w	  J_Adjust2PArtPointer_25 ; loc_21158
-		move.b	#$04, $0001(A0)
-		move.w	$000C(A0), $0030(A0)
-		moveq	#$00, D0
-		move.b	$0028(A0), D0
-		lsl.w	#$02, D0
-		lea	loc_20E98(PC, D0), A1
-		move.b	(A1)+, $0024(A0)
-		move.b	(A1)+, $0019(A0)
-		move.b	(A1)+, $0018(A0)
-		move.b	(A1)+, $001A(A0)
-		cmpi.w	#$0008, D0
-		bne.s	loc_20EF4
-		move.b	#$06, $0020(A0)
-		move.b	#$08, $0021(A0)
-loc_20EF4:
+		jmp	DeleteObject
+; ===========================================================================
+Pri_Index:	dc.w Pri_Main-Pri_Index
+		dc.w Pri_BodyMain-Pri_Index
+		dc.w Pri_Switched-Pri_Index
+		dc.w Pri_Explosion-Pri_Index
+		dc.w Pri_Explosion-Pri_Index
+		dc.w Pri_Explosion-Pri_Index
+		dc.w Pri_Animals-Pri_Index
+		dc.w Pri_EndAct-Pri_Index
+
+
+
+Pri_Var:	dc.b 2,	$20, 4,	0	; routine, width, priority, frame
+		dc.b 4,	$C, 5, 1
+		dc.b 6,	$10, 4,	3
+		dc.b 8,	$10, 3,	5
+; ===========================================================================
+
+Pri_Main:
+		move.l	#Map_Pri,4(a0)
+		move.w	#$49D,2(a0)
+		move.b	#4,1(a0)
+		move.w	$C(a0),$30(a0)
+		moveq	#0,d0
+		move.b	$28(a0),d0
+		lsl.w	#2,d0
+		lea	Pri_Var(pc,d0),a1
+		move.b	(a1)+,$24(a0)
+		move.b	(a1)+,$19(a0)
+		move.b	(a1)+,$18(a0)
+		move.b	(a1)+,$1A(a0)
+		cmpi.w	#8,d0
+		bne.s	return_20EF4
+
+		move.b	#6,$20(a0)
+		move.b	#8,$21(a0)
+
+return_20EF4:
 		rts
-loc_20EF6:
-		cmpi.b	#$02, (Boss_defeated_flag).w
+; ===========================================================================
+
+Pri_BodyMain:
+		cmpi.b	#2,(Boss_defeated_flag).w
 		beq.s	loc_20F14
-		move.w	#$002B, D1
-		move.w	#$0018, D2
-		move.w	#$0018, D3
-		move.w	$0008(A0), D4
-		jmp	SolidObject		; (loc_F4A0)
+		move.w	#$2B,d1
+		move.w	#$18,d2
+		move.w	#$18,d3
+		move.w	8(a0),d4
+		jmp	SolidObject
+; ===========================================================================
+
 loc_20F14:
-		tst.b	$0025(A0)
+		tst.b	$25(a0)
 		beq.s	loc_20F2A
-		clr.b	$0025(A0)
-		bclr	#$03, ($FFFFB022).w
-		bset	#$01, ($FFFFB022).w
+		clr.b	$25(a0)
+		bclr	#3,(MainCharacter+$22).w
+		bset	#1,(MainCharacter+$22).w
+
 loc_20F2A:
-		move.b	#$02, $001A(A0)
+		move.b	#2,$1A(a0)
 		rts
-loc_20F32:
-		move.w	#$0017, D1
-		move.w	#$0008, D2
-		move.w	#$0008, D3
-		move.w	$0008(A0), D4
-		jsr	SolidObject		; (loc_F4A0)
-		lea	(loc_210A4).l, A1
-		jsr	AnimateSprite		; (loc_D412)
-		move.w	$0030(A0), $000C(A0)
-		move.b	$0022(A0), D0
-		andi.b	#$18, D0
+; ===========================================================================
+
+Pri_Switched:
+		move.w	#$17,d1
+		move.w	#8,d2
+		move.w	#8,d3
+		move.w	8(a0),d4
+		jsr	SolidObject
+		lea	(loc_210A4).l,a1
+		jsr	AnimateSprite
+		move.w	$30(a0),$C(a0)
+		move.b	$22(a0),d0
+		andi.b	#$18,d0
 		beq.s	loc_20F98
-		addq.w	#$08, $000C(A0)
-		move.b	#$0A, $0024(A0)
-		move.w	#$003C, $001E(A0)
+
+		addq.w	#8,$C(a0)
+		move.b	#$A,$24(a0)
+		move.w	#$3C,$1E(a0)
 		clr.b	(Update_HUD_timer).w
 		clr.b	(Current_Boss_ID).w
-		move.b	#$01, (Control_Locked).w
-		move.w	#$0800, (Ctrl_1_Logical).w
-		clr.b	$0025(A0)
-		bclr	#$03, ($FFFFB022).w
-		bset	#$01, ($FFFFB022).w
+		move.b	#1,(Control_Locked).w
+		move.w	#$800,(Ctrl_1_Logical).w
+		clr.b	$25(a0)
+		bclr	#3,(MainCharacter+$22).w
+		bset	#1,(MainCharacter+$22).w
 loc_20F98:
 		rts
-loc_20F9A:
-		moveq	#$07, D0
-		and.b	(Vint_runcount+3).w, D0
+; ===========================================================================
+
+Pri_Explosion:
+		moveq	#7,d0
+		and.b	(Vint_runcount+3).w,d0
 		bne.s	loc_20FD8
-		jsr	SingleObjLoad	     ; (loc_E772)
+		jsr	SingleObjLoad
 		bne.s	loc_20FD8
-		_move.b  #$3F, 0(A1)
-		move.w	$0008(A0), $0008(A1)
-		move.w	$000C(A0), $000C(A1)
-		jsr	(PseudoRandomNumber).l	    ; loc_31E4
-		moveq	#$00, D1
-		move.b	D0, D1
-		lsr.b	#$02, D1
-		subi.w	#$0020, D1
-		add.w	D1, $0008(A1)
-		lsr.w	#$08, D0
-		lsr.b	#$03, D0
-		add.w	D0, $000C(A1)
+		_move.b	#$3F,0(a1)
+		move.w	8(a0),$8(a1)
+		move.w	$C(a0),$C(a1)
+		jsr	(PseudoRandomNumber).l
+		moveq	#0,d1
+		move.b	d0,d1
+		lsr.b	#2,d1
+		subi.w	#$20,d1
+		add.w	D1,$8(a1)
+		lsr.w	#8,d0
+		lsr.b	#3,d0
+		add.w	d0,$C(a1)
+
 loc_20FD8:
-		subq.w	#$01, $001E(A0)
+		subq.w	#1,$1E(a0)
 		beq.s	loc_20FE0
 		rts
+; ===========================================================================
+
 loc_20FE0:
-		move.b	#$02, (Boss_defeated_flag).w
-		move.b	#$0C, $0024(A0)
-		move.b	#$06, $001A(A0)
-		move.w	#$0096, $001E(A0)
-		addi.w	#$0020, $000C(A0)
-		moveq	#$07, D6
-		move.w	#$009A, D5
-		moveq	#-$1C, D4
+		move.b	#2,(Boss_defeated_flag).w
+		move.b	#$C,$24(a0)
+		move.b	#6,$1A(a0)
+		move.w	#$96,$1E(a0)
+		addi.w	#$20,$C(a0)
+		moveq	#7,d6
+		move.w	#$9A,d5
+		moveq	#-$1C,d4
+
 loc_21006:
-		jsr	SingleObjLoad	     ; (loc_E772)
-		bne.s	loc_21030
-		_move.b  #$28, 0(A1)
-		move.w	$0008(A0), $0008(A1)
-		move.w	$000C(A0), $000C(A1)
-		add.w	D4, $0008(A1)
-		addq.w	#$07, D4
-		move.w	D5, $0036(A1)
-		subq.w	#$08, D5
-		dbf    D6, loc_21006
-loc_21030:
+		jsr	SingleObjLoad
+		bne.s	return_21030
+		_move.b	#$28,0(a1)
+		move.w	8(a0),8(a1)
+		move.w	$C(a0),$C(a1)
+		add.w	d4,$8(a1)
+		addq.w	#7,d4
+		move.w	d5,$36(a1)
+		subq.w	#8,d5
+		dbf	d6,loc_21006
+
+return_21030:
 		rts
-loc_21032:
-		moveq	#$07, D0
-		and.b	(Vint_runcount+3).w, D0
+; ===========================================================================
+
+Pri_Animals:
+		moveq	#7,d0
+		and.b	(Vint_runcount+3).w,d0
 		bne.s	loc_21070
-		jsr	SingleObjLoad	     ; (loc_E772)
+		jsr	SingleObjLoad
 		bne.s	loc_21070
-		_move.b  #$28, 0(A1)
-		move.w	$0008(A0), $0008(A1)
-		move.w	$000C(A0), $000C(A1)
-		jsr	(PseudoRandomNumber).l	    ; loc_31E4
-		andi.w	#$001F, D0
-		subq.w	#$06, D0
-		tst.w	D1
+		_move.b	#$28,0(a1)
+		move.w	8(a0),8(a1)
+		move.w	$C(a0),$C(a1)
+		jsr	(PseudoRandomNumber).l
+		andi.w	#$1F,d0
+		subq.w	#6,d0
+		tst.w	d1
 		bpl.s	loc_21066
-		neg.w	D0
+		neg.w	d0
+
 loc_21066:
-		add.w	D0, $0008(A1)
-		move.w	#$000C, $0036(A1)
+		add.w	d0,8(a1)
+		move.w	#$C,$36(a1)
+
 loc_21070:
-		subq.w	#$01, $001E(A0)
-		bne.s	loc_21080
-		addq.b	#$02, $0024(A0)
-		move.w	#$00B4, $001E(A0)
-loc_21080:
+		subq.w	#1,$1E(a0)
+		bne.s	return_21080
+		addq.b	#2,$24(a0)
+		move.w	#$B4,$1E(a0)
+
+return_21080:
 		rts
-loc_21082:
-		moveq	#$3E, D0
-		moveq	#$28, D1
-		moveq	#$40, D2
-		lea	($FFFFB040).w, A1
+; ===========================================================================
+
+Pri_EndAct:
+		moveq   #$3E,d0
+		moveq   #$28,d1
+		moveq   #$40,d2
+		lea     (Sidekick).w,a1
+
 loc_2108C:
-		cmp.b	(A1), D1
-		beq.s	loc_210A2
-		adda.w	D2, A1
-		dbf    D0, loc_2108C
-		jsr	(loc_F352)
-		jmp	DeleteObject		; (loc_D3B4)
-loc_210A2:
+		cmp.b	(a1),d1
+		beq.s	return_210A2
+		adda.w	d2,a1
+		dbf	d0,loc_2108C
+		jsr	(Load_EndOfAct)
+		jmp	DeleteObject            ; (loc_D3B4)
+
+return_210A2:
 		rts
 loc_210A4:
 		dc.w	loc_210A8-loc_210A4
@@ -38321,14 +38353,14 @@ loc_210A4:
 loc_210A8:
 		dc.b	$02, $01, $03, $FF
 
-loc_210AC:
-		dc.w	loc_210BA-loc_210AC
-		dc.w	loc_210F4-loc_210AC
-		dc.w	loc_210FE-loc_210AC
-		dc.w	loc_21130-loc_210AC
-		dc.w	loc_2113A-loc_210AC
-		dc.w	loc_2114C-loc_210AC
-		dc.w	loc_21156-loc_210AC
+Map_Pri:
+		dc.w    loc_210BA-Map_Pri
+		dc.w    loc_210F4-Map_Pri
+		dc.w    loc_210FE-Map_Pri
+		dc.w    loc_21130-Map_Pri
+		dc.w    loc_2113A-Map_Pri
+		dc.w    loc_2114C-Map_Pri
+		dc.w    loc_21156-Map_Pri
 loc_210BA:
 		dc.w	$0007
 		dc.l	$E00C2000, $2000FFF0, $E80D2004, $2002FFE0
