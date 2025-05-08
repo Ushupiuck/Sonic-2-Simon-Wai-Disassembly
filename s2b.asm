@@ -4434,8 +4434,8 @@ loc_43F4:
 		move.b	D0, (Extra_life_flags).w
 loc_4424:
 		move.b	D0, (Time_Over_flag).w
-		move.b	D0, (Shield).w
-		move.b	D0, (Invincibility).w
+		move.b	D0, (Shield_flag).w
+		move.b	D0, (Invincibility_flag).w
 		move.b	D0, (Speed_shoes).w
 		move.b	D0, (unk_FE2F).w
 		move.w	D0, (Debug_placement_mode).w
@@ -12858,8 +12858,8 @@ loc_AFDC:
 		move.b	#$06, $0024(A1)
 		move.b	#$1C, ($FFFFB01C).w
 		move.b	#$01, (Enter_SpecialStage_flag).w
-		clr.b	(Invincibility).w
-		clr.b	(Shield).w
+		clr.b	(Invincibility_flag).w
+		clr.b	(Shield_flag).w
 loc_B01A:
 		rts
 loc_B01C:
@@ -13142,8 +13142,8 @@ Monitor_Subroutines: ; loc_B4F6:
 		dc.w	Monitor_Null-Monitor_Subroutines	  ; loc_B50A
 		dc.w	Monitor_Rings-Monitor_Subroutines	  ; loc_B530
 		dc.w	Monitor_Shoes-Monitor_Subroutines	  ; loc_B56A
-		dc.w	Monitor_Shield-Monitor_Subroutines	  ; loc_B592
-		dc.w	Monitor_Invincibility-Monitor_Subroutines ; loc_B5A8
+		dc.w	Monitor_Shield_flag-Monitor_Subroutines	  ; loc_B592
+		dc.w	Monitor_Invincibility_flag-Monitor_Subroutines ; loc_B5A8
 		dc.w	Monitor_SuperSonic-Monitor_Subroutines	  ; loc_B5D4
 		dc.w	Monitor_Null-Monitor_Subroutines	  ; loc_B50A
 Monitor_Null: ; loc_B50A:
@@ -13180,13 +13180,13 @@ Monitor_Shoes: ; loc_B56A:
 		move.w	#$0080, (Sonic_deceleration).w
 		move.w	#$00FB, D0
 		jmp	(PlayMusic).l		 ; loc_14C0
-Monitor_Shield: ; loc_B592:
-		move.b	#$01, (Shield).w
+Monitor_Shield_flag: ; loc_B592:
+		move.b	#$01, (Shield_flag).w
 		move.b	#$38, ($FFFFB180).w
 		move.w	#$00AF, D0
 		jmp	(PlayMusic).l		 ; loc_14C0
-Monitor_Invincibility: ; loc_B5A8:
-		move.b	#$01, (Invincibility).w
+Monitor_Invincibility_flag: ; loc_B5A8:
+		move.b	#$01, (Invincibility_flag).w
 		move.w	#$04B0, ($FFFFB032).w
 		move.b	#$35, ($FFFFB200).w
 		tst.b	(Current_Boss_ID).w
@@ -14395,7 +14395,7 @@ loc_CAC8:
 ;[ Begin ]
 ;===============================================================================
 Touch_Spikes: ; loc_CAD0:
-		tst.b	(Invincibility).w	    ; Invincibility Running ?
+		tst.b	(Invincibility_flag).w	    ; Invincibility_flag Running ?
 		bne.s	Touch_Spikes_No_Hurt	; loc_CAFC
 		cmpi.b	#$04, $0024(A1)
 		bcc.s	Touch_Spikes_No_Hurt	; loc_CAFC
@@ -14792,10 +14792,10 @@ Obj_Index:
 		dc.l	Obj_0x32_Breakable_Obstacule	  ; loc_1768A
 		dc.l	Obj_0x33_Touch_Booster		  ; loc_17CA0
 		dc.l	Obj34			; Sonic 1 title cards
-		dc.l	Obj_0x35_Invincibility		  ; loc_1264E
+		dc.l	Obj_0x35_Invincibility_flag		  ; loc_1264E
 		dc.l	Obj_0x36_Spikes		   ; loc_C944
 		dc.l	Obj_0x37_Rings_Out		; loc_AD62
-		dc.l	Obj_0x38_Shield		   ; loc_125CE
+		dc.l	Obj_0x38_Shield_flag		   ; loc_125CE
 		dc.l	Obj_0x39_Time_Game_Over 	  ; loc_BD76
 		dc.l	Obj_0x3A_Level_Results		  ; loc_BE38
 		dc.l	Obj3B			; Purple rock (leftover from S1)
@@ -18031,7 +18031,7 @@ loc_F352:
 		tst.b	($FFFFB5C0).w
 		bne.s	loc_F3B6
 		move.w	(Camera_Max_X_pos).w, (Camera_Min_X_pos).w
-		clr.b	(Invincibility).w
+		clr.b	(Invincibility_flag).w
 		clr.b	(Update_HUD_timer).w
 		move.b	#$3A, ($FFFFB5C0).w
 		moveq	#$26, D0
@@ -18960,8 +18960,8 @@ Sonic_Display:
 Obj01_Display:
 		jsr	(DisplaySprite).l
 ; loc_FD8A:
-Obj01_ChkInvin:	; Checks if Sonic has run out of invincibility frames
-		tst.b	(Invincibility).w
+Obj01_ChkInvin:	; Checks if Sonic has run out of Invincibility_flag frames
+		tst.b	(Invincibility_flag).w
 		beq.s	Obj01_ChkShoes
 		tst.w	$32(a0)
 		beq.s	Obj01_ChkShoes
@@ -18978,7 +18978,7 @@ Obj01_ChkInvin:	; Checks if Sonic has run out of invincibility frames
 		jsr	(PlayMusic).l
 ; loc_FDBE:
 Obj01_RmvInvin:
-		move.b	#0,(Invincibility).w
+		move.b	#0,(Invincibility_flag).w
 ; loc_FDC4:
 Obj01_ChkShoes:	; Checks if Sonic should still have the speed shoes
 		tst.b	(Speed_shoes).w
@@ -18999,7 +18999,7 @@ Obj01_ExitChk:
 ; End of subroutine Sonic_Display
 
 ; ---------------------------------------------------------------------------
-; Subroutine to record Sonic's previous positions for invincibility stars
+; Subroutine to record Sonic's previous positions for Invincibility_flag stars
 ; and input/status flags for Tails' AI to follow
 ; ---------------------------------------------------------------------------
 
@@ -20905,7 +20905,7 @@ Tails_Display: ; loc_10F12:
 loc_10F20:
 		jsr	DisplaySprite		; loc_D3C2
 loc_10F26:
-		tst.b	(Invincibility).w
+		tst.b	(Invincibility_flag).w
 		beq.s	loc_10F60
 		tst.w	$0032(A0)
 		beq.s	loc_10F60
@@ -20921,7 +20921,7 @@ loc_10F26:
 		move.b	$00(A1, D0), D0
 		jsr	(PlayMusic).l		 ; loc_14C0
 loc_10F5A:
-		move.b	#$00, (Invincibility).w
+		move.b	#$00, (Invincibility_flag).w
 loc_10F60:
 		tst.b	(Speed_shoes).w
 		beq.s	loc_10F94
@@ -22891,7 +22891,7 @@ ResumeMusic: ; loc_124FE:
 		cmpi.w	#$000C, (Current_Air).w
 		bhi.s	loc_12524
 		move.w	#S1MusID_LZ, D0
-		tst.b	(Invincibility).w
+		tst.b	(Invincibility_flag).w
 		beq.s	loc_12514
 		move.w	#S1MusID_Invinc, D0
 loc_12514:
@@ -22963,7 +22963,7 @@ loc_125C4:
 ; Object 0x38 -
 ; [ Begin ]
 ;===============================================================================
-Obj_0x38_Shield: ; loc_125CE:
+Obj_0x38_Shield_flag: ; loc_125CE:
 		moveq	#$00, D0
 		move.b	$0024(A0), D0
 		move.w	loc_125DC(PC, D0), D1
@@ -22983,9 +22983,9 @@ loc_125E0:
 		beq.s	loc_12616
 		bset	#$07, $0002(A0)
 loc_12616:
-		tst.b	(Invincibility).w
+		tst.b	(Invincibility_flag).w
 		bne.s	loc_12646
-		tst.b	(Shield).w
+		tst.b	(Shield_flag).w
 		beq.s	J_DeleteObject_03	; loc_12648
 		move.w	($FFFFB008).w, $0008(A0)
 		move.w	($FFFFB00C).w, $000C(A0)
@@ -23005,7 +23005,7 @@ J_DeleteObject_03: ; loc_12648:
 ; Object 0x35 -
 ; [ Begin ]
 ;===============================================================================
-Obj_0x35_Invincibility: ; loc_1264E:
+Obj_0x35_Invincibility_flag: ; loc_1264E:
 		moveq	#$00, D0
 		move.b	$000A(A0), D0
 		move.w	loc_1265C(PC, D0), D1
@@ -23023,7 +23023,7 @@ loc_12660:
 		move.b	#$10, $000E(A0)
 		move.b	#$08, $000F(A0)
 loc_1268E:
-		tst.b	(Invincibility).w
+		tst.b	(Invincibility_flag).w
 		beq.w	 DeleteObject		 ; loc_D3B4
 		lea	($FFFFB000).w, A1
 		move.w	$0008(A1), $0008(A0)
@@ -38469,7 +38469,7 @@ loc_212A4:
 loc_212B6:
 		rts
 loc_212B8:
-		tst.b	(Invincibility).w
+		tst.b	(Invincibility_flag).w
 		bne.s	loc_212D0
 		cmpi.b	#$09, $001C(A0)
 		beq.s	loc_212D0
@@ -38526,7 +38526,7 @@ Enemy_Points: ; loc_21362:
 loc_2136A:
 		bset	#$07, $0022(A1)
 loc_21370:
-		tst.b	(Invincibility).w
+		tst.b	(Invincibility_flag).w
 		beq.s	Touch_Hurt		; loc_2137A
 loc_21376:
 		moveq	#-1, D0
@@ -38543,17 +38543,17 @@ Touch_Hurt: ; loc_2137A:
 ; [ Begin ]
 ;===============================================================================
 HurtSonic: ; loc_21384:
-		tst.b	(Shield).w
-		bne.s	HurtShield		; loc_213AC
+		tst.b	(Shield_flag).w
+		bne.s	HurtShield_flag		; loc_213AC
 		tst.w	(Ring_count).w
 		beq.w	 Hurt_NoRings		 ; loc_2141A
 		jsr	SingleObjLoad	     ; loc_E772
-		bne.s	HurtShield		; loc_213AC
+		bne.s	HurtShield_flag		; loc_213AC
 		_move.b  #$37, 0(A1)
 		move.w	$0008(A0), $0008(A1)
 		move.w	$000C(A0), $000C(A1)
-HurtShield: ; loc_213AC:
-		move.b	#$00, (Shield).w
+HurtShield_flag: ; loc_213AC:
+		move.b	#$00, (Shield_flag).w
 		move.b	#$04, $0024(A0)
 		bsr.w	  J_Sonic_ResetOnFloor_00 ; loc_214FC
 		bset	#$01, $0022(A0)
@@ -38582,7 +38582,7 @@ loc_21410:
 		rts
 Hurt_NoRings: ; loc_2141A:
 		tst.w	(Debug_mode_flag).w
-		bne.w	 HurtShield		 ; loc_213AC
+		bne.w	 HurtShield_flag		 ; loc_213AC
 ;===============================================================================
 ; Sub Routine HurtSonic
 ; [ End ]
@@ -38595,7 +38595,7 @@ Hurt_NoRings: ; loc_2141A:
 KillSonic: ; loc_21422:
 		tst.w	(Debug_placement_mode).w
 		bne.s	Kill_NoDeath		; loc_21476
-		move.b	#$00, (Invincibility).w
+		move.b	#$00, (Invincibility_flag).w
 		move.b	#$06, $0024(A0)
 		bsr.w	  J_Sonic_ResetOnFloor_00 ; loc_214FC
 		bset	#1, $0022(A0)
@@ -42258,7 +42258,7 @@ PlrList_Std1_End:
 ;---------------------------------------------------------------------------------------
 PlrList_Std2:	plrlistheader
 		plreq $0680, ArtNem_Powerups
-		plreq $04BE, ArtNem_Shield
+		plreq $04BE, ArtNem_Shield_flag
 		plreq $04DE, ArtNem_Stars
 PlrList_Std2_End:
 ;---------------------------------------------------------------------------------------
@@ -44264,8 +44264,8 @@ Title_Screen_Sonic_Tails: ; loc_72E82:
 		BINCLUDE  "data\sprites\sontascr.nem" ; Sonic And Tails in Title Screen
 FireBall: ; loc_739C6:
 		BINCLUDE  "data\sprites\fireball.nem"
-ArtNem_Shield: ; loc_6DF8E:
-		BINCLUDE  "data\sprites\shield.nem"
+ArtNem_Shield_flag: ; loc_6DF8E:
+		BINCLUDE  "data\sprites\Shield.nem"
 ArtNem_Stars: ; loc_6E114:
 		BINCLUDE  "data\sprites\invstars.nem"
 Unused_Dust: ; loc_6E1FC:
