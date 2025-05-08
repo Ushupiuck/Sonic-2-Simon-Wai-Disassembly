@@ -38156,10 +38156,9 @@ Obj3E:
 		andi.w	#$FF80,d0
 		sub.w	(Camera_X_pos_coarse).w,d0
 		cmpi.w	#$280,d0
-		bhi.s	J_DeleteObject_29
+		bhi.s	+
 		jmp	DisplaySprite
-J_DeleteObject_29: ; loc_20E82:
-		jmp	DeleteObject
++		jmp	DeleteObject
 ; ===========================================================================
 Pri_Index:	dc.w Pri_Main-Pri_Index
 		dc.w Pri_BodyMain-Pri_Index
@@ -38339,14 +38338,12 @@ Pri_EndAct:
 
 loc_2108C:
 		cmp.b	(a1),d1
-		beq.s	return_210A2
+		beq.s	return_21080
 		adda.w	d2,a1
 		dbf	d0,loc_2108C
 		jsr	(Load_EndOfAct)
 		jmp	DeleteObject            ; (loc_D3B4)
-
-return_210A2:
-		rts
+; ===========================================================================
 loc_210A4:
 		dc.w	loc_210A8-loc_210A4
 		dc.w	loc_210A8-loc_210A4
