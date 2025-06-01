@@ -8,6 +8,7 @@ Size_of_DAC_samples =		$2723
 Size_of_SEGA_sound =		$6174
 Size_of_Snd_driver_guess =	$DF3 ; approximate post-compressed size of the Z80 sound driver
 
+object_size = $40
 ; ---------------------------------------------------------------------------
 ; Object Status Table offsets (for everything between Object_RAM and Primary_Collision)
 ; ---------------------------------------------------------------------------
@@ -45,8 +46,11 @@ respawn_index =		$23
 subtype =		$28
 ; ---------------------------------------------------------------------------
 ; conventions specific to Sonic/Tails (Obj01, Obj02, and ObjDB):
-; note: $1F, $20, and $21 are unused and available (however, $1F is cleared by loc_A53A and ObjB2_Landed_on_plane)
+; note: $1F, $20, and $21 are unused and available
 inertia =		$14 ; and $15 ; directionless representation of speed... not updated in the air
+; KiS2: New SSTs, related to Knuckles' abilities.
+double_jump_property =	$20 ; Changed from $1F
+double_jump_flag =	$21
 flip_angle =		$27 ; angle about the x axis (360 degrees = 256) (twist/tumble)
 air_left =		$28
 flip_turned =		$29 ; 0 for normal, 1 to invert flipping (it's a 180 degree rotation about the axis of Sonic's spine, so he stays in the same position but looks turned around)
@@ -73,67 +77,64 @@ lrb_solid_bit =		$3F ; the bit to check for left/right/bottom solidity (either $
 ; conventions followed by several objects but NOT Sonic/Tails:
 y_pixel =		2+x_pos ; and 3+x_pos ; y coordinate for objects using screen-space coordinate system
 x_pixel =		x_pos ; and 1+x_pos ; x coordinate for objects using screen-space coordinate system
-parent =		objoff_3E ; and $3F ; address of object that owns or spawned this one, if applicable
+parent =		$3E ; and $3F ; address of object that owns or spawned this one, if applicable
 ; TODO: $2C is often parent instead (see LoadChildObject); consider defining parent2 = $2C and changing some objoff_2Cs to that
 ; ---------------------------------------------------------------------------
 ; conventions followed by some/most bosses:
-boss_subtype		= objoff_A
-boss_invulnerable_time	= objoff_14
-boss_sine_count		= mapping_frame
-boss_routine		= angle
-boss_defeated		= objoff_2C
-boss_hitcount2		= objoff_32
-boss_hurt_sonic		= objoff_38	; flag set by collision response routine when Sonic has just been hurt (by boss?)
+boss_subtype		= $A
+boss_invulnerable_time	= $14
+boss_sine_count		= $1A	;mapping_frame
+boss_routine		= $26	;angle
+boss_defeated		= $2C
+boss_hitcount2		= $32
+boss_hurt_sonic		= $38	; flag set by collision response routine when Sonic has just been hurt (by boss?)
 ; ---------------------------------------------------------------------------
 ; when childsprites are activated (i.e. bit #6 of render_flags set)
+mainspr_mapframe	= $B
+mainspr_width		= $E
+mainspr_childsprites 	= $F	; amount of child sprites
+mainspr_height		= $14
+sub2_x_pos		= $10	;x_vel
+sub2_y_pos		= $12	;y_vel
+sub2_mapframe		= $15
+sub3_x_pos		= $16	;y_radius
+sub3_y_pos		= $18	;priority
+sub3_mapframe		= $1B	;anim_frame
+sub4_x_pos		= $1C	;anim
+sub4_y_pos		= $1E	;anim_frame_duration
+sub4_mapframe		= $21	;collision_property
+sub5_x_pos		= $22	;status
+sub5_y_pos		= $24	;routine
+sub5_mapframe		= $27
+sub6_x_pos		= $28	;subtype
+sub6_y_pos		= $2A
+sub6_mapframe		= $2D
+sub7_x_pos		= $2E
+sub7_y_pos		= $30
+sub7_mapframe		= $33
+sub8_x_pos		= $34
+sub8_y_pos		= $36
+sub8_mapframe		= $39
+sub9_x_pos		= $3A
+sub9_y_pos		= $3C
+sub9_mapframe		= $3F
 next_subspr		= $6
-mainspr_mapframe	= objoff_B
-mainspr_width		= objoff_E
-mainspr_childsprites 	= objoff_F	; amount of child sprites
-mainspr_height		= objoff_14
-subspr_data		= $10
-sub2_x_pos		= subspr_data+next_subspr*0+0	;x_vel
-sub2_y_pos		= subspr_data+next_subspr*0+2	;y_vel
-sub2_mapframe		= subspr_data+next_subspr*0+5
-sub3_x_pos		= subspr_data+next_subspr*1+0	;y_radius
-sub3_y_pos		= subspr_data+next_subspr*1+2	;priority
-sub3_mapframe		= subspr_data+next_subspr*1+5	;anim_frame
-sub4_x_pos		= subspr_data+next_subspr*2+0	;anim
-sub4_y_pos		= subspr_data+next_subspr*2+2	;anim_frame_duration
-sub4_mapframe		= subspr_data+next_subspr*2+5	;collision_property
-sub5_x_pos		= subspr_data+next_subspr*3+0	;status
-sub5_y_pos		= subspr_data+next_subspr*3+2	;routine
-sub5_mapframe		= subspr_data+next_subspr*3+5
-sub6_x_pos		= subspr_data+next_subspr*4+0	;subtype
-sub6_y_pos		= subspr_data+next_subspr*4+2
-sub6_mapframe		= subspr_data+next_subspr*4+5
-sub7_x_pos		= subspr_data+next_subspr*5+0
-sub7_y_pos		= subspr_data+next_subspr*5+2
-sub7_mapframe		= subspr_data+next_subspr*5+5
-sub8_x_pos		= subspr_data+next_subspr*6+0
-sub8_y_pos		= subspr_data+next_subspr*6+2
-sub8_mapframe		= subspr_data+next_subspr*6+5
-sub9_x_pos		= subspr_data+next_subspr*7+0
-sub9_y_pos		= subspr_data+next_subspr*7+2
-sub9_mapframe		= subspr_data+next_subspr*7+5
 ; ---------------------------------------------------------------------------
 ; unknown or inconsistently used offsets that are not applicable to Sonic/Tails:
 ; (provided because rearrangement of the above values sometimes requires making space in here too)
-objoff_A =		x_sub+0 ; note: x_pos can be 4 bytes, but sometimes the last 2 bytes of x_pos are used for other unrelated things
-objoff_B =		x_sub+1 ; unused
-objoff_E =		y_sub+0	; unused
-objoff_F =		y_sub+1 ; unused
-objoff_10 =		x_vel
-objoff_14 =		inertia+0
-objoff_15 =		inertia+1
-objoff_1F =		anim_frame_duration+1
+objoff_A =		2+x_pos ; note: x_pos can be 4 bytes, but sometimes the last 2 bytes of x_pos are used for other unrelated things
+objoff_B =		3+x_pos ; unused
+objoff_E =		2+y_pos	; unused
+objoff_F =		3+y_pos ; unused
+objoff_10 =		$10
+objoff_14 =		$14
+objoff_15 =		$15
+objoff_1F =		$1F
 objoff_27 =		$27
-objoff_28 =		subtype ; overlaps subtype, but a few objects use it for other things anyway
+objoff_28 =		$28 ; overlaps subtype, but a few objects use it for other things anyway
  enum               objoff_29=$29,objoff_2A=$2A,objoff_2B=$2B,objoff_2C=$2C,objoff_2D=$2D,objoff_2E=$2E,objoff_2F=$2F
  enum objoff_30=$30,objoff_31=$31,objoff_32=$32,objoff_33=$33,objoff_34=$34,objoff_35=$35,objoff_36=$36,objoff_37=$37
  enum objoff_38=$38,objoff_39=$39,objoff_3A=$3A,objoff_3B=$3B,objoff_3C=$3C,objoff_3D=$3D,objoff_3E=$3E,objoff_3F=$3F
-
-object_size = $40
 ; ---------------------------------------------------------------------------
 ; Constants that can be used instead of hard-coded IDs for various things.
 ; The "id" function allows to remove elements from an array/table without having
@@ -270,7 +271,7 @@ PalID_SEGA =		id(PalPtr_SEGA)
 PalID_Title =		id(PalPtr_Title)
 PalID_LevelSel =	id(PalPtr_LevelSel)
 PalID_SonicTails =	id(PalPtr_SonicTails)
-PalID_GHZ =		id(PalPtr_GHZ)
+PalID_EHZ =		id(PalPtr_EHZ)
 PalID_OWZ =		id(PalPtr_OWZ)
 PalID_WZ =		id(PalPtr_WZ)
 PalID_SSZ =		id(PalPtr_SSZ)
@@ -354,7 +355,7 @@ idstart :=	$81
 
 MusID__First = idstart
 MusID_OOZ =		id(zMusIDPtr_OOZ)
-MusID_GHZ =		id(zMusIDPtr_GHZ)
+MusID_EHZ =		id(zMusIDPtr_EHZ)
 MusID_MTZ =		id(zMusIDPtr_MTZ)
 MusID_CNZ =		id(zMusIDPtr_CNZ)
 MusID_DHZ =		id(zMusIDPtr_DHZ)
@@ -388,101 +389,12 @@ MusID_EmeraldDup2 =	id(zMusIDPtr_EmeraldDup2)
 MusID__End =		id(zMusIDPtr__End)
 
 ; Whenever the music references a slot that was its placement in Sonic 1
-S1MusID_LZ =		MusID_GHZ
+S1MusID_LZ =		MusID_EHZ
 S1MusID_Invinc =	MusID_NGHZ
 S1MusID_ExtraLife =	MusID_DEZ
 S1MusID_Boss =		MusID_FinalBoss
 S1MusID_ActClear =	MusID_Boss
 S1MusID_Emerald =	MusID_BOZ
-
-; Sound IDs
-offset :=	SoundIndex
-ptrsize :=	2
-idstart :=	$A0
-; $80 is reserved for silence, so if you make idstart $80 or less,
-; you may need to insert a dummy SndPtr in the $80 slot
-
-SndID__First = idstart
-SndID_Jump =		id(SndPtr_Jump)			; A0
-SndID_Checkpoint =	id(SndPtr_Checkpoint)		; A1
-SndID_SpikeSwitch =	id(SndPtr_SpikeSwitch)		; A2
-SndID_Hurt =		id(SndPtr_Hurt)			; A3
-SndID_Skidding =	id(SndPtr_Skidding)		; A4
-SndID_MissileDissolve =	id(SndPtr_MissileDissolve)	; A5
-SndID_HurtBySpikes =	id(SndPtr_HurtBySpikes)		; A6
-SndID_PushBlock =	id(SndPtr_PushBlock)		; A7
-SndID_SSGoal =		id(SndPtr_SSGoal)		; A8
-SndID_Bwoop =		id(SndPtr_Bwoop)		; A9
-SndID_Splash =		id(SndPtr_Splash)		; AA
-SndID_Swish =		id(SndPtr_Swish)		; AB
-SndID_BossHit =		id(SndPtr_BossHit)		; AC
-SndID_InhalingBubble =	id(SndPtr_InhalingBubble)	; AD
-SndID_ArrowFiring =	id(SndPtr_ArrowFiring)		; AE
-SndID_LavaBall =	id(SndPtr_LavaBall)		; AE
-SndID_Shield =		id(SndPtr_Shield)		; AF
-SndID_Saw =		id(SndPtr_Saw)			; B0
-SndID_Electric =	id(SndPtr_Electric)		; B1
-SndID_Drown =		id(SndPtr_Drown)		; B2
-SndID_FireBurn =	id(SndPtr_FireBurn)		; B3
-SndID_Bumper =		id(SndPtr_Bumper)		; B4
-SndID_Ring =		id(SndPtr_Ring)			; B5
-SndID_RingRight =	id(SndPtr_RingRight)		; B5
-SndID_SpikesMove =	id(SndPtr_SpikesMove)		; B6
-SndID_Rumbling =	id(SndPtr_Rumbling)		; B7
-SndID_Smash =		id(SndPtr_Smash)		; B9
-SndID_SSGlass =		id(SndPtr_SSGlass)		; BA
-SndID_DoorSlam =	id(SndPtr_DoorSlam)		; BB
-SndID_SpindashRelease =	id(SndPtr_SpindashRelease)	; BC
-SndID_Hammer =		id(SndPtr_Hammer)		; BD
-SndID_Roll =		id(SndPtr_Roll)			; BE
-SndID_ContinueJingle =	id(SndPtr_ContinueJingle)	; BF
-SndID_BasaranFlap =	id(SndPtr_BasaranFlap)		; C0
-SndID_Explosion =	id(SndPtr_Explosion)		; C1
-SndID_WaterWarning =	id(SndPtr_WaterWarning)		; C2
-SndID_EnterGiantRing =	id(SndPtr_EnterGiantRing)	; C3
-SndID_BossExplosion =	id(SndPtr_BossExplosion)	; C4
-SndID_TallyEnd =	id(SndPtr_TallyEnd)		; C5
-SndID_RingSpill =	id(SndPtr_RingSpill)		; C6
-SndID_Flamethrower =	id(SndPtr_Flamethrower)		; C8
-SndID_Bonus =		id(SndPtr_Bonus)		; C9
-SndID_SpecStageEntry =	id(SndPtr_SpecStageEntry)	; CA
-SndID_SlowSmash =	id(SndPtr_SlowSmash)		; CB
-SndID_Spring =		id(SndPtr_Spring)		; CC
-SndID_Blip =		id(SndPtr_Blip)			; CD
-SndID_RingLeft =	id(SndPtr_RingLeft)		; CE
-SndID_Signpost =	id(SndPtr_Signpost)		; CF
-SndID_CNZBossZap =	id(SndPtr_CNZBossZap)		; D0
-SndID_Signpost2P =	id(SndPtr_Signpost2P)		; D3
-SndID_OOZLidPop =	id(SndPtr_OOZLidPop)		; D4
-SndID_SlidingSpike =	id(SndPtr_SlidingSpike)		; D5
-SndID_CNZElevator =	id(SndPtr_CNZElevator)		; D6
-SndID_PlatformKnock =	id(SndPtr_PlatformKnock)	; D7
-SndID_BonusBumper =	id(SndPtr_BonusBumper)		; D8
-SndID_LargeBumper =	id(SndPtr_LargeBumper)		; D9
-SndID_Gloop =		id(SndPtr_Gloop)		; DA
-SndID_PreArrowFiring =	id(SndPtr_PreArrowFiring)	; DB
-SndID_Fire =		id(SndPtr_Fire)			; DC
-SndID_ArrowStick =	id(SndPtr_ArrowStick)		; DD
-SndID_Helicopter =	id(SndPtr_Helicopter)		; DE
-SndID_SuperTransform =	id(SndPtr_SuperTransform)	; DF
-SndID_SpindashRev =	id(SndPtr_SpindashRev)		; E0
-SndID__End =		id(SndPtr__End)			; E1
-
-; Sound command IDs
-offset :=	zCommandIndex
-ptrsize :=	4
-idstart :=	$F9
-
-CmdID__First = idstart
-MusID_FadeOut =		id(CmdPtr_FadeOut)	; F9
-SndID_SegaSound =	id(CmdPtr_SegaSound)	; FA
-MusID_SpeedUp =		id(CmdPtr_SpeedUp)	; FB
-MusID_SlowDown =	id(CmdPtr_SlowDown)	; FC
-MusID_Stop =		id(CmdPtr_Stop)		; FD
-CmdID__End =		id(CmdPtr__End)		; FE
-
-MusID_Pause =		$7E+$80			; FE
-MusID_Unpause =		$7F+$80			; FF
 
 ; Other sizes
 palette_line_size =	$10*2	; 16 word entries
@@ -497,7 +409,7 @@ ramaddr function x,-(-x)&$FFFFFFFF
 	phase	ramaddr($FFFF0000)	; Pretend we're in the RAM
 RAM_Start:
 Chunk_Table:			ds.b	$8000
-Chunk_Table_End:
+
 Level_Layout:			ds.b	$1000
 Level_Layout_End:
 
@@ -563,10 +475,9 @@ Sprite_Table_2:			ds.b	$280	; Sprite attribute table buffer for the bottom split
 				ds.b	$80	; unused, but SAT buffer can spill over into this area when there are too many sprites on-screen
 
 Horiz_Scroll_Buf:		ds.l	224
-Horiz_Scroll_Buf_End:
 				ds.l	16 	; A bug/optimisation in 'SwScrl_CPZ' causes 'Horiz_Scroll_Buf' to overflow into this.
 				ds.b	$40	; unused
-Horiz_Scroll_Buf_End_Padded:
+Horiz_Scroll_Buf_End:
 
 Sonic_Stat_Record_Buf:		ds.b	$100
 
@@ -764,7 +675,7 @@ Sprite_count:			ds.b	1	; the number of sprites drawn in the current frame
 PalCycle_Frame:			ds.w	1	; ColorID loaded in PalCycle
 PalCycle_Timer:			ds.w	1	; number of frames until next PalCycle call
 RNG_seed:			ds.l	1	; used for random number generation
-Game_paused:			ds.w	1	
+Game_paused:			ds.w	1
 				ds.b	4	; $FFFFF63C-$FFFFF63F ; seems unused
 DMA_data_thunk:			ds.w	1	; Used as a RAM holder for the final DMA command word. Data will NOT be preserved across V-INTs, so consider this space reserved.
 				ds.w	1	; $FFFFF642-$FFFFF643 ; seems unused
@@ -797,14 +708,14 @@ MiscLevelVariables_End
 Plc_Buffer:			ds.b	$60	; Pattern load queue (each entry is 6 bytes)
 Plc_Buffer_Only_End:
 				; these seem to store nemesis decompression state so PLC processing can be spread out across frames
-Plc_Buffer_Reg0:		ds.l	1	
-Plc_Buffer_Reg4:		ds.l	1	
-Plc_Buffer_Reg8:		ds.l	1	
-Plc_Buffer_RegC:		ds.l	1	
-Plc_Buffer_Reg10:		ds.l	1	
-Plc_Buffer_Reg14:		ds.l	1	
+Plc_Buffer_Reg0:		ds.l	1
+Plc_Buffer_Reg4:		ds.l	1
+Plc_Buffer_Reg8:		ds.l	1
+Plc_Buffer_RegC:		ds.l	1
+Plc_Buffer_Reg10:		ds.l	1
+Plc_Buffer_Reg14:		ds.l	1
 Plc_Buffer_Reg18:		ds.w	1	; amount of current entry remaining to decompress
-Plc_Buffer_Reg1A:		ds.w	1	
+Plc_Buffer_Reg1A:		ds.w	1
 				ds.b	4	; seems unused
 Plc_Buffer_End:
 
@@ -1046,7 +957,7 @@ Oscillating_Numbers:
 Oscillation_Control:		ds.w	1
 Oscillating_variables:
 Oscillating_Data:		ds.w	$20
-
+Oscillating_Numbers_End
 				; Fun Fact: when documenting the last of the ROM, I forgot to add this,
 				; causing the rest to be incorrect
 				ds.b	$20	; $FFFFFEA0-$FFFFFEBF ; seems unused
@@ -1069,18 +980,15 @@ SpecialStage4_anim_frame:
 Ring_spill_anim_frame:		ds.b	1
 Ring_spill_anim_accum:		ds.w	1
 				ds.b	6	; $FFFFFEC9-$FFFFFECF ; seems unused
+Oscillating_variables_End
 				ds.b	$20	; $FFFFFED0-$FFFFFEEF ; seems unused
 
 Camera_Min_Y_pos_Debug_Copy:	ds.w	1
 Camera_Max_Y_pos_Debug_Copy:	ds.w	1
-
-				ds.b	$C	; unused
-Oscillating_Numbers_End
-				ds.b	$40	; $FFFFFEF4-$FFFFFF3F ; seems unused
+				ds.b	$4C	; $FFFFFEF4-$FFFFFF3F ; seems unused
 
 Perfect_rings_left:		ds.w	1
 				ds.b	$3E	; $FFFFFF42-$FFFFFF7F ; seems unused
-Oscillating_variables_End
 
 LevSel_HoldTimer:		ds.w	1
 Level_select_zone:		ds.w	1
@@ -1148,7 +1056,7 @@ Z80_Reset =			$A11200
 Security_Addr =			$A14000
 
 ; ---------------------------------------------------------------------------
-; I/O Area 
+; I/O Area
 HW_Version =			$A10001
 HW_Port_1_Data =		$A10003
 HW_Port_2_Data =		$A10005

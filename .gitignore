@@ -1,11 +1,14 @@
 # Compiler Crap
-s2built.bin
-s2built.prev.bin
-s2.log
-s2.lst
-s2.p
-s2.h
+s2SWbuilt.bin
+s2SWbuilt.prev.bin
+s2b.log
+s2b.lst
+s2b.p
+s2b.h
+_123COMPILE/
 SonLVL INI Files/dllcache/
 README.md
-Sonic The Hedgehog 2 (Simon Wai Prototype).bin
+build_source/
+win32/
+Sonic_The_Hedgehog_2_(Simon_Wai_Prototype).bin
 SonLVL INI Files/SonLVL.log
