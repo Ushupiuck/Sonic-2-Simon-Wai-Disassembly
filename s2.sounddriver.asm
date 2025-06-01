@@ -370,7 +370,7 @@ zWriteFMII:	rsttarget
 
 ; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
 		org	38h
-VInt:		rsttarget
+VInt:	rsttarget
 		push	af
 		exx
 		call	zBankSwitchToMusic
@@ -2479,7 +2479,7 @@ loc_D79:
 		pop	de
 		add	hl,de
 
-                ld	a,(hl)
+		ld	a,(hl)
 		inc	hl
 		ld	(loc_DBA+1),a
 		ld	c,a
@@ -2488,7 +2488,7 @@ loc_D79:
 		add	a,0B0h
 		rst	zWriteFMIorII
 
-                sub	80h
+		sub	80h
 		ld	b,4
 
 loc_D9B:
@@ -2818,7 +2818,7 @@ dac_sample_metadata macro label,sampleRate
 		dac_sample_metadata zDACPtr_Scratch,19000	; 84h
 		dac_sample_metadata zDACPtr_Timpani,7350	; 85h
 		dac_sample_metadata zDACPtr_Tom,   13500	; 86h
-		dw	0					; 87h
+		dw	0										; 87h
 		dac_sample_metadata zDACPtr_Timpani,9750	; 88h
 		dac_sample_metadata zDACPtr_Timpani,8750	; 89h
 		dac_sample_metadata zDACPtr_Timpani,7250	; 8Ah
@@ -2910,9 +2910,39 @@ zMusIDPtr_EmeraldDup:	music_metadata	0,MusPtr_Emerald
 zMusIDPtr_EmeraldDup2:	music_metadata	0,MusPtr_Emerald
 zMusIDPtr__End:
 
-SpeedUpTempoLst:db 07h,72h,73h,26h,15h,08h,0FFh,05h,20h,20h,20h
-		db 20h,20h,20h,20h,20h,20h,20h,20h,20h,20h,20h
-		db 20h,20h,20h,20h,20h,20h,20h,20h,20h,20h
+SpeedUpTempoLst:
+		db 07h
+		db 72h
+		db 73h
+		db 26h
+		db 15h
+		db 08h
+		db 0FFh
+		db 05h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
+		db 20h
 zCurDAC:	db 0
 byte_11A9:	db 0
 zDoSFXFlag:	db 0
