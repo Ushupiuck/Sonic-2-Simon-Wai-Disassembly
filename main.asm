@@ -34,13 +34,13 @@
 ; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ; ASSEMBLY OPTIONS:
 ;
-padToPowerOfTwo = 1
+padToPowerOfTwo = 0
 ;	| If 1, pads the end of the ROM to the next power of two bytes (for real hardware)
 ;
-zeroOffsetOptimization = 0
+zeroOffsetOptimization = 1
 ;	| If 1, makes a handful of zero-offset instructions smaller
 ;
-useFullWaterTables = 0
+useFullWaterTables = 1
 ;	| If 1, zone offset tables for water levels cover all level slots instead of only slots 8-$F
 ;	| Set to 1 if you've shifted level IDs around or you want water in levels with a level slot below 8
 ;
@@ -311,11 +311,9 @@ GameClrRAM:
 		dbf	d6,GameClrRAM
 
 		bsr.w	VDPSetupGame
-		bsr.w	JmpTo_SoundDriverLoad
+		bsr.w	SoundDriverLoad
 		bsr.w	JoypadInit
-		; Strangely,this loads the title screen,and not the Sega screen,
-		; and the August 21st prototype suggests this was NOT done by the pirates...
-		move.b	#GameModeID_TitleScreen,(Game_Mode).w
+		move.b	#GameModeID_SegaScreen,(Game_Mode).w
 ; loc_38E:
 MainGameLoop:
 		move.b	(Game_Mode).w,d0
@@ -1102,20 +1100,42 @@ ClearScreen:
 		clr.l	(Vscroll_Factor).w
 		clr.l	(unk_F61A).w
 
-		; These '+4's shouldn't be here; clearRAM accidentally clears an additional 4 bytes
-		clearRAM Sprite_Table,Sprite_Table_End+$80+4
-		clearRAM Horiz_Scroll_Buf,Horiz_Scroll_Buf_End_Padded+4
+		clearRAM Sprite_Table,Sprite_Table_End+$80
+		clearRAM Horiz_Scroll_Buf,Horiz_Scroll_Buf_End_Padded
 
 		startZ80
 		rts
 ; ===========================================================================
-; loc_14B8:
-JmpTo_SoundDriverLoad: ; JmpTo
-		nop
-		jmp	(SoundDriverLoad).l
-		; strange,seemingly leftover Sonic 1 sound driver code isn't here...
-		; I wonder if it was used whenever the code was actually meant for
-		; whenver the sound driver was uncompressed
+; ---------------------------------------------------------------------------
+; Subroutine to load the sound driver
+; ---------------------------------------------------------------------------
+
+; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
+
+; loc_EC000:
+SoundDriverLoad:
+		move	sr,-(sp)
+		movem.l	d0-a6,-(sp)
+		move	#$2700,sr
+		lea	(Z80_Bus_Request).l,a3
+		lea	(Z80_Reset).l,a2
+		moveq	#0,d2
+		move.w	#$100,d1
+		move.w	d1,(a3)	; get Z80 bus
+		move.w	d1,(a2)	; release Z80 reset (was held high by console on startup)
+
+-		btst	d2,(a3)
+		bne.s	-	; wait until the 68000 has the bus
+		jsr	(DecompressSoundDriver).l
+		move.w	d2,(a2)
+		move.w	d2,(a3)
+		moveq	#$17,d0
+
+-		dbf	d0,-		; wait for 2,314 cycles
+		move.w	d1,(a2)		; release Z80 reset
+		movem.l	(sp)+,d0-a6
+		move	(sp)+,sr
+		rts
 
 ; ---------------------------------------------------------------------------
 ; Sound queues; they're used interchangably,however symbol tables in
@@ -1618,7 +1638,6 @@ RunPLC_RAM:
 
 loc_17CA:
 		andi.w	#$7FFF,d2
-		move.w	d2,(Plc_Buffer_Reg18).w
 		bsr.w	NemDec4
 		move.b	(a0)+,d5
 		asl.w	#8,d5
@@ -1632,6 +1651,7 @@ loc_17CA:
 		move.l	d0,(Plc_Buffer_RegC).w
 		move.l	d5,(Plc_Buffer_Reg10).w
 		move.l	d6,(Plc_Buffer_Reg14).w
+		move.w	d2,(Plc_Buffer_Reg18).w
 
 return_17FC:
 		rts
@@ -2552,8 +2572,7 @@ Pal_CPZ_U:		binclude	"art/palettes/CPZ underwater.bin"
 Pal_NGHZ:		binclude	"art/palettes/NGHZ.bin"
 Pal_NGHZ_U:		binclude	"art/palettes/NGHZ underwater.bin"
 Pal_SpecialStage:	binclude	"art/palettes/Special Stage.bin"
-
-		nop
+		even
 ; ---------------------------------------------------------------------------
 ; Subroutine to perform vertical synchronization
 ; ---------------------------------------------------------------------------
@@ -2700,7 +2719,6 @@ AngleData: ; loc_3508:
 		dc.b	$1F,$1F,$1F,$1F,$1F,$1F,$1F,$1F,$1F,$1F,$20,$20,$20,$20,$20,$20
 		dc.b	$20
 		even
-		nop
 ;===============================================================================
 ; Sega Logo
 ; [ Begin ]
@@ -3019,10 +3037,7 @@ LevelSelect_PressStart:
 		add.w	d0,d0
 		move.w	LevelSelect_Order(pc,d0.w),d0
 		bmi.w	LevelSelect_Loop
-		; The original value was seemingly a hackish way to make the
-		; Special Stages inaccessable,remove the '+1' from here and
-		; from LevelSelect_Order to "access" the remnants
-		cmpi.w	#$7FFF+1,d0
+		cmpi.w	#$7FFF,d0
 		bne.s	LevelSelect_StartZone
 
 ; LevelSelect_SpecialStage:
@@ -3050,7 +3065,7 @@ LevelSelect_Order:
 		dc.w	genocide_city_zone_act_1,genocide_city_zone_act_2
 		dc.w	neo_green_hill_zone_act_1,neo_green_hill_zone_act_2
 		dc.w	death_egg_zone_act_1,death_egg_zone_act_2
-		dc.w	$7FFF+1			; SS
+		dc.w	$7FFF			; SS
 		dc.w	0			; Sound Test
 ; ===========================================================================
 ; loc_3B0A: Level_Select_Level:
@@ -3071,9 +3086,8 @@ PlayLevel:
 		move.l	d0,(Got_Emeralds_array+4).w
 		move.b	d0,(Continue_count).w
 		move.l	#5000,(Next_Extra_life_score).w
-		move.b	#SndID_SpindashRev,d0	; Bug: This should be using MusID_Stop
-		bsr.w	PlaySound
-		rts
+		move.b	#MusID_Stop,d0
+		bra.w	PlaySound
 ; ===========================================================================
 ; byte_3B52:
 LevelSelectCode_J:
@@ -3116,7 +3130,7 @@ Run_Demo_Mode: ; loc_3B8E:
 		bne.w	Title_ChkLevSel
 		tst.w	(Demo_Time_left).w
 		bne.w	loc_3B68
-		move.b	#SndID_SpindashRev,d0	; Bug: This should be using MusID_Stop
+		move.b	#MusID_Stop,d0
 		bsr.w	PlaySound
 		move.w	(Demo_number).w,d0
 		andi.w	#7,d0
@@ -3359,103 +3373,6 @@ Level_Select_Text: ; loc_3d7C: ; Level Select Menu Text
 		even
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
-; These subroutines overwrite data in the ROM,likely similar
-; to ConvertCollisionArray (but need special read/write carts to work)
-; ---------------------------------------------------------------------------
-; For some reason,this is similar to the MainLoadBlock code,but with the
-; registers reversed...
-; loc_4056: Unused_Code1:
-		lea	(Chunk_Table).l,a1
-		move.w	#$2EB,d2
-
--		move.w	(a1),d0
-		move.w	d0,d1
-		andi.w	#$F800,d1
-		andi.w	#$7FF,d0
-		lsr.w	#$01,d0
-		or.w	d0,d1
-		move.w	d1,(a1)+
-		dbf	d2,-
-		rts
-; ---------------------------------------------------------------------------
-; This chunk is duplicated after loc_78F8 for some reason; its' purpose
-; was to convert Sonic 1's chunk data to the Sonic 2 format
-; ConvertChunksFrom256x256To128x128: Unused_Code2: loc_4078:
-		lea	($FE0000).l,a1
-		lea	($FE0080).l,a2
-		lea	(Chunk_Table).l,a3
-		move.w	#$3F,d1
-	
--		bsr.w	Unused_Code4
-		bsr.w	Unused_Code4
-		dbf	d1,-
-		lea	($FE0000).l,a1
-		lea	($FF0000).l,a2
-		move.w	#$3F,d1
-
--		move.w	#0,(a2)+
-		dbf	d1,-
-		move.w	#$3FBF,d1
-	
--		move.w	(a1)+,(a2)+
-		dbf	d1,-
-		rts
-; ===========================================================================
-; This code removes duplicate chunks
-; EliminateChunkDuplicates: Unused_Code3: loc_40BE:
-		lea	($FE0000).l,a1
-		lea	(Chunk_Table).l,a3
-		moveq	#$1F,d0
-
--		move.l	(a1)+,(a3)+
-		dbf	d0,-
-		moveq	#0,d7
-		lea	($FE0000),a1
-		move.w	#$FF,d5
-
-Unused_Code3_Loop2: ; loc_40DE:		
-		lea	(Chunk_Table),A3
-		move.w	d7,d6
-Unused_Code3_Loop3: ; loc_40E6:		
-		movem.l A1-A3,-(sp)
-		move.w	#$3F,d0
-Unused_Code3_Loop4: ; loc_40EE:		
-		cmpm.w  (a1)+,(a3)+
-		bne.s	Unused_Code3_loc_4104
-		dbf	d0,Unused_Code3_Loop4  ; loc_40EE
-		movem.l (sp)+,A1-A3
-		adda.w	#$80,A1
-		dbf	d5,Unused_Code3_Loop2  ; loc_40DE
-		bra.s	Unused_Code3_loc_411E
-Unused_Code3_loc_4104:
-		movem.l (sp)+,A1-A3
-		adda.w	#$80,A3
-		dbf	d6,Unused_Code3_Loop3  ; loc_40E6
-		moveq	#$1F,d0
-Unused_Code3_Loop5: ; loc_4112:		
-		move.l	(a1)+,(a3)+
-		dbf	d0,Unused_Code3_Loop5  ; loc_4112
-		addq.l	#1,d7
-		dbf	d5,Unused_Code3_Loop2  ; loc_40DE
-Unused_Code3_loc_411E:
-		bra.s	Unused_Code3_loc_411E
-Unused_Code4: ; loc_4120:
-		moveq	#7,d0
-Unused_Code4_Loop: ; loc_4122:		
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		dbf	d0,Unused_Code4_Loop	; loc_4122
-		adda.w	#$80,A1
-		adda.w	#$80,A2
-		rts
-; ===========================================================================
-; ---------------------------------------------------------------------------
 ; Music Playlist
 ; ---------------------------------------------------------------------------
 ; byte_4140:
@@ -3476,8 +3393,7 @@ MusicList:	zoneOrderedTable 1,1
 	zoneTableEntry.b	MusID_CPZ	; CPZ
 	zoneTableEntry.b	MusID_CPZ	; GCZ
 	zoneTableEntry.b	MusID_NGHZ	; NGHZ
-	; no *proper* entry for DEZ,so it instead uses the alignment to play sound $08
-	;zoneTableEntry.b	MusID_DEZ	; DEZ
+	zoneTableEntry.b	MusID_DEZ	; DEZ
 	zoneTableEnd
 	even
 
@@ -3681,7 +3597,7 @@ Level_LoadObj:
 		jsr	(RingsManager).l
 		jsr	(RunObjects).l
 		jsr	(BuildSprites).l
-		bsr.w	JmpTo_AniArt_Load
+		jsr	(AniArt_Load).l
 		moveq	#0,d0
 		tst.b	(Last_star_pole_hit).w
 		bne.s	Level_FromCheckpoint
@@ -3795,7 +3711,7 @@ loc_456A:
 loc_456E:
 		bsr.w	UpdateWaterSurface
 		jsr	(RingsManager).l
-		bsr.w	JmpTo_AniArt_Load
+		jsr	(AniArt_Load).l
 		bsr.w	PalCycle_Load
 		bsr.w	RunPLC_RAM
 		bsr.w	Oscillate_Num_Do
@@ -4469,14 +4385,14 @@ loc_4C68:
 		addq.b	#1,(Rings_anim_frame).w
 		andi.b	#3,(Rings_anim_frame).w
 loc_4C7E:
-		subq.b	#1,(Unknown_anim_counter).w
-		bpl.s	loc_4C9C
-		move.b	#7,(Unknown_anim_counter).w
-		addq.b	#1,(Unknown_anim_frame).w
-		cmpi.b	#6,(Unknown_anim_frame).w
-		bcs.s	loc_4C9C
-		move.b	#0,(Unknown_anim_frame).w
-loc_4C9C:
+;		subq.b	#1,(Unknown_anim_counter).w
+;		bpl.s	loc_4C9C
+;		move.b	#7,(Unknown_anim_counter).w
+;		addq.b	#1,(Unknown_anim_frame).w
+;		cmpi.b	#6,(Unknown_anim_frame).w
+;		bcs.s	loc_4C9C
+;		move.b	#0,(Unknown_anim_frame).w
+;loc_4C9C:
 		tst.b	(Ring_spill_anim_counter).w
 		beq.s	loc_4CBE
 		moveq	#0,d0
@@ -4595,12 +4511,6 @@ Demo_Chemical_Plant: ; loc_50F8: ; $07 - Chemical Plant Sonic Demo control
 		dc.w	$0000,$0000,$0000,$0000,$0000,$0000,$0000,$0000
 
 ; ===========================================================================
-; loc_51F8: JumpToDynamic_Art_Cues:
-JmpTo_AniArt_Load ; JmpTo
-	jmp	(AniArt_Load).l
-	align 4
-
-; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Sonic 1 Special Stages
 ; You can technically "access" them,unlike the Nick Arcade prototype,but
@@ -4639,7 +4549,7 @@ loc_5260:
 		moveq	#S1PLCID_SpecStg,d0
 		bsr.w	RunPLC_ROM
 
-		clearRAM Primary_Collision,Primary_Collision+$2000
+		clearRAM Object_RAM,Object_RAM_End
 		clearRAM Misc_Variables,Misc_Variables_End
 		clearRAM Oscillating_Data,Oscillating_Numbers_End
 		clearRAM Decomp_Buffer,Decomp_Buffer_End
@@ -5018,11 +4928,11 @@ loc_58E5:
 loc_58ED:
 		dc.b	$08,$02,$04,$FF,$02,$03,$08,$FF,$04,$02,$02,$03,$08,$FD,$04,$02
 		dc.b	$02,$03,$02,$FF,$00
+		even
 ;===============================================================================
 ; Special Stage
 ; [ End ]
 ;===============================================================================
-		nop		             ; Filler
 ; ---------------------------------------------------------------------------
 ; Subroutine to load level boundaries and start locations
 ; ---------------------------------------------------------------------------
@@ -8113,85 +8023,6 @@ loc_78DE:
 ;===============================================================================
 
 ;===============================================================================
-; Sub Routine Unused #2
-; [ Begin ]
-;===============================================================================
-;loc_78F8:
-		lea	($FE0000),A1
-		lea	($FE0080),A2
-		lea	(Chunk_Table),A3
-		move.w	#$3F,d1
-loc_790E:
-		bsr.w	loc_79A0
-		bsr.w	loc_79A0
-		dbf	d1,loc_790E
-		lea	($FE0000),A1
-		lea	($FF0000),A2
-		move.w	#$3F,d1
-loc_792A:
-		move.w	#0,(a2)+
-		dbf	d1,loc_792A
-		move.w	#$3FBF,d1
-loc_7936:
-		move.w	(a1)+,(a2)+
-		dbf	d1,loc_7936
-		rts
-		lea	($FE0000),A1
-		lea	(Chunk_Table),A3
-		moveq	#$1F,d0
-loc_794C:
-		move.l	(a1)+,(a3)+
-		dbf	d0,loc_794C
-		moveq	#0,d7
-		lea	($FE0000),A1
-		move.w	#$FF,d5
-loc_795E:
-		lea	(Chunk_Table),A3
-		move.w	d7,d6
-loc_7966:
-		movem.l A1-A3,-(sp)
-		move.w	#$3F,d0
-loc_796E:
-		cmpm.w  (a1)+,(a3)+
-		bne.s	loc_7984
-		dbf	d0,loc_796E
-		movem.l (sp)+,A1-A3
-		adda.w	#$80,A1
-		dbf	d5,loc_795E
-		bra.s	loc_799E
-loc_7984:
-		movem.l (sp)+,A1-A3
-		adda.w	#$80,A3
-		dbf	d6,loc_7966
-		moveq	#$1F,d0
-loc_7992:
-		move.l	(a1)+,(a3)+
-		dbf	d0,loc_7992
-		addq.l	#1,d7
-		dbf	d5,loc_795E
-loc_799E:
-		bra.s	loc_799E
-loc_79A0:
-		moveq	#7,d0
-loc_79A2:
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a1)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		move.l	(a3)+,(a2)+
-		dbf	d0,loc_79A2
-		adda.w	#$80,A1
-		adda.w	#$80,A2
-		rts
-;===============================================================================
-; Sub Routine Unused #2
-; [ Begin ]
-;===============================================================================
-
-;===============================================================================
 ; Sub Routine Dyn_Screen_Boss_Loader
 ; [ Begin ]
 ;===============================================================================
@@ -8297,7 +8128,6 @@ loc_7AC8:
 		beq.s	loc_7Ad4
 		move.b	#GameModeID_SegaScreen,(Game_Mode).w
 loc_7Ad4:
-		rts
 		rts
 loc_7AD8:
 		rts
@@ -8696,9 +8526,6 @@ DynResize_NGHz: ;loc_7Fd6:
 		rts
 DynResize_DEz: ;loc_7FD8:
 		rts
-; ===========================================================================
-		nop
-
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Object 11 - Bridge in Green Hill Zone and Hidden Palace Zone
@@ -9591,7 +9418,7 @@ loc_8A92:
 		beq.s	loc_8AC0
 		moveq	#0,d3
 		move.b	$19(a0),d3
-		bsr.w	JmpTo_ObjHitWallRight
+		jsr	(ObjHitWallRight).l
 		tst.w	d1
 		bpl.s	loc_8AC0
 		add.w   d1,8(a0)
@@ -9630,24 +9457,11 @@ Obj15_MapUnc_8B7A: ; loc_8B7A:
 Dhz_Swing_Platforms_Map_04: ; loc_8B80:
 		dc.w	$0002
 		dc.l	$F80d6058,$602CFFE0,$F80d6858,$682C0000				          
-;=============================================================================== 
+		even
+;===============================================================================
 ; Object 0x15 - Swing Platforms - Dust Hill / Oil Ocean
 ; [ End ]
-;===============================================================================   
-		nop
-
-; NOTE:
-; These "JumpTo" blocks were presumably generated at the end of each source file by
-; compiler ProASM on the Amiga computers Sonic 2 was developed on. As a result,it
-; is theoretically possible to split the game in a similar way to how the actual
-; source files were.
-
-; loc_8B94:
-JmpTo_ObjHitWallRight:
-		jmp	(ObjHitWallRight).l
-
-		align 4
-
+;===============================================================================
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
 ; Object 17 - GHZ rotating log helix spikes (leftover from S1)
@@ -9783,9 +9597,8 @@ Obj17_Display:
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
 Obj17_MapUnc_8CDE:	binclude	"mappings/sprite/obj17.bin"
+		even
 ; ===========================================================================
-		nop
-
 ;===============================================================================
 ; Object 0x18 - Platforms
 ; [ Begin ]
@@ -10409,9 +10222,9 @@ loc_9828:
 Obj1A_MapUnc_9858:	binclude	"mappings/sprite/obj1A_HPZ.bin"
 Obj1A_MapUnc_9902:	binclude	"mappings/sprite/obj1A_OOZ.bin"
 Obj1A_MapUnc_9942:	binclude	"mappings/sprite/obj1F_DHZ.bin"
+		even
 
 ; ===========================================================================
-		nop
 
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
@@ -10541,8 +10354,8 @@ Obj1C_MapUnc_9B52:	binclude	"mappings/sprite/obj1C_b.bin"	; NGHZ waterfall
 Obj1C_MapUnc_9B6A:	binclude	"mappings/sprite/obj1C_OOZ.bin"	; OOZ oil
 Obj1C_MapUnc_9B9A:	binclude	"mappings/sprite/obj1C_d.bin"	; MTZ thingy
 Obj71_MapUnc_9BBE:	binclude	"mappings/sprite/obj71_b.bin"	; MTZ lava bubble
+		even
 ; ===========================================================================
-		nop
 
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
@@ -10728,8 +10541,8 @@ Obj2D_Solid:
 ; Sprite mappings
 ; ---------------------------------------------------------------------------
 Obj2D_MapUnc_9E1E:	binclude	"mappings/sprite/obj2D.bin"
+		even
 ; ===========================================================================
-		nop
 
 ; ===========================================================================
 ; ---------------------------------------------------------------------------
@@ -16085,13 +15898,14 @@ ObjectsManager_Init:
 		lea	(Object_Respawn_Table).w,a2
 		move.w	#$0101,(a2)+	; the first two bytes are not used as respawn values
 		; Instead,they are used to keep track of the current respawn indexes
-
-		; This clears longwords,but the loop counter is measured in words!
-		; This causes $17C bytes to be cleared instead of $BE.
-		move.w	#bytesToWcnt(Obj_respawn_data_End-Obj_respawn_data),d0 ; set loop counter
+		move.w	#bytesToLcnt(Obj_respawn_data_End-Obj_respawn_data-2),d0 ; set loop counter
 
 -		clr.l	(a2)+
 		dbf	d0,-
+		; Clear the last word, since the above loop only does longwords.
+	if (Obj_respawn_data_End-Obj_respawn_data-2)&2
+		clr.w	(a2)+
+	endif
 
 		lea	(Object_Respawn_Table).w,a2
 		moveq	#0,d2
@@ -17267,11 +17081,12 @@ loc_F0E8:
 		dc.w	$0004
 		dc.l	$000d1000,$1000FFF0,$F0051008,$10040000
 		dc.l	$F505100C,$1006FFF6,$F005101C,$100EFFF0   
-;=============================================================================== 
-; Object 0x41 - Springs 
+		even
+;===============================================================================
+; Object 0x41 - Springs
 ; [ End ]
-;===============================================================================   
-		nop		             ; Filler  
+;===============================================================================
+
 ;=============================================================================== 
 ; Object 0x44
 ; [ Begin ]
@@ -18384,8 +18199,7 @@ Sonic_MusicList:	zoneOrderedTable 1,1
 	zoneTableEntry.b	MusID_CPZ	; CPZ
 	zoneTableEntry.b	MusID_CPZ	; GCZ
 	zoneTableEntry.b	MusID_NGHZ	; NGHZ
-	; no *proper* entry for DEZ,so it instead uses the alignment to play sound $08
-	;zoneTableEntry.b	MusID_DEZ	; DEZ
+	zoneTableEntry.b	MusID_DEZ	; DEZ
     zoneTableEnd
 	even
 
@@ -19153,7 +18967,7 @@ Sonic_Boundary_CheckBottom:
 ; ===========================================================================
 ; loc_103CE:
 Sonic_Boundary_Bottom:
-		bra.w	JmpTo_KillSonic
+;		bra.w	JmpTo_KillSonic
 ; ---------------------------------------------------------------------------
 ; Leftover from Sonic 1,which would transport the player to SBZ3/LZ4 upon
 ; reaching a certain position; its ID is different,for whatever reason
@@ -19500,10 +19314,8 @@ Sonic_JumpAngle:
 		bpl.s	loc_106B0	; if higher than 0,branch
 
 		addq.b	#2,d0		; increase angle
-		bcc.s	BranchTo_Sonic_JumpAngleSet
+		bcc.s	Sonic_JumpAngleSet
 		moveq	#0,d0
-; loc_106AE:
-BranchTo_Sonic_JumpAngleSet:
 		bra.s	Sonic_JumpAngleSet
 ; ===========================================================================
 
@@ -19533,14 +19345,13 @@ Sonic_JumpFlip:
 Sonic_JumpRightFlip:
 		move.b	$2D(a0),d1
 		add.b	d1,d0
-		bcc.s	BranchTo_Sonic_JumpFlipSet
+		bcc.s	Sonic_JumpFlipSet
 		subq.b	#1,$2C(a0)
-		bcc.s	BranchTo_Sonic_JumpFlipSet
+		bcc.s	Sonic_JumpFlipSet
 		move.b	#0,$2C(a0)
 		moveq	#0,d0
-; loc_106DC:
-BranchTo_Sonic_JumpFlipSet:
-		bra.s	Sonic_JumpFlipSet
+		move.b	d0,$27(a0)
+		rts
 ; ===========================================================================
 ; loc_106DE:
 Sonic_JumpLeftFlip:
@@ -19557,7 +19368,7 @@ Sonic_JumpLeftFlip:
 Sonic_JumpFlipSet:
 		move.b	d0,$27(a0)
 
-return_106FE:		
+return_106FE:
 		rts
 ; End of function Sonic_JumpAngle
 
@@ -20355,8 +20166,7 @@ Tails_MusicList:	zoneOrderedTable 1,1
 	zoneTableEntry.b	MusID_CPZ	; CPZ
 	zoneTableEntry.b	MusID_CPZ	; GCZ
 	zoneTableEntry.b	MusID_NGHZ	; NGHZ
-	; no *proper* entry for DEZ,so it instead uses the alignment to play sound $08
-	;zoneTableEntry.b	MusID_DEZ	; DEZ
+	zoneTableEntry.b	MusID_DEZ	; DEZ
     zoneTableEnd
 	even
 
@@ -20461,15 +20271,15 @@ TailsCPU_Init:
 ; ---------------------------------------------------------------------------
 ; loc_10Fd6:
 Tails_Control_01:
-		move.w	#6,(Tails_CPU_routine).w
-		rts
+;		move.w	#6,(Tails_CPU_routine).w
+;		rts
 		move.w	#$40,(unk_F706).w
 		move.w	#4,(Tails_CPU_routine).w
 
 ; loc_10FEA:
 Tails_Control_02:
-		move.w	#6,(Tails_CPU_routine).w
-		rts
+;		move.w	#6,(Tails_CPU_routine).w
+;		rts
 		move.w	(unk_F706).w,d1
 		subq.w	#1,d1
 		cmpi.w	#$10,d1
@@ -22199,11 +22009,11 @@ loc_1205A:	dc.b	  3,$4D,$4E,$4F,$50,$FF
 loc_12060:	dc.b	  3,$51,$52,$53,$54,$FF
 loc_12066:	dc.b	  3,$55,$56,$57,$58,$FF
 loc_1206C: 	dc.b	  2,$81,$82,$83,$84,$FF
+		even
 ;=============================================================================== 
 ; Object 0x05 - Tails "Tail"
 ; [ End ]
-;===============================================================================		    
-		nop
+;===============================================================================
 KillTails: ; loc_12074:
 		jmp     (KillSonic).l               ; loc_21422
 		align 4
@@ -41895,163 +41705,6 @@ loc_24868:
 		dc.w	$8B80
 		dc.l    ArtNem_HrzntlSprng       ; loc_78774
 		dc.w	$8E00
-Casino_Night_Sprites_Previous_Build_1:
-loc_248B4:
-		dc.w    (((loc_248C2-loc_248B4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_CNZ-$07E2 ; loc_AB748 ; Left over from previous build
-		dc.w	$0000
-		dc.l    ArtNem_CNZCards-$07E2              ; loc_AE75A ; Left over from previous build
-		dc.w	$7A00
-Casino_Night_Sprites_Previous_Build_2:
-loc_248C2:
-		dc.w    (((loc_248DC-loc_248C2-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l    ArtNem_DignlSprng         ; loc_7883E
-		dc.w	$8780
-		dc.l    ArtNem_VrtclSprng         ; loc_78658
-		dc.w	$8B80
-		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w	$8E00
-Chemical_Plant_Sprites_Previous_Build_1:
-loc_248DC:
-		dc.w    (((loc_2491A-loc_248DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_CPZ-$07E2 ; loc_B1d24
-		dc.w	$0000
-		dc.l    Cpz_Metal_Structure     ; loc_77A1C
-		dc.w	$6E60
-		dc.l    ArtNem_ConstructionStripes      ; loc_77C66
-		dc.w	$7280
-		dc.l    ArtNem_CPZBooster       ; loc_77942
-		dc.w	$7380
-		dc.l    ArtNem_CPZElevator            ; loc_77684
-		dc.w	$7400
-		dc.l    ArtNem_CPZAnimatedBits ; loc_77Cd2
-		dc.w	$7600
-		dc.l    ArtNem_CPZTubeSpring        ; loc_78074
-		dc.w	$7C00
-		dc.l    Water_Surface           ; loc_777d2
-		dc.w	$8000
-		dc.l    ArtNem_CPZStairBlock           ; loc_77EB4
-		dc.w	$8300
-		dc.l    ArtNem_CPZMetalBlock
-		dc.w	$8600
-Chemical_Plant_Sprites_Previous_Build_2:
-loc_2491A:
-		dc.w    (((loc_2493A-loc_2491A-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l    ArtNem_CPZDroplet               ; loc_779AA
-		dc.w	$8780
-		dc.l    (ArtNem_LeverSpring-$0188) ; loc_7976C
-		dc.w	$8800
-		dc.l    ArtNem_VrtclSprng         ; loc_78658
-		dc.w	$8B80
-		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w	$8E00
-Neo_Green_Hill_Sprites_Previous_Build_1:
-loc_2493A:
-		dc.w    (((loc_2495A-loc_2493A-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_NGHZ-$07d2 ; loc_B9686
-		dc.w	$0000
-		dc.l    Nghz_Water_Surface      ; loc_78270
-		dc.w	$8000
-		dc.l    Nghz_Leaves             ; loc_78356
-		dc.w	$8200
-		dc.l    ArtNem_ArrowAndShooter      ; loc_783E2
-		dc.w	$82E0
-		dc.l    Nghz_Water_Splash       ; loc_78540
-		dc.w	$8500
-Neo_Green_Hill_Sprites_Previous_Build_2:
-loc_2495A:
-		dc.w    (((loc_24974-loc_2495A-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_Spikes		  ; loc_7914E
-		dc.w	$8680
-		dc.l    (ArtNem_LeverSpring-$0188) ; loc_7976C
-		dc.w	$8800
-		dc.l    ArtNem_VrtclSprng         ; loc_78658
-		dc.w	$8B80
-		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w	$8E00
-End_Level_Results_Sprites_Previous_Build:
-loc_24974:
-		dc.w    (((loc_2497C-loc_24974-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    Title_Cards-$07E2       ; loc_7E222
-		dc.w	$B000
-End_Level_Sprites_Previous_Build:
-loc_2497C:
-		dc.w    (((loc_24990-loc_2497C-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_Signpost               ; loc_7931E
-		dc.w	$d000
-		dc.l    Hidden_Points-$07E2     ; loc_7F37A
-		dc.w	$96C0
-		dc.l    Big_Ring_Flash-$07E2    ; loc_7F206
-		dc.w	$8C40
-Green_Hill_Boss_Previous_Build:
-loc_24990:
-		dc.w    (((loc_249A4-loc_24990-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    Robotnik_Ship-$07E2     ; loc_7C4BC
-		dc.w	$8C00
-		dc.l    ArtNem_GHZBoss-$07E2      ; loc_7D942
-		dc.w	$9800
-		dc.l    ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$A800
-loc_249A4:
-		dc.l    Robotnik_Ship-$07E2     ; loc_7C4BC
-		dc.w	$8000
-		dc.l    Cpz_Boss-$07E2          ; loc_7CBF8
-		dc.w	$8C00
-		dc.l    Ship_Boost-$07E2        ; loc_7d7DE
-		dc.w	$9A00
-		dc.l    Boss_Smoke-$07E2        ; loc_7D85C
-		dc.w	$9B00
-		dc.l    ArtNem_GHZBoss-$07E2      ; loc_7D942
-		dc.w	$9d00
-		dc.l    ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$Ad00
-		dc.w	$8680
-		dc.l    (ArtNem_LeverSpring-$0188) ; loc_7976C
-		dc.w	$8800
-		dc.l    ArtNem_VrtclSprng         ; loc_78658
-		dc.w	$8B80
-		dc.l    ArtNem_HrzntlSprng       ; loc_78774
-		dc.w	$8E00
-loc_249DC:
-		dc.w    (((loc_249E4-loc_249DC-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    Title_Cards-$07E2       ; loc_7E222
-		dc.w	$B000
-loc_249E4:
-		dc.w    (((loc_249F8-loc_249E4-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    ArtNem_Signpost               ; loc_7931E
-		dc.w	$d000
-		dc.l    Hidden_Points-$07E2     ; loc_7F37A
-		dc.w	$96C0
-		dc.l    Big_Ring_Flash-$07E2    ; loc_7F206
-		dc.w	$8C40
-loc_249F8:
-		dc.w    (((loc_24A0C-loc_249F8-$02)/$06)-$01) ; Auto Detect Number of Sprites Esrael L. G. Neto
-		dc.l    Robotnik_Ship-$07E2     ; loc_7C4BC
-		dc.w	$8C00
-		dc.l    ArtNem_GHZBoss-$07E2      ; loc_7D942
-		dc.w	$9800
-		dc.l    ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$A800
-loc_24A0C:
-		dc.l    Robotnik_Ship-$07E2     ; loc_7C4BC
-		dc.w	$8000
-		dc.l    Cpz_Boss-$07E2          ; loc_7CBF8
-		dc.w	$8C00
-		dc.l    Ship_Boost-$07E2        ; loc_7d7DE
-		dc.w	$9A00
-		dc.l    Boss_Smoke-$07E2        ; loc_7D85C
-		dc.w	$9B00
-		dc.l    ArtNem_GHZBoss-$07E2      ; loc_7D942
-		dc.w	$9d00
-		dc.l    ArtNem_EggChoppers-$07E2   ; loc_7E12E
-		dc.w	$Ad00
-Unknow_Data_0x024A30:
-loc_24A30:
-		binclude	"misc/24A30.bin"
 ;---------------------------------------------------------------------------------------
 ; Uncompressed art
 ; Animated flowers in GHZ and HTZ ; ArtUnc_28000: ArtUnc_28080: ArtUnc_21800: ArtUnc_28180:
@@ -42350,20 +42003,6 @@ Null_Layout_6:     ; loc_40CFC:
 ;===============================================================================
 loc_40d00: ; Big Ring - Left Over from Sonic 1
 		binclude	"data\sprites\bigring.dat"
-loc_41940: ; Neo Green Hill Foreground Act 2 overwrite by Big Ring- Left Over from previous build ???
-		binclude	"data\nghz\fgunused.dat"
-loc_41B72: ; Neo Green Hill Background Act 1 - Left Over from previous build ???
-		binclude	"data\nghz\backact1.dat"
-loc_42374: ; Neo Green Hill Background Act 2 - Left Over from previous build ???
-		binclude	"data\nghz\bgunused.dat"
-loc_42B76: ; Filler for Null Level Layout - Left Over from previous build ???
-		dc.l 0
-loc_42B7A: ; Another Big Ring - Left Over from Sonic 1
-		binclude	"data\sprites\bigring.dat"
-Unknow_Pallete_0x0437BA: ; loc_437BA:
-		dc.w	$0000,$0262,$02A4,$04E8,$0000,$0EEE
-Unknow_Data_0x0437C6: ; loc_437C6:
-		binclude	"misc/437C6.bin"
 ;===============================================================================
 ; Level Object Layout
 ; [ Begin ]
@@ -42455,14 +42094,6 @@ Null_Objects_Layout:
 ; Level Object Layout
 ; [ End ]
 ;===============================================================================
-Unknow_Data_0x04634E: ; loc_4634E:
-		binclude	"misc/4634E.bin"
-Unknow_Pallete_0x0474AC:
-loc_474AC:
-		binclude	"misc/474AC.bin"
-Unknow_Data_0x04760C:
-loc_4760C:
-		binclude	"misc/4760C.bin"
 ;===============================================================================
 ; Level Rings Layout
 ; [ Begin ]
@@ -42555,41 +42186,18 @@ DEz_2_Rings_Layout:   ; loc_48DB2:
 ; Level Rings Layout
 ; [ End ]
 ;===============================================================================
-Unknow_Data_0x048DB4: ; loc_48DB4:
-		binclude	"misc/48DB4.bin"
-Rock_Splashing: ; loc_4B76C:
-		binclude	"data\sprites\rockspsh.dat"
-Unknow_Palett_0x04BAAC: ; loc_4BAAC:
-		binclude	"misc/4BAAC.bin"
-Unknow_Data_0x04BC4C: ; loc_4BC4C:
-		binclude	"misc/4BC4C.bin"
-Fire_In_Bowl: ; loc_4E86C:
-		binclude	"data\sprites\firebowl.dat"
-; ---------------------------------------------------------------------------
-; Filler (free space)
-; ---------------------------------------------------------------------------
-		rept $194
-		dc.b	$FF
-		endm
-
-Unknow_Data_0x04EE00: ; loc_4EE00:
-		binclude	"misc/4EE00.bin"
-; ---------------------------------------------------------------------------
-; Filler (free space)
-; ---------------------------------------------------------------------------
-		rept $468
-		dc.b	$FF
-		endm
 ;---------------------------------------------------------------------------------------
 ; Uncompressed art
 ; Patterns for Sonic  ; ArtUnc_50000:
 ;---------------------------------------------------------------------------------------
+		align $10
 ArtUnc_Sonic:	binclude	"art/uncompressed/Sonic's art.bin"
 ;--------------------------------------------------------------------------------------
 ; Sprite Mappings
 ; Sonic			; MapUnc_614C0: Sonic_Mappings:
 ;--------------------------------------------------------------------------------------
 MapUnc_Sonic:	binclude	"mappings/sprite/Sonic.bin"
+		align $10
 Tails_Sprites: ; loc_6254C:
 		binclude	"data\sprites\tails.dat"
 ;--------------------------------------------------------------------------------------
@@ -44275,57 +43883,6 @@ Nghz_Init_Sprites_Dyn_Reload: ; loc_BF408:  Waterfalls
 ; LevChunk_BF568: Neo_Green_Hill_128x128_Map:
 BM128_NGHZ:	binclude	"mappings/128x128/NGHZ.bin"
 
-; For whatever reason,the assembler compiled the end of the NGHZ chunk data twice...
-; word_C2138:
-		dc.w	$C00B,$F8C4,$C00B,$5200,$F8C0,$F80E,$F0,0
-
-; ===========================================================================
-; Leftover data from an earlier build; CPZ's chunk data at this point more
-; closely resembles the Nick Arcade prototype,in addition to all chunk data
-; being uncompressed rather than Kosinski-compressed
-
-; This is presumably the result reusing EEPROM chips and not allocating memory
-; correctly,so any large chunks of padding simply left in whatever was in the
-; cartridge at this point; the Nick Arcade prototype had something similar,with
-; leftovers from ToeJam & Earl REV00 and some source code remnants
-
-; LevChunk_C2148:
-		binclude	"misc/leftovers/Incomplete chunk data for earlier CNZ.bin"
-; LevBlock_C943C:
-		binclude	"misc/leftovers/Block data for earlier CPZ.bin"
-; ArtNem_CAA1C:
-		binclude	"misc/leftovers/Art data for earlier CPZ.bin"
-; ArtNem_CDFC6:
-		binclude	"misc/leftovers/Initial animated tiles for earlier CPZ.bin"
-; LevChunk_CE03A:
-		binclude	"misc/leftovers/Chunk data for earlier CPZ.bin"
-; LevBlock_d603A:
-		binclude	"misc/leftovers/Block data for earlier NGHZ.bin"
-; ArtNem_d793A:
-		binclude	"misc/leftovers/Art data for earlier NGHZ.bin"
-; ArtNem_DCEEA:
-		binclude	"misc/leftovers/Initial animated tiles for earlier NGHZ.bin"
-; LevChunk_Dd04A:
-		binclude	"misc/leftovers/Chunk data for earlier NGHZ.bin"
-
-		align 4
-
-; ===========================================================================
-; A second set of leftover build data,this time for NGHZ exclusively; oddly,
-; the chunk data here is created through manually writing bytes,and can be
-; viewed in a text editor (although the Japanese may not appear correctly)
-
-; The fact this is here is hilarious,as it means the EEPROM was used at least
-; FOUR TIMES (once for Chiki Chiki Boys,and three times for Sonic 2 builds
-; leading up to Simon Wai) and somehow this set never got overwritten,fascinating
-
-; ArtNem_E504A:
-		binclude	"misc/leftovers/Art data for earlier earlier NGHZ.bin"
-; ArtNem_E57E6:
-		binclude	"misc/leftovers/Initial animated tiles for earlier NGHZ.bin"
-; LevChunk_E5946:
-		binclude	"misc/leftovers/Uncompiled chunk data for NGHZ.bin"
-
 ; ===========================================================================
 ; Moving the music and sound effects would cause them to break due to using
 ; hardcoded pointers; I have already have converted the music to ASM,but
@@ -44339,40 +43896,6 @@ BM128_NGHZ:	binclude	"mappings/128x128/NGHZ.bin"
 ; $FF000 => Sounds $A0 to $E0
 
 ; ===========================================================================
-; Unused duplicate Sega sound
-Sega_SndDup:	binclude	"sound/Unused Sega PCM.bin"
-
-; ===========================================================================
-; ---------------------------------------------------------------------------
-; Subroutine to load the sound driver
-; ---------------------------------------------------------------------------
-
-; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
-
-; loc_EC000:
-SoundDriverLoad:
-		move	sr,-(sp)
-		movem.l	d0-a6,-(sp)
-		move	#$2700,sr
-		lea	(Z80_Bus_Request).l,a3
-		lea	(Z80_Reset).l,a2
-		moveq	#0,d2
-		move.w	#$100,d1
-		move.w	d1,(a3)	; get Z80 bus
-		move.w	d1,(a2)	; release Z80 reset (was held high by console on startup)
-
--		btst	d2,(a3)
-		bne.s	-	; wait until the 68000 has the bus
-		jsr	DecompressSoundDriver(pc)
-		move.w	d2,(a2)
-		move.w	d2,(a3)
-		moveq	#$17,d0
-
--		dbf	d0,-		; wait for 2,314 cycles
-		move.w	d1,(a2)		; release Z80 reset
-		movem.l	(sp)+,d0-a6
-		move	(sp)+,sr
-		rts
 
 ; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
 ; Handles the decompression of the sound driver (Saxman compression,an LZSS variant)
@@ -44627,7 +44150,8 @@ Mus_Unused2:	include		"sound/music/Unused 2.asm"	; 2-player results theme in fin
 Mus_Invinc:	include		"sound/music/Invincible.asm"	; Super Sonic theme in final
 Mus_HTZ:	include		"sound/music/HTZ.asm"
 
-	org $FF000
+;	org $FF000
+
 ; loc_FF000: Sfx_A0_To_F9:
 SoundIndex:
 SndPtr_Jump:		rom_ptr_z80	Sfx_A0
