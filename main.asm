@@ -2785,7 +2785,7 @@ Sega_WaitPalette: ; loc_36F0:
 		bsr.w	PlaySound
 		move.b	#VintID_SEGA,(Vint_routine).w
 		bsr.w	WaitForVint
-		move.w	#$B4,(Demo_Time_left).w
+		move.w	#$B4,(Demo_Time_left).w	; 180, AKA 3 seconds
 Sega_WaitEnd: ; loc_3718:
 		move.b	#VintID_PCM,(Vint_routine).w
 		bsr.w	WaitForVint
@@ -22010,7 +22010,7 @@ loc_12060:	dc.b	  3,$51,$52,$53,$54,$FF
 loc_12066:	dc.b	  3,$55,$56,$57,$58,$FF
 loc_1206C: 	dc.b	  2,$81,$82,$83,$84,$FF
 		even
-;=============================================================================== 
+;===============================================================================
 ; Object 0x05 - Tails "Tail"
 ; [ End ]
 ;===============================================================================
