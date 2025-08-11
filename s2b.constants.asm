@@ -368,7 +368,6 @@ Ring_Positions:			ds.b	$600
 Ring_Positions_End:
 
 Camera_RAM:
-
 Camera_Positions:
 Camera_X_pos:			ds.l	1
 Camera_Y_pos:			ds.l	1
